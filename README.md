@@ -1,7 +1,6 @@
-# 🥒 MƯỚP ĐẮNG CŨNG CÓ VỊ NGỌT — WEBSITE ĐỌC TRUYỆN ZHIHU MÃ NGUỒN MỞ
+# 🥒 MƯỚP ĐẮNG CŨNG CÓ VỊ NGỌT — WEBSITE ĐỌC TRUYỆN ZHIHU
 
-Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được xây dựng hoàn chỉnh trên nền tảng **WordPress mã nguồn mở (PHP 8.2 + MySQL)**. Giao diện thiết kế theo tông màu tươi mát **xanh mướp, xanh bơ, xanh lá**, lấy cảm hứng từ phong cách hiện đại của [monkeydd.com](https://monkeydd.com/), tối ưu 100% hiển thị đa thiết bị (máy tính & di động).
-
+Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được xây dựng hoàn chỉnh trên nền tảng **WordPress mã nguồn mở (PHP 8.2 + MySQL)**. 
 ---
 
 ## 🚀 TRUY CẬP WEBSITE NGAY
@@ -87,7 +86,7 @@ Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được x
 - 6 thẻ chỉ số KPI tổng quan: Lượt xem tháng, Tổng bộ truyện, Tổng độc giả, Tổng dịch giả, Click Shopee, Click TikTok
 - **Quản lý & Kiểm duyệt truyện:** Duyệt bài đăng mới của dịch giả, từ chối, xóa, gán nhãn Đề cử (Ngày / Tuần / Tháng)
 - **Quản lý Link Shopee & TikTok:**
-  - Tùy chỉnh link Shopee (`https://s.shopee.vn/4qG9lQO2rp`) và link TikTok (`https://shop.tiktok.com/...`)
+  - Tùy chỉnh link Shopee và link TikTok 
   - Thống kê chi tiết số lượt click thực tế và xem nhật ký IP, chương mở khóa
 - **Quản lý Người Dùng & Phân Quyền:** Xem danh sách, thêm tài khoản mới, phân quyền (Độc giả, Dịch giả, Quản trị viên), Khóa / Mở khóa tài khoản
 - **Quản lý Lương Dịch Giả:** Bảng kê chi tiết từng dịch giả, số view đạt được và tổng số tiền nhuận bút được nhận (nhân với 8đ/view)
