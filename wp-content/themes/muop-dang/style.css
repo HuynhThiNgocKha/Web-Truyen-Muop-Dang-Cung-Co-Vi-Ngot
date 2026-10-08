@@ -1,0 +1,68 @@
+/*
+Theme Name: Mướp Đắng Cũng Có Vị Ngọt
+Theme URI: http://localhost:8080/
+Author: Antigravity
+Author URI: http://localhost:8080/
+Description: Theme đọc truyện Zhihu mã nguồn mở tông màu xanh lá, xanh bơ, xanh mướp tươi mát. Tích hợp đầy đủ phân quyền Độc Giả, Dịch Giả, Quản Trị Viên (Admin), cổng đăng truyện cho dịch giả, tính lương 8đ/view, kiểm duyệt, gắn link Shopee & TikTok, thống kê click, và chống copy nội dung.
+Version: 1.0.0
+Requires at least: 6.0
+Tested up to: 7.1
+Requires PHP: 8.0
+Text Domain: muop-dang
+Tags: novel, stories, zhihu, manga, custom-colors, green, responsive
+*/
+
+/* Reset & Root Variables */
+:root {
+  --primary-green: #3F7523;
+  --primary-hover: #325E1C;
+  --avocado-green: #689F38;
+  --avocado-light: #8BC34A;
+  --luffa-green: #4E8732;
+  --soft-green: #E8F5E9;
+  --pastel-green: #F1F8E9;
+  --melon-accent: #7CB342;
+  
+  --bg-body: #F4F8F3;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #FCFDFC;
+  --text-main: #1C2B18;
+  --text-muted: #556B4E;
+  --border-color: #D2E3CD;
+  --border-light: #E4EFE0;
+  
+  --shadow-sm: 0 2px 6px rgba(45, 85, 30, 0.06);
+  --shadow-md: 0 6px 18px rgba(45, 85, 30, 0.08);
+  --shadow-lg: 0 12px 30px rgba(45, 85, 30, 0.12);
+  
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  
+  --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --header-height: 120px;
+}
+
+[data-theme="dark"] {
+  --primary-green: #6BB343;
+  --primary-hover: #81CA57;
+  --avocado-green: #7EBA45;
+  --avocado-light: #9BD961;
+  --luffa-green: #5E9E39;
+  --soft-green: #1F2B1B;
+  --pastel-green: #192416;
+  --melon-accent: #92CD52;
+  
+  --bg-body: #111810;
+  --bg-card: #182216;
+  --bg-card-hover: #1E2B1C;
+  --text-main: #E2ECE0;
+  --text-muted: #9BB098;
+  --border-color: #273724;
+  --border-light: #202D1E;
+  
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.6);
+}

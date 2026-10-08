@@ -1,0 +1,9 @@
+# MySQL runtime data (binary database files)
+mysql_data/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

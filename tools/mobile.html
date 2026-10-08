@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kết Nối Web Truyện Trên Điện Thoại (Mobile Connect)</title>
+    <style>
+        :root {
+            --primary: #43A047;
+            --primary-dark: #2E7D32;
+            --bg: #F4F7F4;
+            --card: #FFFFFF;
+            --text: #212121;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .connect-card {
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            max-width: 480px;
+            width: 100%;
+            padding: 32px 28px;
+            text-align: center;
+            border: 1px solid #E0E0E0;
+        }
+        .badge-brand {
+            display: inline-block;
+            background: #E8F5E9;
+            color: var(--primary-dark);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+        h1 {
+            font-size: 22px;
+            margin: 0 0 8px;
+            color: var(--primary-dark);
+        }
+        p {
+            font-size: 14px;
+            color: #666;
+            margin: 0 0 20px;
+            line-height: 1.5;
+        }
+        .qr-box {
+            background: #FAFAFA;
+            border: 2px dashed #C8E6C9;
+            border-radius: 16px;
+            padding: 16px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .qr-box img {
+            width: 220px;
+            height: 220px;
+            display: block;
+            border-radius: 8px;
+        }
+        .url-box {
+            background: #F1F8E9;
+            border: 1px solid #C5E1A5;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--primary-dark);
+            word-break: break-all;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .step-list {
+            text-align: left;
+            background: #FAFAFA;
+            border-radius: 12px;
+            padding: 16px 20px;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.6;
+        }
+        .step-list ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .step-list li {
+            margin-bottom: 6px;
+        }
+        .step-list li:last-child {
+            margin-bottom: 0;
+        }
+        .btn-open {
+            display: inline-block;
+            background: var(--primary);
+            color: #fff;
+            text-decoration: none;
+            padding: 10px 24px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 14px;
+            margin-top: 18px;
+            transition: background 0.2s;
+        }
+        .btn-open:hover {
+            background: var(--primary-dark);
+        }
+    </style>
+</head>
+<body>
+    <div class="connect-card">
+        <span class="badge-brand">📱 MOBILE RUNNER</span>
+        <h1>Chạy Web Trên Điện Thoại</h1>
+        <p>Quét mã QR bằng ứng dụng Camera điện thoại để vào trang web trực tiếp</p>
+
+        <div class="qr-box">
+            <img id="qrImg" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=http://192.168.1.182:8080/" alt="QR Code Truy Cập Web">
+        </div>
+
+        <div class="url-box" id="urlBox">
+            🌐 <span id="mobileUrl">http://192.168.1.182:8080/</span>
+        </div>
+
+        <div class="step-list">
+            <strong>📋 Hướng dẫn kết nối:</strong>
+            <ol>
+                <li>Điện thoại cần kết nối <strong>cùng mạng Wi-Fi</strong> với máy tính này.</li>
+                <li>Mở Camera điện thoại hoặc Zalo để quét mã QR ở trên.</li>
+                <li>Hoặc mở Safari / Chrome trên điện thoại gõ trực tiếp địa chỉ: <br><strong id="directUrl">http://192.168.1.182:8080/</strong></li>
+            </ol>
+        </div>
+
+        <a href="http://localhost:8080/" target="_blank" class="btn-open">🖥️ Mở trên máy tính (Localhost)</a>
+    </div>
+
+    <script>
+        // Update URL dynamically if query param present
+        const urlParams = new URLSearchParams(window.location.search);
+        const hostIp = urlParams.get('ip') || '192.168.1.182';
+        const targetUrl = 'http://' + hostIp + ':8080/';
+
+        document.getElementById('mobileUrl').innerText = targetUrl;
+        document.getElementById('directUrl').innerText = targetUrl;
+        document.getElementById('qrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(targetUrl);
+    </script>
+</body>
+</html>
