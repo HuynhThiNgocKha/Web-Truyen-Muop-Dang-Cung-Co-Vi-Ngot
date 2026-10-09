@@ -5,9 +5,13 @@
 $root = __DIR__;
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// 1. Mobile connect helper
+// 1. Mobile connect & Sitemap helpers
 if ($uri === '/mobile.html' || $uri === '/mobile') {
     require $root . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'mobile.html';
+    return true;
+}
+if ($uri === '/sitemap.html' || $uri === '/sitemap') {
+    require $root . DIRECTORY_SEPARATOR . 'tools' . DIRECTORY_SEPARATOR . 'sitemap.html';
     return true;
 }
 

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danh Sách Tất Cả Đường Dẫn — Mướp Đắng Cũng Có Vị Ngọt</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3F7523;
+            --primary-light: #52962E;
+            --pastel: #EBF7E3;
+            --bg: #F8FBF6;
+            --card: #FFFFFF;
+            --text: #213516;
+            --text-muted: #5F7355;
+            --border: #D7E7CE;
+            --shadow: 0 4px 16px rgba(63, 117, 35, 0.08);
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 24px;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 26px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14.5px;
+        }
+
+        .host-switch-bar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .host-pill {
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            border: 2px solid var(--primary);
+            background: var(--card);
+            color: var(--primary);
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .host-pill.active, .host-pill:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .section-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            margin-bottom: 22px;
+            box-shadow: var(--shadow);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 2px solid var(--pastel);
+            padding-bottom: 8px;
+        }
+
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .link-item {
+            display: flex;
+            flex-direction: column;
+            padding: 12px 14px;
+            background: var(--pastel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.2s ease;
+        }
+
+        .link-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+            box-shadow: 0 4px 10px rgba(63, 117, 35, 0.15);
+            background: #e2f4d6;
+        }
+
+        .link-name {
+            font-weight: 700;
+            font-size: 14.5px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .link-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        .link-url {
+            font-size: 11.5px;
+            color: #4a6839;
+            font-family: monospace;
+            margin-top: 6px;
+            word-break: break-all;
+        }
+
+        .badge-role {
+            font-size: 10.5px;
+            padding: 2px 7px;
+            border-radius: 12px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag-pill {
+            padding: 6px 14px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .tag-pill:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-compass"></i> BẢNG ĐIỀU HƯỚNG TẤT CẢ ĐƯỜNG DẪN</h1>
+            <p class="subtitle">Tập hợp toàn bộ các trang, phân hệ tài khoản, dịch giả, quản trị viên và thể loại website <strong>Mướp Đắng Cũng Có Vị Ngọt</strong></p>
+            <div class="host-switch-bar">
+                <button type="button" class="host-pill active" id="btnLive" onclick="switchBase('https://muopdangcungcovingot.io.vn')">
+                    <i class="fa-solid fa-globe"></i> Tên Miền Chính Thức (Live)
+                </button>
+                <button type="button" class="host-pill" id="btnLocal" onclick="switchBase('http://localhost:8080')">
+                    <i class="fa-solid fa-laptop-code"></i> Chạy Máy Tính (Localhost:8080)
+                </button>
+            </div>
+        </header>
+
+        <!-- 1. PUBLIC -->
+        <div class="section-card">
+            <h2 class="section-title"><i class="fa-solid fa-house"></i> 1. Trang Độc Giả & Công Khai (Public Pages)</h2>
+            <div class="links-grid">
+                <a href="https://muopdangcungcovingot.io.vn/" class="link-item" target="_blank" data-path="/">
+                    <div class="link-name"><span>Trang Chủ</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Trang đón khách, banner, truyện hot & đề cử</div>
+                    <div class="link-url">/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/truyen-moi/" class="link-item" target="_blank" data-path="/truyen-moi/">
+                    <div class="link-name"><span>Truyện Mới Cập Nhật</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Danh sách truyện mới đăng gần đây</div>
+                    <div class="link-url">/truyen-moi/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/truyen-hot/" class="link-item" target="_blank" data-path="/truyen-hot/">
+                    <div class="link-name"><span>Truyện Hot</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Truyện có nhiều lượt xem nhất</div>
+                    <div class="link-url">/truyen-hot/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/truyen-full/" class="link-item" target="_blank" data-path="/truyen-full/">
+                    <div class="link-name"><span>Truyện Full</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Danh sách các truyện đã hoàn thành</div>
+                    <div class="link-url">/truyen-full/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/" class="link-item" target="_blank" data-path="/the-loai/">
+                    <div class="link-name"><span>Lưới Tất Cả Thể Loại</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Chọn lọc truyện theo danh mục thể loại</div>
+                    <div class="link-url">/the-loai/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/gioi-thieu/" class="link-item" target="_blank" data-path="/gioi-thieu/">
+                    <div class="link-name"><span>Giới Thiệu Website</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Thông tin dự án và đội ngũ</div>
+                    <div class="link-url">/gioi-thieu/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/dieu-khoan/" class="link-item" target="_blank" data-path="/dieu-khoan/">
+                    <div class="link-name"><span>Điều Khoản Sử Dụng</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Quy định bản quyền và điều khoản sàn</div>
+                    <div class="link-url">/dieu-khoan/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/chinh-sach-bao-mat/" class="link-item" target="_blank" data-path="/chinh-sach-bao-mat/">
+                    <div class="link-name"><span>Chính Sách Bảo Mật</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Bảo mật thông tin tài khoản người dùng</div>
+                    <div class="link-url">/chinh-sach-bao-mat/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/lien-he/" class="link-item" target="_blank" data-path="/lien-he/">
+                    <div class="link-name"><span>Liên Hệ Hỗ Trợ</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Thông tin gửi thắc mắc và đóng góp</div>
+                    <div class="link-url">/lien-he/</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- 2. AUTH & USER -->
+        <div class="section-card">
+            <h2 class="section-title"><i class="fa-solid fa-user-circle"></i> 2. Phân Hệ Người Dùng & Hồ Sơ (Auth & Profile)</h2>
+            <div class="links-grid">
+                <a href="https://muopdangcungcovingot.io.vn/dang-nhap/" class="link-item" target="_blank" data-path="/dang-nhap/">
+                    <div class="link-name"><span>Đăng Nhập</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Trang đăng nhập tài khoản</div>
+                    <div class="link-url">/dang-nhap/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/dang-ky/" class="link-item" target="_blank" data-path="/dang-ky/">
+                    <div class="link-name"><span>Đăng Ký Thành Viên</span> <i class="fa-solid fa-arrow-up-right-from-square"></i></div>
+                    <div class="link-desc">Tạo tài khoản độc giả mới</div>
+                    <div class="link-url">/dang-ky/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/ho-so/" class="link-item" target="_blank" data-path="/ho-so/">
+                    <div class="link-name"><span>Thông Tin Cá Nhân</span> <span class="badge-role">Tab 1</span></div>
+                    <div class="link-desc">Đổi tên hiển thị, tải avatar từ thiết bị/URL, cập nhật bio</div>
+                    <div class="link-url">/ho-so/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/ho-so/#tabPassword" class="link-item" target="_blank" data-path="/ho-so/#tabPassword">
+                    <div class="link-name"><span>Đổi Mật Khẩu</span> <span class="badge-role">Tab 2</span></div>
+                    <div class="link-desc">Cập nhật mật khẩu mới bảo vệ tài khoản</div>
+                    <div class="link-url">/ho-so/#tabPassword</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/ho-so/#tabBookmarks" class="link-item" target="_blank" data-path="/ho-so/#tabBookmarks">
+                    <div class="link-name"><span>Tủ Truyện Đã Lưu</span> <span class="badge-role">Tab 3</span></div>
+                    <div class="link-desc">Danh sách truyện đã thêm vào tủ</div>
+                    <div class="link-url">/ho-so/#tabBookmarks</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/ho-so/#tabHistory" class="link-item" target="_blank" data-path="/ho-so/#tabHistory">
+                    <div class="link-name"><span>Lịch Sử Đọc</span> <span class="badge-role">Tab 4</span></div>
+                    <div class="link-desc">Các chương đã đọc gần đây</div>
+                    <div class="link-url">/ho-so/#tabHistory</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/core/wp-login.php?action=logout" class="link-item" target="_blank" data-path="/core/wp-login.php?action=logout">
+                    <div class="link-name"><span>Đăng Xuất (Logout)</span> <i class="fa-solid fa-arrow-right-from-bracket"></i></div>
+                    <div class="link-desc">Đăng xuất khỏi phiên hiện tại</div>
+                    <div class="link-url">/core/wp-login.php?action=logout</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- 3. CREATOR & ADMIN -->
+        <div class="section-card">
+            <h2 class="section-title"><i class="fa-solid fa-feather-pointed"></i> 3. Kênh Dịch Giả & Quản Trị Hệ Thống (Creator & Admin)</h2>
+            <div class="links-grid">
+                <a href="https://muopdangcungcovingot.io.vn/thong-tin-dich-gia/" class="link-item" target="_blank" data-path="/thong-tin-dich-gia/">
+                    <div class="link-name"><span>Kênh Dịch Giả</span> <span class="badge-role">Dịch Giả</span></div>
+                    <div class="link-desc">Thống kê view, nhuận bút (8đ/view), quản lý truyện</div>
+                    <div class="link-url">/thong-tin-dich-gia/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/dang-truyen/" class="link-item" target="_blank" data-path="/dang-truyen/">
+                    <div class="link-name"><span>Đăng Truyện Mới</span> <span class="badge-role">Dịch Giả</span></div>
+                    <div class="link-desc">Cổng upload tác phẩm mới kèm ảnh bìa</div>
+                    <div class="link-url">/dang-truyen/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/them-chuong/" class="link-item" target="_blank" data-path="/them-chuong/">
+                    <div class="link-name"><span>Thêm Chương Mới</span> <span class="badge-role">Dịch Giả</span></div>
+                    <div class="link-desc">Soạn thảo và đăng chương mới</div>
+                    <div class="link-url">/them-chuong/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/quan-ly-admin/" class="link-item" target="_blank" data-path="/quan-ly-admin/">
+                    <div class="link-name"><span>Quản Trị Hệ Thống</span> <span class="badge-role">Admin</span></div>
+                    <div class="link-desc">Duyệt truyện, quản lý link affiliate Shopee, phân quyền, đổi viewmode</div>
+                    <div class="link-url">/quan-ly-admin/</div>
+                </a>
+                <a href="https://muopdangcungcovingot.io.vn/core/wp-admin/" class="link-item" target="_blank" data-path="/core/wp-admin/">
+                    <div class="link-name"><span>WordPress Core Admin</span> <span class="badge-role">WP Core</span></div>
+                    <div class="link-desc">Trang quản trị gốc WordPress</div>
+                    <div class="link-url">/core/wp-admin/</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- 4. GENRES -->
+        <div class="section-card">
+            <h2 class="section-title"><i class="fa-solid fa-tags"></i> 4. Các Trang Thể Loại Truyện (Genres)</h2>
+            <div class="tag-cloud">
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/ngon-tinh/" class="tag-pill" target="_blank" data-path="/the-loai/ngon-tinh/">Ngôn tình</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/ngot/" class="tag-pill" target="_blank" data-path="/the-loai/ngot/">Ngọt</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/nguoc/" class="tag-pill" target="_blank" data-path="/the-loai/nguoc/">Ngược</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/dam-my/" class="tag-pill" target="_blank" data-path="/the-loai/dam-my/">Đam mỹ</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/co-trang/" class="tag-pill" target="_blank" data-path="/the-loai/co-trang/">Cổ trang</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/hien-dai/" class="tag-pill" target="_blank" data-path="/the-loai/hien-dai/">Hiện đại</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/tuong-lai/" class="tag-pill" target="_blank" data-path="/the-loai/tuong-lai/">Tương lai</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/xuyen-khong/" class="tag-pill" target="_blank" data-path="/the-loai/xuyen-khong/">Xuyên không</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/xuyen-sach/" class="tag-pill" target="_blank" data-path="/the-loai/xuyen-sach/">Xuyên sách</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/zhihu/" class="tag-pill" target="_blank" data-path="/the-loai/zhihu/">Zhihu</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/trong-sinh/" class="tag-pill" target="_blank" data-path="/the-loai/trong-sinh/">Trọng sinh</a>
+                <a href="https://muopdangcungcovingot.io.vn/the-loai/hai-huoc/" class="tag-pill" target="_blank" data-path="/the-loai/hai-huoc/">Hài hước</a>
+            </div>
+        </div>
+
+        <!-- 5. UTILITY -->
+        <div class="section-card">
+            <h2 class="section-title"><i class="fa-solid fa-mobile-screen"></i> 5. Tiện Ích Di Động (Mobile Connect)</h2>
+            <div class="links-grid">
+                <a href="/tools/mobile.html" class="link-item" target="_blank" data-path="/tools/mobile.html">
+                    <div class="link-name"><span>Trang Quét Mã QR Mobile</span> <i class="fa-solid fa-qrcode"></i></div>
+                    <div class="link-desc">Mã QR tự động để kết nối điện thoại qua Wi-Fi</div>
+                    <div class="link-url">/tools/mobile.html</div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchBase(base) {
+            document.querySelectorAll('[data-path]').forEach(el => {
+                const p = el.getAttribute('data-path');
+                el.href = base + p;
+            });
+            document.querySelectorAll('.host-pill').forEach(btn => btn.classList.remove('active'));
+            if (base.includes('localhost')) {
+                document.getElementById('btnLocal').classList.add('active');
+            } else {
+                document.getElementById('btnLive').classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>
