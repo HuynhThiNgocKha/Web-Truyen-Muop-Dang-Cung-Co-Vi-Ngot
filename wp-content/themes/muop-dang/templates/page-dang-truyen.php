@@ -35,6 +35,8 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
         <div id="storyAlert" class="alert-box"></div>
 
         <form id="formSubmitStory" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="muop_submit_story" />
+            <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
             <!-- CENTER 1: THÔNG TIN TRUYỆN -->
             <div style="background: var(--pastel-green); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 22px;">
                 <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-green); margin-bottom: 16px;">

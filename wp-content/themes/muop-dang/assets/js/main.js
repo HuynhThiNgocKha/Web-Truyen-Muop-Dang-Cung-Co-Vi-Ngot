@@ -10,6 +10,27 @@
 (function($) {
   'use strict';
 
+  // Safe helper to extract message from AJAX response or error (prevents undefined reading 'message')
+  function getAjaxMsg(res, defaultMsg) {
+    if (!res) return defaultMsg || 'Có lỗi xảy ra!';
+    if (typeof res === 'string') {
+      if (res === '-1') return 'Phiên bảo mật (nonce) đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
+      if (res === '0') return 'Bạn cần đăng nhập để thực hiện chức năng này!';
+      try {
+        const json = JSON.parse(res);
+        return getAjaxMsg(json, defaultMsg);
+      } catch (e) {
+        return res.length < 250 ? res : (defaultMsg || 'Lỗi xử lý máy chủ!');
+      }
+    }
+    if (res.data) {
+      if (typeof res.data === 'string') return res.data;
+      if (res.data.message) return res.data.message;
+    }
+    if (res.message) return res.message;
+    return defaultMsg || 'Có lỗi xảy ra!';
+  }
+
   // 1. THEME TOGGLE (DARK / LIGHT MODE)
   const ThemeManager = {
     init() {
@@ -255,8 +276,11 @@
             story_id: storyId
           },
           success: (res) => {
-            if (res.success) {
-              if (res.data.bookmarked) {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              if (res.data && res.data.bookmarked) {
                 $btn.html('<i class="fa-solid fa-bookmark"></i> Đã Lưu Tủ Truyện');
                 $btn.addClass('btn-primary').removeClass('btn-secondary');
               } else {
@@ -264,8 +288,11 @@
                 $btn.removeClass('btn-primary').addClass('btn-secondary');
               }
             } else {
-              alert(res.data.message || 'Lỗi lưu truyện!');
+              alert(getAjaxMsg(res, 'Lỗi lưu truyện!'));
             }
+          },
+          error: (xhr) => {
+            alert('Lỗi kết nối máy chủ!');
           }
         });
       });
@@ -290,24 +317,33 @@
         $btn.prop('disabled', true).text('Đang đăng nhập...');
         $alert.hide();
 
+        const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
         $.ajax({
-          url: muopConfig.ajaxUrl,
+          url: ajaxUrl,
           type: 'POST',
-          data: $form.serialize() + '&action=muop_login&nonce=' + muopConfig.nonce,
+          data: $form.serialize() + '&action=muop_login&nonce=' + encodeURIComponent(nonce),
           success: (res) => {
-            if (res.success) {
-              $alert.removeClass('alert-error').addClass('alert-success').text(res.data.message).fadeIn();
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Đăng nhập thành công!')).fadeIn();
               setTimeout(() => {
-                window.location.href = res.data.redirect || muopConfig.siteUrl;
+                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl : '/');
               }, 600);
             } else {
               $btn.prop('disabled', false).text('Đăng Nhập');
-              $alert.removeClass('alert-success').addClass('alert-error').text(res.data.message).fadeIn();
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Đăng nhập thất bại!')).fadeIn();
             }
           },
-          error: () => {
+          error: (xhr) => {
             $btn.prop('disabled', false).text('Đăng Nhập');
-            $alert.removeClass('alert-success').addClass('alert-error').text('Có lỗi xảy ra, vui lòng thử lại!').fadeIn();
+            let errorMsg = 'Có lỗi xảy ra, vui lòng thử lại!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
         });
       });
@@ -322,24 +358,33 @@
         $btn.prop('disabled', true).text('Đang đăng ký...');
         $alert.hide();
 
+        const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
         $.ajax({
-          url: muopConfig.ajaxUrl,
+          url: ajaxUrl,
           type: 'POST',
-          data: $form.serialize() + '&action=muop_register&nonce=' + muopConfig.nonce,
+          data: $form.serialize() + '&action=muop_register&nonce=' + encodeURIComponent(nonce),
           success: (res) => {
-            if (res.success) {
-              $alert.removeClass('alert-error').addClass('alert-success').text(res.data.message).fadeIn();
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Đăng ký thành công!')).fadeIn();
               setTimeout(() => {
-                window.location.href = res.data.redirect || muopConfig.siteUrl;
+                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl : '/');
               }, 800);
             } else {
               $btn.prop('disabled', false).text('Đăng Ký Độc Giả');
-              $alert.removeClass('alert-success').addClass('alert-error').text(res.data.message).fadeIn();
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Đăng ký thất bại!')).fadeIn();
             }
           },
-          error: () => {
+          error: (xhr) => {
             $btn.prop('disabled', false).text('Đăng Ký Độc Giả');
-            $alert.removeClass('alert-success').addClass('alert-error').text('Lỗi kết nối máy chủ!').fadeIn();
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
         });
       });
@@ -359,30 +404,41 @@
         $btn.prop('disabled', true).text('Đang gửi truyện...');
         $alert.hide();
 
+        const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
         const formData = new FormData(this);
-        formData.append('action', 'muop_submit_story');
-        formData.append('nonce', muopConfig.nonce);
+        if (!formData.has('action')) formData.append('action', 'muop_submit_story');
+        if (!formData.has('nonce') || !formData.get('nonce')) formData.append('nonce', nonce);
 
         $.ajax({
-          url: muopConfig.ajaxUrl,
+          url: ajaxUrl,
           type: 'POST',
           data: formData,
           contentType: false,
           processData: false,
           success: (res) => {
-            if (res.success) {
-              $alert.removeClass('alert-error').addClass('alert-success').text(res.data.message).fadeIn();
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const successMsg = getAjaxMsg(res, 'Đăng truyện thành công!');
+              $alert.removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
               setTimeout(() => {
-                window.location.href = res.data.redirect || muopConfig.siteUrl;
+                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl : '/');
               }, 1200);
             } else {
               $btn.prop('disabled', false).text('Đăng Truyện');
-              $alert.removeClass('alert-success').addClass('alert-error').text(res.data.message).fadeIn();
+              const errorMsg = getAjaxMsg(res, 'Lỗi đăng truyện!');
+              $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
             }
           },
-          error: () => {
+          error: (xhr) => {
             $btn.prop('disabled', false).text('Đăng Truyện');
-            $alert.removeClass('alert-success').addClass('alert-error').text('Lỗi upload hoặc hệ thống!').fadeIn();
+            let errorMsg = 'Lỗi upload hoặc hệ thống!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
         });
       });
@@ -397,24 +453,39 @@
         $btn.prop('disabled', true).text('Đang thêm chương...');
         $alert.hide();
 
+        const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
+        let postData = $form.serialize();
+        if (postData.indexOf('action=') === -1) postData += '&action=muop_submit_chapter';
+        if (postData.indexOf('nonce=') === -1 && nonce) postData += '&nonce=' + encodeURIComponent(nonce);
+
         $.ajax({
-          url: muopConfig.ajaxUrl,
+          url: ajaxUrl,
           type: 'POST',
-          data: $form.serialize() + '&action=muop_submit_chapter&nonce=' + muopConfig.nonce,
+          data: postData,
           success: (res) => {
-            if (res.success) {
-              $alert.removeClass('alert-error').addClass('alert-success').text(res.data.message).fadeIn();
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const successMsg = getAjaxMsg(res, 'Thêm chương mới thành công!');
+              $alert.removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
               setTimeout(() => {
-                window.location.href = res.data.redirect || muopConfig.siteUrl;
+                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl : '/');
               }, 1000);
             } else {
               $btn.prop('disabled', false).text('Thêm Chương Mới');
-              $alert.removeClass('alert-success').addClass('alert-error').text(res.data.message).fadeIn();
+              const errorMsg = getAjaxMsg(res, 'Lỗi thêm chương!');
+              $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
             }
           },
-          error: () => {
+          error: (xhr) => {
             $btn.prop('disabled', false).text('Thêm Chương Mới');
-            $alert.removeClass('alert-success').addClass('alert-error').text('Lỗi kết nối máy chủ!').fadeIn();
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
         });
       });
@@ -443,22 +514,34 @@
           data: $form.serialize() + '&action=muop_post_comment&nonce=' + muopConfig.nonce,
           success: (res) => {
             $btn.prop('disabled', false);
-            if (res.success) {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const d = res.data || {};
+              const author = d.author || 'Bạn';
               const html = `
                 <li class="comment-item">
-                  <div class="comment-avatar">${res.data.author.charAt(0).toUpperCase()}</div>
+                  <div class="comment-avatar">${author.charAt(0).toUpperCase()}</div>
                   <div class="comment-body">
-                    <span class="comment-author-name">${res.data.author}</span>
-                    <span class="comment-time">${res.data.time}</span>
-                    <div class="comment-text">${res.data.content}</div>
+                    <span class="comment-author-name">${author}</span>
+                    <span class="comment-time">${d.time || 'Vừa xong'}</span>
+                    <div class="comment-text">${d.content || ''}</div>
                   </div>
                 </li>
               `;
               $('.comment-list-ul').prepend(html);
               $textarea.val('');
             } else {
-              alert(res.data.message || 'Lỗi gửi bình luận!');
+              alert(getAjaxMsg(res, 'Lỗi gửi bình luận!'));
             }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false);
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            alert(errorMsg);
           }
         });
       });
@@ -510,12 +593,21 @@
             nominate_type: nominateType
           },
           success: (res) => {
-            if (res.success) {
-              alert(res.data.message);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              alert(getAjaxMsg(res, 'Thao tác thành công!'));
               window.location.reload();
             } else {
-              alert(res.data.message || 'Lỗi thao tác!');
+              alert(getAjaxMsg(res, 'Lỗi thao tác!'));
             }
+          },
+          error: (xhr) => {
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            alert(errorMsg);
           }
         });
       });
@@ -541,18 +633,24 @@
             story_id: storyId
           },
           success: (res) => {
-            if (res.success) {
-              alert(res.data.message);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              alert(getAjaxMsg(res, 'Đã xóa bộ truyện thành công!'));
               $btn.closest('tr').fadeOut(300, function() {
                 $(this).remove();
               });
             } else {
-              alert(res.data.message || 'Lỗi xóa truyện!');
+              alert(getAjaxMsg(res, 'Lỗi xóa truyện!'));
               $btn.prop('disabled', false);
             }
           },
-          error: () => {
-            alert('Lỗi kết nối máy chủ!');
+          error: (xhr) => {
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            alert(errorMsg);
             $btn.prop('disabled', false);
           }
         });
@@ -569,11 +667,20 @@
           type: 'POST',
           data: $form.serialize() + '&action=muop_admin_action&sub_action=update_links&nonce=' + muopConfig.nonce,
           success: (res) => {
-            if (res.success) {
-              $alert.removeClass('alert-error').addClass('alert-success').text(res.data.message).fadeIn().delay(2000).fadeOut();
-            } else {
-              $alert.removeClass('alert-success').addClass('alert-error').text(res.data.message).fadeIn();
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
             }
+            if (res && res.success) {
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Cập nhật liên kết thành công!')).fadeIn().delay(2000).fadeOut();
+            } else {
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Lỗi cập nhật liên kết!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
         });
       });
@@ -875,38 +982,44 @@
             $btnSubmit.prop('disabled', false);
             $spinner.hide();
 
-            if (res.success) {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+
+            if (res && res.success) {
               $alertContainer.html(`
                 <div class="alert-box alert-success" style="display:block; margin-bottom: 20px;">
-                  <i class="fa-solid fa-circle-check"></i> ${res.data.message || 'Cập nhật thông tin thành công!'}
+                  <i class="fa-solid fa-circle-check"></i> ${getAjaxMsg(res, 'Cập nhật thông tin thành công!')}
                 </div>
               `);
 
               // Update profile header elements
-              if (res.data.display_name) {
-                $('#profileHeaderDisplayName').text(res.data.display_name);
-                $('.user-name-text').text(res.data.display_name);
-                $('.user-dropdown-name').text(res.data.display_name);
-              }
-              if (res.data.user_email) {
-                $('#profileHeaderEmail').text(res.data.user_email);
-              }
-              if (typeof res.data.bio !== 'undefined') {
-                let $bio = $('#profileHeaderBio');
-                if (res.data.bio) {
-                  if (!$bio.length) {
-                    $('.profile-header-info').append(`<p class="profile-bio-text" id="profileHeaderBio">"${res.data.bio}"</p>`);
-                  } else {
-                    $bio.text(`"${res.data.bio}"`).show();
-                  }
-                } else if ($bio.length) {
-                  $bio.hide();
+              if (res.data) {
+                if (res.data.display_name) {
+                  $('#profileHeaderDisplayName').text(res.data.display_name);
+                  $('.user-name-text').text(res.data.display_name);
+                  $('.user-dropdown-name').text(res.data.display_name);
                 }
-              }
-              if (res.data.avatar_url) {
-                $('#profileHeaderAvatarDisplay').html(`<img src="${res.data.avatar_url}" alt="${res.data.display_name || ''}" class="profile-avatar-img" />`);
-                // Update topbar mini avatar
-                $('.user-avatar-mini').html(`<img src="${res.data.avatar_url}" alt="${res.data.display_name || ''}" class="user-avatar-mini-img" />`);
+                if (res.data.user_email) {
+                  $('#profileHeaderEmail').text(res.data.user_email);
+                }
+                if (typeof res.data.bio !== 'undefined') {
+                  let $bio = $('#profileHeaderBio');
+                  if (res.data.bio) {
+                    if (!$bio.length) {
+                      $('.profile-header-info').append(`<p class="profile-bio-text" id="profileHeaderBio">"${res.data.bio}"</p>`);
+                    } else {
+                      $bio.text(`"${res.data.bio}"`).show();
+                    }
+                  } else if ($bio.length) {
+                    $bio.hide();
+                  }
+                }
+                if (res.data.avatar_url) {
+                  $('#profileHeaderAvatarDisplay').html(`<img src="${res.data.avatar_url}" alt="${res.data.display_name || ''}" class="profile-avatar-img" />`);
+                  // Update topbar mini avatar
+                  $('.user-avatar-mini').html(`<img src="${res.data.avatar_url}" alt="${res.data.display_name || ''}" class="user-avatar-mini-img" />`);
+                }
               }
 
               // Scroll smoothly to top of card
@@ -918,17 +1031,20 @@
             } else {
               $alertContainer.html(`
                 <div class="alert-box alert-error" style="display:block; margin-bottom: 20px;">
-                  <i class="fa-solid fa-circle-exclamation"></i> ${res.data.message || 'Lỗi cập nhật thông tin!'}
+                  <i class="fa-solid fa-circle-exclamation"></i> ${getAjaxMsg(res, 'Lỗi cập nhật thông tin!')}
                 </div>
               `);
             }
           },
-          error: () => {
+          error: (xhr) => {
             $btnSubmit.prop('disabled', false);
             $spinner.hide();
+            let errorMsg = 'Lỗi kết nối máy chủ hoặc tệp ảnh quá lớn. Vui lòng thử lại!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
             $alertContainer.html(`
               <div class="alert-box alert-error" style="display:block; margin-bottom: 20px;">
-                <i class="fa-solid fa-circle-exclamation"></i> Lỗi kết nối máy chủ hoặc tệp ảnh quá lớn. Vui lòng thử lại!
+                <i class="fa-solid fa-circle-exclamation"></i> ${errorMsg}
               </div>
             `);
           }
@@ -981,27 +1097,34 @@
             $btnSubmit.prop('disabled', false);
             $spinner.hide();
 
-            if (res.success) {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+
+            if (res && res.success) {
               $alertContainer.html(`
                 <div class="alert-box alert-success" style="display:block; margin-bottom: 20px;">
-                  <i class="fa-solid fa-circle-check"></i> ${res.data.message || 'Đổi mật khẩu thành công!'}
+                  <i class="fa-solid fa-circle-check"></i> ${getAjaxMsg(res, 'Đổi mật khẩu thành công!')}
                 </div>
               `);
               $form[0].reset();
             } else {
               $alertContainer.html(`
                 <div class="alert-box alert-error" style="display:block; margin-bottom: 20px;">
-                  <i class="fa-solid fa-circle-exclamation"></i> ${res.data.message || 'Lỗi đổi mật khẩu!'}
+                  <i class="fa-solid fa-circle-exclamation"></i> ${getAjaxMsg(res, 'Lỗi đổi mật khẩu!')}
                 </div>
               `);
             }
           },
-          error: () => {
+          error: (xhr) => {
             $btnSubmit.prop('disabled', false);
             $spinner.hide();
+            let errorMsg = 'Lỗi kết nối máy chủ! Vui lòng thử lại sau.';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
             $alertContainer.html(`
               <div class="alert-box alert-error" style="display:block; margin-bottom: 20px;">
-                <i class="fa-solid fa-circle-exclamation"></i> Lỗi kết nối máy chủ! Vui lòng thử lại sau.
+                <i class="fa-solid fa-circle-exclamation"></i> ${errorMsg}
               </div>
             `);
           }

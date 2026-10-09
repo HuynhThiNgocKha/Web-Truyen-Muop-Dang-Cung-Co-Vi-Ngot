@@ -53,6 +53,8 @@ if ($selected_story_id) {
         <div id="chapterAlert" class="alert-box"></div>
 
         <form id="formSubmitChapter">
+            <input type="hidden" name="action" value="muop_submit_chapter" />
+            <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
             <div style="background: var(--pastel-green); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 22px;">
                 <!-- Chọn Truyện -->
                 <div class="form-group">
