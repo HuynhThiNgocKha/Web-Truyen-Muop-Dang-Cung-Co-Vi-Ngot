@@ -91,9 +91,14 @@ if ( ! defined( 'WP_DEBUG' ) ) {
 	define( 'WP_DEBUG', false );
 }
 
-// Dynamic Home, SiteURL, and Content paths for subdirectory core architecture & Mobile LAN access
-$protocol = ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' ) ? 'https://' : 'http://';
-$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'localhost:8080';
+// Dynamic Home, SiteURL, and Content paths for subdirectory core architecture & domain support
+$is_ssl = ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' ) 
+       || ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https' )
+       || ( isset( $_SERVER['SERVER_PORT'] ) && $_SERVER['SERVER_PORT'] == 443 );
+
+$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'muopdangcungcovingot.io.vn';
+$protocol = ( $is_ssl || strpos( $host, 'muopdangcungcovingot.io.vn' ) !== false ) ? 'https://' : 'http://';
+
 if ( ! defined( 'WP_HOME' ) ) {
 	define( 'WP_HOME', $protocol . $host );
 }

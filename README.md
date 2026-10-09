@@ -3,12 +3,12 @@
 Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được xây dựng hoàn chỉnh trên nền tảng **WordPress mã nguồn mở (PHP 8.2 + MySQL)**. 
 ---
 
-## 🚀 TRUY CẬP WEBSITE NGAY
+## 🚀 TRUY CẬP WEBSITE
 
-- **Trang chủ:** [http://localhost:8080/](http://localhost:8080/)
-- **Đăng nhập:** [http://localhost:8080/dang-nhap/](http://localhost:8080/dang-nhap/)
-- **Đăng ký:** [http://localhost:8080/dang-ky/](http://localhost:8080/dang-ky/)
-- **Khởi động nhanh:** Chạy tệp tin `start-server.bat` trong thư mục gốc.
+- **Tên miền chính thức:** [https://muopdangcungcovingot.io.vn/](https://muopdangcungcovingot.io.vn/)
+- **Đăng nhập:** [https://muopdangcungcovingot.io.vn/dang-nhap/](https://muopdangcungcovingot.io.vn/dang-nhap/)
+- **Đăng ký:** [https://muopdangcungcovingot.io.vn/dang-ky/](https://muopdangcungcovingot.io.vn/dang-ky/)
+- **Chạy môi trường cục bộ (Local):** [http://localhost:8080/](http://localhost:8080/) (Chạy file `run.bat` trong thư mục gốc)
 
 ---
 
