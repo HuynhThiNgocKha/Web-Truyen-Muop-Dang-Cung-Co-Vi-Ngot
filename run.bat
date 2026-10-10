@@ -7,15 +7,14 @@ echo           WEB DOC TRUYEN: MUOP DANG CUNG CO VI NGOT
 echo ======================================================================
 echo.
 
-:: 1. Kiem tra va khoi dong MySQL neu chua chay
+:: 1. Kiem tra MySQL tren XAMPP
 netstat -ano | findstr ":3306" | findstr "LISTENING" >nul
 if errorlevel 1 (
-    echo [..] Dang khoi dong MariaDB / MySQL tren port 3306...
-    start /b "" "C:\Program Files\xampp\mysql\bin\mysqld.exe" --defaults-file="%~dp0mysql_data\my_custom.ini"
-    timeout /t 2 >nul
-    echo [OK] MySQL da san sang!
+    echo [THONG BAO] MySQL chua chay!
+    echo Vui long mo XAMPP Control Panel va nhan nut [Start] tai muc MySQL.
+    echo.
 ) else (
-    echo [OK] MySQL dang hoat dong (Port 3306).
+    echo [OK] MySQL dang hoat dong tren XAMPP (Port 3306).
 )
 
 :: 2. Kiem tra va khoi dong PHP Web Server tren 0.0.0.0:8080
