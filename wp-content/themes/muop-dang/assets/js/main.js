@@ -207,7 +207,10 @@
   // 5. READING CONTROLS (FONT SIZE, HISTORY, BOOKMARK)
   const ReadingManager = {
     init() {
-      let currentSize = parseInt(localStorage.getItem('muop_reading_font_size'), 10) || 18;
+      let currentSize = parseInt(localStorage.getItem('muop_reading_font_size'), 10);
+      if (!currentSize) {
+        currentSize = ($(window).width() <= 768) ? 17 : 19;
+      }
       this.applyFontSize(currentSize);
 
       $('#btnFontInc').on('click', () => {

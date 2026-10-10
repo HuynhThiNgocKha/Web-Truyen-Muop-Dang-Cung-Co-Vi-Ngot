@@ -1137,3 +1137,15 @@ function muop_check_user_lock($user, $username, $password) {
     return $user;
 }
 add_filter('authenticate', 'muop_check_user_lock', 30, 3);
+
+// 10. Auto-format chapter content for comfortable line/paragraph spacing (Tăng khoảng cách giữa các câu/đoạn)
+function muop_format_chapter_content($content) {
+    if (is_singular('chuong')) {
+        // Convert <br /> inside text into paragraphs
+        $content = preg_replace('/<br\s*\/?>\s*/i', '</p><p>', $content);
+        // Remove empty paragraphs
+        $content = preg_replace('/<p>\s*(?:&nbsp;|\s)*<\/p>/i', '', $content);
+    }
+    return $content;
+}
+add_filter('the_content', 'muop_format_chapter_content', 99);

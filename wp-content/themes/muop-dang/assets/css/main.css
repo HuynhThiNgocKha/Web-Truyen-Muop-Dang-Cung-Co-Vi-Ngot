@@ -1078,8 +1078,17 @@ img {
   border-radius: var(--radius-md);
   padding: 18px;
   margin-bottom: 24px;
-  font-size: 14.5px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+.story-summary-box p {
+  margin-bottom: 16px;
+  line-height: 1.85;
+}
+
+.story-summary-box p:last-child {
+  margin-bottom: 0;
 }
 
 .chapter-list-section {
@@ -1212,12 +1221,25 @@ img {
 }
 
 .chapter-body-text {
-  font-size: 18px;
-  line-height: 1.85;
+  font-size: 19px;
+  line-height: 2.0;
   color: var(--text-main);
+  letter-spacing: 0.012em;
+  word-break: break-word;
 }
 
 .chapter-body-text p {
+  margin-bottom: 26px;
+  line-height: 2.0;
+}
+
+.chapter-body-text p:last-child {
+  margin-bottom: 0;
+}
+
+.chapter-body-text br {
+  display: block;
+  content: "";
   margin-bottom: 18px;
 }
 
@@ -2534,8 +2556,21 @@ img {
     padding: 18px 14px;
   }
   .chapter-body-text {
-    font-size: 16px;
-    line-height: 1.8;
+    font-size: 17px;
+    line-height: 1.95;
+    letter-spacing: 0.012em;
+  }
+  .chapter-body-text p {
+    margin-bottom: 24px;
+    line-height: 1.95;
+  }
+  .chapter-body-text p:last-child {
+    margin-bottom: 0;
+  }
+  .chapter-body-text br {
+    display: block;
+    content: "";
+    margin-bottom: 16px;
   }
 
   /* Admin Dashboard Mobile Tidy & Compact Optimization */
