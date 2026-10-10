@@ -76,13 +76,33 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Chọn Thể Loại (Có thể chọn nhiều)</label>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 140px; overflow-y: auto; background: var(--bg-card); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <label class="form-label" style="margin-bottom: 0;">Chọn Thể Loại (Có thể chọn nhiều)</label>
+                        <button type="button" id="btnToggleAddNewGenre" class="btn btn-secondary" style="padding: 4px 12px; font-size: 12.5px; border-radius: 6px;">
+                            <i class="fa-solid fa-plus"></i> Thêm Thể Loại Mới
+                        </button>
+                    </div>
+
+                    <!-- Hộp thêm thể loại mới trực tiếp -->
+                    <div id="boxAddNewGenre" style="display: none; margin-bottom: 12px; padding: 12px 14px; background: var(--bg-card); border: 1.5px dashed var(--primary-green); border-radius: var(--radius-sm);">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--primary-green); margin-bottom: 8px;">
+                            <i class="fa-solid fa-tags"></i> Thêm Thể Loại Mới Vào Hệ Thống (Lưu & Dùng Cho Tất Cả):
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="inputNewGenreName" class="form-input" placeholder="Nhập tên thể loại (vd: Trinh thám, Kinh dị, Xuyên không...)" style="flex: 1; padding: 7px 12px; font-size: 13.5px;" />
+                            <button type="button" id="btnConfirmAddGenre" class="btn btn-primary" style="padding: 7px 16px; font-size: 13px; white-space: nowrap;">
+                                <i class="fa-solid fa-check"></i> Lưu Thể Loại
+                            </button>
+                        </div>
+                        <div id="addGenreStatus" style="font-size: 12.5px; margin-top: 6px; display: none;"></div>
+                    </div>
+
+                    <div id="genresCheckboxList" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 160px; overflow-y: auto; background: var(--bg-card); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
                         <?php if (!empty($all_genres) && !is_wp_error($all_genres)) : ?>
                             <?php foreach ($all_genres as $genre) : ?>
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
                                     <input type="checkbox" name="categories[]" value="<?php echo esc_attr($genre->term_id); ?>" />
-                                    <?php echo esc_html($genre->name); ?>
+                                    <span><?php echo esc_html($genre->name); ?></span>
                                 </label>
                             <?php endforeach; ?>
                         <?php endif; ?>

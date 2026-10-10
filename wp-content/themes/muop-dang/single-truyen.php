@@ -75,10 +75,24 @@ if (!$thumb_url) {
                         </div>
                     <?php endif; ?>
 
-                    <?php if (!empty($team)) : ?>
+                    <?php if (!empty($team)) : 
+                        $team_terms = get_the_terms($story_id, 'team_dich');
+                        if (!empty($team_terms) && !is_wp_error($team_terms)) {
+                            $team_url = get_term_link($team_terms[0]);
+                        } else {
+                            $found_term = get_term_by('name', $team, 'team_dich');
+                            $team_url = ($found_term && !is_wp_error($found_term)) ? get_term_link($found_term) : home_url('/team-dich/' . sanitize_title($team) . '/');
+                        }
+                    ?>
                         <div class="meta-item">
                             <span class="meta-label"><i class="fa-solid fa-users"></i> Team dịch:</span>
-                            <span class="meta-value"><?php echo esc_html($team); ?></span>
+                            <div class="meta-value">
+                                <a href="<?php echo esc_url($team_url); ?>" class="team-badge-btn" title="Xem trang của Team <?php echo esc_attr($team); ?>">
+                                    <i class="fa-solid fa-users-viewfinder"></i>
+                                    <span><?php echo esc_html($team); ?></span>
+                                    <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 10px; margin-left: 3px; opacity: 0.75;"></i>
+                                </a>
+                            </div>
                         </div>
                     <?php endif; ?>
 

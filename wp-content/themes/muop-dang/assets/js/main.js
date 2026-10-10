@@ -945,6 +945,96 @@
   // 7. STORY & CHAPTER SUBMISSION (TRANSLATORS / ADMIN)
   const CreatorForms = {
     init() {
+      // Toggle Box Add New Genre
+      $('#btnToggleAddNewGenre').on('click', function(e) {
+        e.preventDefault();
+        const $box = $('#boxAddNewGenre');
+        $box.slideToggle(180, function() {
+          if ($box.is(':visible')) {
+            $('#inputNewGenreName').focus();
+          }
+        });
+      });
+
+      // Confirm Add New Genre (Lưu vào taxonomy the_loai ngay lập tức)
+      const handleCreateGenre = () => {
+        const $input = $('#inputNewGenreName');
+        const genreName = $.trim($input.val());
+        const $status = $('#addGenreStatus');
+        const $btn = $('#btnConfirmAddGenre');
+
+        if (!genreName) {
+          $status.css('color', '#ef4444').text('Vui lòng nhập tên thể loại!').fadeIn();
+          $input.focus();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $status.hide();
+
+        const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_create_genre',
+            nonce: nonce,
+            name: genreName
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thể Loại');
+            if (typeof res === 'string') {
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
+            }
+            if (res && res.success) {
+              const data = res.data;
+              const termId = data.term_id;
+              const termName = data.name;
+
+              // Kiểm tra xem đã có checkbox trong list chưa
+              let $existing = $(`#genresCheckboxList input[value="${termId}"]`);
+              if ($existing.length) {
+                $existing.prop('checked', true);
+                $status.css('color', '#3F7523').text(`Thể loại "${termName}" đã có sẵn và đã được chọn!`).fadeIn();
+              } else {
+                const newHtml = `
+                  <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--primary-green); font-weight: 600;">
+                    <input type="checkbox" name="categories[]" value="${termId}" checked />
+                    <span>${termName} (Mới)</span>
+                  </label>
+                `;
+                $('#genresCheckboxList').prepend(newHtml);
+                $status.css('color', '#3F7523').text(`Đã thêm thể loại "${termName}" thành công!`).fadeIn();
+              }
+              $input.val('');
+            } else {
+              $status.css('color', '#ef4444').text(getAjaxMsg(res, 'Lỗi thêm thể loại!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thể Loại');
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $status.css('color', '#ef4444').text(errorMsg).fadeIn();
+          }
+        });
+      };
+
+      $('#btnConfirmAddGenre').on('click', function(e) {
+        e.preventDefault();
+        handleCreateGenre();
+      });
+
+      $('#inputNewGenreName').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleCreateGenre();
+        }
+      });
+
       // Submit Story
       $('#formSubmitStory').on('submit', function(e) {
         e.preventDefault();
@@ -1828,6 +1918,70 @@
     }
   };
 
+  // 15. TEAM DỊCH MANAGER (YÊU THÍCH / THEO DÕI TEAM)
+  const TeamManager = {
+    init() {
+      $('#btnToggleFavoriteTeam').on('click', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const teamId = $btn.data('team-id');
+        const teamName = $btn.data('team-name');
+        const $icon = $('#favTeamHeartIcon');
+        const $text = $('#favTeamBtnText');
+        const $count = $('#teamFavCountDisplay');
+
+        if (!teamId && !teamName) return;
+
+        $btn.prop('disabled', true);
+        const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_toggle_favorite_team',
+            nonce: nonce,
+            team_id: teamId,
+            team_name: teamName
+          },
+          success: (res) => {
+            $btn.prop('disabled', false);
+            if (typeof res === 'string') {
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
+            }
+            if (res && res.success) {
+              const isFav = res.data.favorited;
+              const count = res.data.count;
+
+              if (isFav) {
+                $btn.removeClass('btn-secondary').addClass('btn-primary');
+                $icon.removeClass('fa-regular').addClass('fa-solid');
+                $text.text('Đã Yêu Thích Team');
+              } else {
+                $btn.removeClass('btn-primary').addClass('btn-secondary');
+                $icon.removeClass('fa-solid').addClass('fa-regular');
+                $text.text('Yêu Thích Team');
+              }
+              if ($count.length) {
+                $count.text(count.toLocaleString('vi-VN'));
+              }
+            } else {
+              alert(getAjaxMsg(res, 'Vui lòng đăng nhập để lưu team vào danh sách yêu thích!'));
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false);
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            alert(errorMsg);
+          }
+        });
+      });
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     localStorage.removeItem('muop_accent_color');
@@ -1844,6 +1998,7 @@
     MobileNavManager.init();
     ProfileManager.init();
     StoryStatusManager.init();
+    TeamManager.init();
   });
 
 })(jQuery);

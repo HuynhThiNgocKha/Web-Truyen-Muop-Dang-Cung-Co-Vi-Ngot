@@ -7,7 +7,19 @@ if (!defined('ABSPATH')) exit;
 
 get_header();
 
-$current_genre_slug = get_query_var('the_loai') ?: (isset($_GET['the_loai']) ? sanitize_text_field($_GET['the_loai']) : '');
+$queried_obj = get_queried_object();
+if ($queried_obj instanceof WP_Term && $queried_obj->taxonomy === 'the_loai') {
+    $current_genre_slug = $queried_obj->slug;
+    $genre_title = $queried_obj->name;
+} else {
+    $current_genre_slug = get_query_var('the_loai') ?: (isset($_GET['the_loai']) ? sanitize_text_field($_GET['the_loai']) : '');
+    if (!empty($current_genre_slug)) {
+        $current_term = get_term_by('slug', $current_genre_slug, 'the_loai');
+        $genre_title = $current_term ? $current_term->name : 'Thể loại';
+    } else {
+        $genre_title = 'Tất Cả Thể Loại';
+    }
+}
 $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
 
 $all_genres = get_terms(array(
@@ -30,10 +42,6 @@ if (!empty($current_genre_slug)) {
             'terms'    => $current_genre_slug
         )
     );
-    $current_term = get_term_by('slug', $current_genre_slug, 'the_loai');
-    $genre_title = $current_term ? $current_term->name : 'Thể loại';
-} else {
-    $genre_title = 'Tất Cả Thể Loại';
 }
 
 $query = new WP_Query($query_args);

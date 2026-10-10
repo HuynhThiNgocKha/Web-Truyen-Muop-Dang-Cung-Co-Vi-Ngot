@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.0.1');
+define('MUOP_THEME_VERSION', '2.0.2');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -726,13 +726,33 @@ function muop_ajax_submit_story_handler() {
     update_post_meta($story_id, '_truyen_nominated', 'none');
 
     // Taxonomies
+    if (!empty($_POST['new_categories'])) {
+        $new_cats = is_array($_POST['new_categories']) ? $_POST['new_categories'] : explode(',', sanitize_text_field($_POST['new_categories']));
+        foreach ($new_cats as $new_c) {
+            $nc_name = trim(sanitize_text_field($new_c));
+            if (!empty($nc_name)) {
+                $term = term_exists($nc_name, 'the_loai');
+                if (!$term) {
+                    $term = wp_insert_term($nc_name, 'the_loai');
+                }
+                if (!is_wp_error($term) && isset($term['term_id'])) {
+                    $categories[] = (int) $term['term_id'];
+                }
+            }
+        }
+    }
+
     if (!empty($categories)) {
-        wp_set_object_terms($story_id, $categories, 'the_loai');
+        wp_set_object_terms($story_id, array_unique($categories), 'the_loai');
     }
     if (!empty($author_name)) {
         wp_set_object_terms($story_id, array($author_name), 'tac_gia');
     }
     if (!empty($team_name)) {
+        $team_term = term_exists($team_name, 'team_dich');
+        if (!$team_term) {
+            wp_insert_term($team_name, 'team_dich');
+        }
         wp_set_object_terms($story_id, array($team_name), 'team_dich');
     }
 
@@ -1182,4 +1202,112 @@ function muop_ajax_save_reading_preferences_handler() {
     );
     update_user_meta($user_id, 'muop_reading_preferences', $prefs);
     wp_send_json_success(array('message' => 'Đã lưu cài đặt đọc truyện thành công!', 'preferences' => $prefs));
+}
+
+// 12. AJAX: Toggle Favorite Team (Yêu thích / Theo dõi Team Dịch)
+add_action('wp_ajax_muop_toggle_favorite_team', 'muop_ajax_toggle_favorite_team_handler');
+add_action('wp_ajax_nopriv_muop_toggle_favorite_team', 'muop_ajax_toggle_favorite_team_handler');
+function muop_ajax_toggle_favorite_team_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để lưu team dịch vào danh sách yêu thích!'));
+    }
+
+    $user_id   = get_current_user_id();
+    $team_id   = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+    $team_name = isset($_POST['team_name']) ? sanitize_text_field($_POST['team_name']) : '';
+
+    if ($team_id <= 0 && !empty($team_name)) {
+        $term = get_term_by('name', $team_name, 'team_dich');
+        if ($term && !is_wp_error($term)) {
+            $team_id = $term->term_id;
+        } else {
+            $inserted = wp_insert_term($team_name, 'team_dich');
+            if (!is_wp_error($inserted) && isset($inserted['term_id'])) {
+                $team_id = (int) $inserted['term_id'];
+            }
+        }
+    }
+
+    if ($team_id <= 0) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thông tin team dịch!'));
+    }
+
+    $fav_teams = get_user_meta($user_id, '_muop_favorite_teams', true);
+    if (!is_array($fav_teams)) {
+        $fav_teams = array();
+    }
+
+    $count = (int) get_term_meta($team_id, '_team_favorite_count', true);
+    if ($count < 0) $count = 0;
+
+    if (in_array($team_id, $fav_teams)) {
+        $fav_teams = array_values(array_diff($fav_teams, array($team_id)));
+        $count = max(0, $count - 1);
+        update_user_meta($user_id, '_muop_favorite_teams', $fav_teams);
+        update_term_meta($team_id, '_team_favorite_count', $count);
+        wp_send_json_success(array(
+            'favorited' => false,
+            'count'     => $count,
+            'message'   => 'Đã hủy yêu thích team dịch!'
+        ));
+    } else {
+        $fav_teams[] = $team_id;
+        $count++;
+        update_user_meta($user_id, '_muop_favorite_teams', $fav_teams);
+        update_term_meta($team_id, '_team_favorite_count', $count);
+        wp_send_json_success(array(
+            'favorited' => true,
+            'count'     => $count,
+            'message'   => 'Đã thêm team dịch vào danh sách yêu thích!'
+        ));
+    }
+}
+
+// 13. AJAX: Create New Genre (Thêm Thể Loại Mới)
+add_action('wp_ajax_muop_create_genre', 'muop_ajax_create_genre_handler');
+function muop_ajax_create_genre_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện chức năng này!'));
+    }
+    if (!current_user_can('dich_gia') && !current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Bạn cần có quyền Dịch Giả hoặc Quản Trị Viên để thêm thể loại mới!'));
+    }
+
+    $genre_name = isset($_POST['name']) ? sanitize_text_field(trim($_POST['name'])) : '';
+    if (empty($genre_name)) {
+        wp_send_json_error(array('message' => 'Vui lòng nhập tên thể loại!'));
+    }
+
+    $exists = term_exists($genre_name, 'the_loai');
+    if ($exists) {
+        $term_id = is_array($exists) ? (int)$exists['term_id'] : (int)$exists;
+        $term = get_term($term_id, 'the_loai');
+        wp_send_json_success(array(
+            'term_id' => $term_id,
+            'name'    => $term->name,
+            'slug'    => $term->slug,
+            'is_new'  => false,
+            'message' => 'Thể loại này đã có sẵn trong hệ thống!'
+        ));
+    }
+
+    $inserted = wp_insert_term($genre_name, 'the_loai');
+    if (is_wp_error($inserted)) {
+        wp_send_json_error(array('message' => $inserted->get_error_message()));
+    }
+
+    $term = get_term($inserted['term_id'], 'the_loai');
+    wp_send_json_success(array(
+        'term_id' => (int) $inserted['term_id'],
+        'name'    => $term->name,
+        'slug'    => $term->slug,
+        'is_new'  => true,
+        'message' => 'Đã thêm thể loại mới thành công!'
+    ));
 }

@@ -1080,6 +1080,34 @@ img {
   align-items: center;
 }
 
+.team-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--soft-green);
+  color: var(--primary-green);
+  border: 1px solid var(--border-color);
+  padding: 3px 12px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.22s ease;
+  line-height: 1.4;
+}
+
+.team-badge-btn:hover {
+  background: var(--primary-green);
+  color: #ffffff;
+  border-color: var(--primary-green);
+  box-shadow: 0 3px 10px rgba(63, 117, 35, 0.25);
+  transform: translateY(-1px);
+}
+
+.team-badge-btn:hover i {
+  color: #ffffff;
+}
+
 .genre-tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -4403,6 +4431,315 @@ img {
   }
 
   .preset-avatar-grid {
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   TEAM DỊCH (PAGE / TAXONOMY STYLES)
+   ========================================================================== */
+.team-hero-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 26px;
+  margin-bottom: 26px;
+  box-shadow: var(--shadow-sm);
+}
+
+.team-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 20px;
+}
+
+.team-avatar-wrap {
+  flex-shrink: 0;
+}
+
+.team-avatar-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-green), var(--avocado-green));
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(63, 117, 35, 0.3);
+  border: 3px solid #ffffff;
+}
+
+.team-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.team-hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.team-hero-name {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.team-hero-bio {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.team-hero-action {
+  flex-shrink: 0;
+}
+
+.btn-favorite-team {
+  padding: 9px 20px !important;
+  font-size: 13.5px !important;
+  border-radius: var(--radius-full) !important;
+}
+
+/* Team Stats KPI Grid */
+.team-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.team-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--pastel-green);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.team-stat-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.team-stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--primary-green);
+  flex-shrink: 0;
+  border: 1px solid var(--border-light);
+}
+
+.team-stat-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.team-stat-num {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.team-stat-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Team Spotlight Box (Truyện được yêu thích nhất) */
+.team-spotlight-box {
+  background: linear-gradient(135deg, var(--pastel-green), var(--bg-card));
+  border: 1.5px solid var(--primary-green);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  margin-bottom: 30px;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+}
+
+.team-spotlight-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #FFF8E1, #FFECB3);
+  color: #B45309;
+  border: 1px solid #FDE68A;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.team-spotlight-content {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+}
+
+.team-spotlight-thumb {
+  width: 125px;
+  aspect-ratio: 5 / 7;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  display: block;
+}
+
+.team-spotlight-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.team-spotlight-thumb:hover img {
+  transform: scale(1.04);
+}
+
+.team-spotlight-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.team-spotlight-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 8px 0;
+  line-height: 1.35;
+}
+
+.team-spotlight-title a {
+  color: var(--text-main);
+}
+
+.team-spotlight-title a:hover {
+  color: var(--primary-green);
+}
+
+.team-spotlight-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.team-spotlight-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.team-spotlight-desc {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+
+.team-spotlight-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Mobile responsive for Team Dịch */
+@media (max-width: 768px) {
+  .team-hero-card {
+    padding: 18px 14px;
+  }
+  .team-hero-top {
+    flex-direction: column;
+    text-align: center;
+    gap: 14px;
+    padding-bottom: 18px;
+  }
+  .team-hero-title-row {
+    justify-content: center;
+  }
+  .team-hero-name {
+    font-size: 20px;
+  }
+  .team-hero-action {
+    width: 100%;
+  }
+  .btn-favorite-team {
+    width: 100%;
+    justify-content: center;
+  }
+  .team-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .team-stat-item {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .team-stat-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+  }
+  .team-stat-num {
+    font-size: 15px;
+  }
+  .team-stat-label {
+    font-size: 11.5px;
+  }
+  .team-spotlight-box {
+    padding: 16px 14px;
+  }
+  .team-spotlight-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+  }
+  .team-spotlight-thumb {
+    width: 110px;
+  }
+  .team-spotlight-title {
+    font-size: 17px;
+  }
+  .team-spotlight-meta {
+    justify-content: center;
+    gap: 10px;
+  }
+  .team-spotlight-actions {
+    justify-content: center;
+    width: 100%;
+  }
+  .team-spotlight-actions .btn {
+    flex: 1;
     justify-content: center;
   }
 }
