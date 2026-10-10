@@ -14,13 +14,18 @@
   function getAjaxMsg(res, defaultMsg) {
     if (!res) return defaultMsg || 'Có lỗi xảy ra!';
     if (typeof res === 'string') {
-      if (res === '-1') return 'Phiên bảo mật (nonce) đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
-      if (res === '0') return 'Bạn cần đăng nhập để thực hiện chức năng này!';
+      let clean = res.trim();
+      // Remove any leaked PHP HTML notices/warnings
+      if (clean.indexOf('PHP Request Startup') !== -1 || clean.indexOf('<b>Notice</b>') !== -1 || clean.indexOf('<b>Warning</b>') !== -1) {
+        clean = clean.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+      }
+      if (clean === '-1') return 'Phiên bảo mật (nonce) đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
+      if (clean === '0' || clean.endsWith(' 0') || clean === '0') return 'Bạn cần đăng nhập để thực hiện chức năng này!';
       try {
-        const json = JSON.parse(res);
+        const json = JSON.parse(clean);
         return getAjaxMsg(json, defaultMsg);
       } catch (e) {
-        return res.length < 250 ? res : (defaultMsg || 'Lỗi xử lý máy chủ!');
+        return clean.length < 250 && clean.length > 0 ? clean : (defaultMsg || 'Lỗi xử lý máy chủ!');
       }
     }
     if (res.data) {
@@ -419,7 +424,8 @@
           processData: false,
           success: (res) => {
             if (typeof res === 'string') {
-              try { res = JSON.parse(res); } catch (e) {}
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
             }
             if (res && res.success) {
               const successMsg = getAjaxMsg(res, 'Đăng truyện thành công!');
@@ -983,7 +989,8 @@
             $spinner.hide();
 
             if (typeof res === 'string') {
-              try { res = JSON.parse(res); } catch (e) {}
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
             }
 
             if (res && res.success) {

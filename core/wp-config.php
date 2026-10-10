@@ -90,6 +90,19 @@ $table_prefix = 'wp_';
 if ( ! defined( 'WP_DEBUG' ) ) {
 	define( 'WP_DEBUG', false );
 }
+if ( ! defined( 'WP_DEBUG_DISPLAY' ) ) {
+	define( 'WP_DEBUG_DISPLAY', false );
+}
+@ini_set( 'display_errors', '0' );
+
+// Ensure local writable upload temp directory exists to avoid PHP Request Startup notice
+$custom_tmp_dir = dirname( __DIR__ ) . DIRECTORY_SEPARATOR . 'tmp';
+if ( ! is_dir( $custom_tmp_dir ) ) {
+	@mkdir( $custom_tmp_dir, 0777, true );
+}
+if ( is_dir( $custom_tmp_dir ) && is_writable( $custom_tmp_dir ) ) {
+	@ini_set( 'upload_tmp_dir', $custom_tmp_dir );
+}
 
 // Dynamic Home, SiteURL, and Content paths for subdirectory core architecture & domain support
 $is_ssl = ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' ) 

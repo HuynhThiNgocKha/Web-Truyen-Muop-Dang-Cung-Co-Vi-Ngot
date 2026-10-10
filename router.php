@@ -2,7 +2,16 @@
 /**
  * Router script for PHP built-in web server
  */
+@ini_set('display_errors', '0');
+@error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
+
 $root = __DIR__;
+$localTmp = $root . DIRECTORY_SEPARATOR . 'tmp';
+if (!is_dir($localTmp)) {
+    @mkdir($localTmp, 0777, true);
+}
+@ini_set('upload_tmp_dir', $localTmp);
+
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 // 1. Mobile connect & Sitemap helpers
