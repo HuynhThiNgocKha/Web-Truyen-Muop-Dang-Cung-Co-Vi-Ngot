@@ -122,6 +122,9 @@ $genres = get_terms(array(
                             <a href="<?php echo esc_url(home_url('/ho-so/#tabPassword')); ?>">
                                 <i class="fa-solid fa-key"></i> <span>Đổi mật khẩu</span>
                             </a>
+                            <a href="<?php echo esc_url(home_url('/ho-so/#tabReadingSettings')); ?>">
+                                <i class="fa-solid fa-sliders"></i> <span>Cài đặt đọc truyện</span>
+                            </a>
 
                             <?php if (in_array('dich_gia', (array)$current_user->roles) || current_user_can('administrator')) : ?>
                                 <a href="<?php echo esc_url(home_url('/thong-tin-dich-gia/')); ?>">

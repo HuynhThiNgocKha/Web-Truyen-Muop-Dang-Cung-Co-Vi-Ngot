@@ -58,6 +58,7 @@
       } else {
         $icon.removeClass('fa-sun').addClass('fa-moon');
       }
+      $(document).trigger('muopThemeChanged', [theme]);
     }
   };
 
@@ -204,36 +205,361 @@
     }
   };
 
-  // 5. READING CONTROLS (FONT SIZE, HISTORY, BOOKMARK)
+  // 5. READING CONTROLS (FONT SIZE, FONT FAMILY, TEXT COLOR, FLOATING SETTINGS, HISTORY, BOOKMARK)
   const ReadingManager = {
-    init() {
-      let currentSize = parseInt(localStorage.getItem('muop_reading_font_size'), 10);
-      if (!currentSize) {
-        currentSize = ($(window).width() <= 768) ? 17 : 19;
-      }
-      this.applyFontSize(currentSize);
+    // 5 Màu Đề Xuất Phổ Biến Cho Nền Sáng
+    suggestedColorsLight: [
+      { color: '#262626', name: 'Đen than (Chuẩn)' },
+      { color: '#3E2723', name: 'Nâu cà phê' },
+      { color: '#1A365D', name: 'Xanh chàm' },
+      { color: '#1B4332', name: 'Xanh rêu' },
+      { color: '#4A5568', name: 'Xám dịu' }
+    ],
+    // 5 Màu Đề Xuất Phổ Biến Cho Nền Tối
+    suggestedColorsDark: [
+      { color: '#E5E7EB', name: 'Trắng bạc (Chuẩn)' },
+      { color: '#FDE68A', name: 'Vàng ấm' },
+      { color: '#A7F3D0', name: 'Xanh ngọc' },
+      { color: '#D1D5DB', name: 'Xám khói' },
+      { color: '#FBCFE8', name: 'Hồng phấn' }
+    ],
 
+    prefs: {
+      fontSize: ($(window).width() <= 768) ? 19 : 21,
+      fontFamily: 'sans-serif',
+      textColorLight: '#262626',
+      textColorDark: '#E5E7EB'
+    },
+
+    init() {
+      this.loadPreferences();
+      this.applyAllPreferences();
+      this.bindReaderToolbarEvents();
+      this.bindQuickModalEvents();
+      this.bindFloatingButtonEvents();
+      this.bindProfileSettingsEvents();
+      this.bindChapterDrawerEvents();
+      this.recordHistoryAndView();
+      this.bindBookmarkToggle();
+
+      // Khi đổi Theme Sáng / Tối, tự động cập nhật màu chữ và bảng màu tương ứng
+      $(document).on('muopThemeChanged', (e, theme) => {
+        this.updateColorsPaletteUI();
+        this.applyTextColor();
+      });
+    },
+
+    loadPreferences() {
+      // Ưu tiên load từ user_meta qua muopConfig nếu đã đăng nhập
+      let serverPrefs = muopConfig.readingPrefs;
+      if (typeof serverPrefs === 'string') {
+        try { serverPrefs = JSON.parse(serverPrefs); } catch (e) {}
+      }
+
+      let localPrefs = null;
+      try {
+        localPrefs = JSON.parse(localStorage.getItem('muop_reading_prefs'));
+      } catch (e) {}
+
+      // Legacy font size fallback
+      const legacyFontSize = parseInt(localStorage.getItem('muop_reading_font_size'), 10);
+
+      const source = serverPrefs || localPrefs || {};
+      if (source.fontSize) this.prefs.fontSize = parseInt(source.fontSize, 10);
+      else if (source.font_size) this.prefs.fontSize = parseInt(source.font_size, 10);
+      else if (legacyFontSize) this.prefs.fontSize = Math.max(legacyFontSize, ($(window).width() <= 768) ? 19 : 21);
+
+      if (source.fontFamily) this.prefs.fontFamily = source.fontFamily;
+      else if (source.font_family) this.prefs.fontFamily = source.font_family;
+
+      if (source.textColorLight) this.prefs.textColorLight = source.textColorLight;
+      else if (source.text_color_light) this.prefs.textColorLight = source.text_color_light;
+
+      if (source.textColorDark) this.prefs.textColorDark = source.textColorDark;
+      else if (source.text_color_dark) this.prefs.textColorDark = source.text_color_dark;
+    },
+
+    savePreferences(syncServer = false) {
+      localStorage.setItem('muop_reading_prefs', JSON.stringify(this.prefs));
+      localStorage.setItem('muop_reading_font_size', this.prefs.fontSize);
+
+      if (syncServer && muopConfig.isLoggedIn) {
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_save_reading_preferences',
+            nonce: muopConfig.nonce,
+            font_size: this.prefs.fontSize,
+            font_family: this.prefs.fontFamily,
+            text_color_light: this.prefs.textColorLight,
+            text_color_dark: this.prefs.textColorDark
+          }
+        });
+      }
+    },
+
+    applyAllPreferences() {
+      this.applyFontSize(this.prefs.fontSize);
+      this.applyFontFamily(this.prefs.fontFamily);
+      this.applyTextColor();
+      this.updateColorsPaletteUI();
+    },
+
+    applyFontSize(size) {
+      this.prefs.fontSize = size;
+      $('.chapter-body-text, #previewBodyText').css('font-size', size + 'px');
+      $('#settingSizeBadge, #profileSizeDisplay').text(size + 'px');
+      this.savePreferences(false);
+    },
+
+    applyFontFamily(fontKey) {
+      this.prefs.fontFamily = fontKey;
+      const $targets = $('.chapter-body-text, #previewBodyText');
+      $targets.removeClass('reader-font-sans-serif reader-font-merriweather reader-font-be-vietnam reader-font-georgia reader-font-times');
+      $targets.addClass('reader-font-' + fontKey);
+
+      // Active chips UI
+      $('.setting-font-chips .font-chip-btn').removeClass('active');
+      $(`.setting-font-chips .font-chip-btn[data-font="${fontKey}"]`).addClass('active');
+
+      this.savePreferences(false);
+    },
+
+    applyTextColor() {
+      const isDark = ($('html').attr('data-theme') === 'dark');
+      const activeColor = isDark ? this.prefs.textColorDark : this.prefs.textColorLight;
+
+      $('.chapter-body-text, #previewBodyText').css('color', activeColor);
+
+      // Update color inputs and hex badges
+      $('#inputCustomColorReader, #inputProfileCustomColor').val(activeColor);
+      $('#customColorHexReader, #profileCustomColorHex').text(activeColor.toUpperCase());
+
+      // Update active swatch
+      $('.color-swatch-item').removeClass('active');
+      $(`.color-swatch-item[data-color="${activeColor.toUpperCase()}"]`).addClass('active');
+
+      this.savePreferences(false);
+    },
+
+    updateColorsPaletteUI() {
+      const isDark = ($('html').attr('data-theme') === 'dark');
+      const list = isDark ? this.suggestedColorsDark : this.suggestedColorsLight;
+      const activeColor = (isDark ? this.prefs.textColorDark : this.prefs.textColorLight).toUpperCase();
+
+      const renderSwatches = (containerId) => {
+        const $cont = $(containerId);
+        if (!$cont.length) return;
+        let html = '';
+        list.forEach(item => {
+          const uCol = item.color.toUpperCase();
+          const isActive = (uCol === activeColor) ? 'active' : '';
+          html += `<button type="button" class="color-swatch-item ${isActive}" data-color="${uCol}" style="background-color: ${uCol};" title="${item.name} (${uCol})" aria-label="${item.name}"></button>`;
+        });
+        $cont.html(html);
+      };
+
+      renderSwatches('#settingColorsPalette');
+      renderSwatches('#profileColorsPalette');
+
+      const modeHint = isDark ? '5 màu đề xuất cho Nền Tối 🌙:' : '5 màu đề xuất cho Nền Sáng ☀️:';
+      $('#colorModeHint, #profileColorModeHint').text(modeHint);
+    },
+
+    // Toolbar A-, A+ & Settings buttons
+    bindReaderToolbarEvents() {
       $('#btnFontInc').on('click', () => {
-        if (currentSize < 28) {
-          currentSize += 2;
-          this.applyFontSize(currentSize);
+        if (this.prefs.fontSize < 32) {
+          this.applyFontSize(this.prefs.fontSize + 2);
         }
       });
 
       $('#btnFontDec').on('click', () => {
-        if (currentSize > 14) {
-          currentSize -= 2;
-          this.applyFontSize(currentSize);
+        if (this.prefs.fontSize > 15) {
+          this.applyFontSize(this.prefs.fontSize - 2);
         }
       });
 
-      // Chapter change dropdown (fallback)
-      $('#readingChapterSelect').on('change', function() {
-        const url = $(this).val();
-        if (url) window.location.href = url;
+      // Quick size in modal
+      $('#btnQuickFontInc').on('click', () => {
+        if (this.prefs.fontSize < 32) {
+          this.applyFontSize(this.prefs.fontSize + 1);
+        }
       });
 
-      // Chapter Drawer / Modal Handler (Nút 3 gạch mở danh sách chương)
+      $('#btnQuickFontDec').on('click', () => {
+        if (this.prefs.fontSize > 15) {
+          this.applyFontSize(this.prefs.fontSize - 1);
+        }
+      });
+
+      // Open settings triggers
+      $(document).on('click', '.btn-reading-settings-trigger', (e) => {
+        e.preventDefault();
+        this.openQuickModal();
+      });
+    },
+
+    // Floating Button (Chế độ chìm khi cuộn đọc truyện)
+    bindFloatingButtonEvents() {
+      const $floatingBtn = $('#btnFloatingReadingSettings');
+      if (!$floatingBtn.length) return;
+
+      $(window).on('scroll', () => {
+        const scrollY = $(window).scrollTop();
+        if (scrollY > 160) {
+          $floatingBtn.fadeIn(220);
+        } else {
+          $floatingBtn.fadeOut(200);
+        }
+      });
+    },
+
+    // Quick Modal Handlers
+    openQuickModal() {
+      $('#readingSettingsOverlay').fadeIn(180);
+      $('#readingSettingsQuickModal').fadeIn(180);
+      $('#btnFloatingReadingSettings').addClass('is-active');
+      this.updateColorsPaletteUI();
+    },
+
+    closeQuickModal() {
+      $('#readingSettingsQuickModal').fadeOut(150);
+      $('#readingSettingsOverlay').fadeOut(150);
+      $('#btnFloatingReadingSettings').removeClass('is-active');
+    },
+
+    bindQuickModalEvents() {
+      $('#btnCloseReadingSettings, #readingSettingsOverlay').on('click', () => {
+        this.closeQuickModal();
+      });
+
+      $(document).on('keydown', (e) => {
+        if (e.key === 'Escape' && $('#readingSettingsQuickModal').is(':visible')) {
+          this.closeQuickModal();
+        }
+      });
+
+      // Font chips selection
+      $(document).on('click', '#readingFontChips .font-chip-btn', (e) => {
+        const font = $(e.currentTarget).data('font');
+        this.applyFontFamily(font);
+      });
+
+      // Color swatches selection
+      $(document).on('click', '#settingColorsPalette .color-swatch-item', (e) => {
+        const col = $(e.currentTarget).data('color');
+        const isDark = ($('html').attr('data-theme') === 'dark');
+        if (isDark) this.prefs.textColorDark = col;
+        else this.prefs.textColorLight = col;
+        this.applyTextColor();
+      });
+
+      // Custom color picker
+      $('#inputCustomColorReader').on('input change', (e) => {
+        const col = $(e.currentTarget).val();
+        const isDark = ($('html').attr('data-theme') === 'dark');
+        if (isDark) this.prefs.textColorDark = col;
+        else this.prefs.textColorLight = col;
+        this.applyTextColor();
+      });
+
+      // Theme choices in modal
+      $('.setting-theme-choice-row .theme-choice-btn').on('click', function() {
+        const theme = $(this).data('theme');
+        ThemeManager.setTheme(theme);
+        $('.setting-theme-choice-row .theme-choice-btn').removeClass('active');
+        $(this).addClass('active');
+      });
+
+      // Reset Defaults
+      $('#btnResetReadingPrefs').on('click', () => {
+        this.prefs.fontSize = ($(window).width() <= 768) ? 19 : 21;
+        this.prefs.fontFamily = 'sans-serif';
+        this.prefs.textColorLight = '#262626';
+        this.prefs.textColorDark = '#E5E7EB';
+        this.applyAllPreferences();
+        this.savePreferences(true);
+      });
+    },
+
+    // Profile Page Tab 5 Handlers
+    bindProfileSettingsEvents() {
+      const $tab = $('#tabReadingSettings');
+      if (!$tab.length) return;
+
+      // Font size buttons
+      $('#btnProfileFontInc').on('click', () => {
+        if (this.prefs.fontSize < 32) this.applyFontSize(this.prefs.fontSize + 1);
+      });
+      $('#btnProfileFontDec').on('click', () => {
+        if (this.prefs.fontSize > 15) this.applyFontSize(this.prefs.fontSize - 1);
+      });
+
+      // Font chips
+      $('#profileFontChips .font-chip-btn').on('click', (e) => {
+        const font = $(e.currentTarget).data('font');
+        this.applyFontFamily(font);
+      });
+
+      // Color swatches
+      $(document).on('click', '#profileColorsPalette .color-swatch-item', (e) => {
+        const col = $(e.currentTarget).data('color');
+        const isDark = ($('#previewContentBox').hasClass('preview-theme-dark'));
+        if (isDark) this.prefs.textColorDark = col;
+        else this.prefs.textColorLight = col;
+        this.applyTextColor();
+      });
+
+      // Custom color
+      $('#inputProfileCustomColor').on('input change', (e) => {
+        const col = $(e.currentTarget).val();
+        const isDark = ($('#previewContentBox').hasClass('preview-theme-dark'));
+        if (isDark) this.prefs.textColorDark = col;
+        else this.prefs.textColorLight = col;
+        this.applyTextColor();
+      });
+
+      // Preview theme toggle
+      $('.btn-preview-theme').on('click', function() {
+        $('.btn-preview-theme').removeClass('active');
+        $(this).addClass('active');
+        const previewTheme = $(this).data('preview-theme');
+        $('#previewContentBox').removeClass('preview-theme-light preview-theme-dark')
+          .addClass('preview-theme-' + previewTheme);
+        ReadingManager.applyTextColor();
+      });
+
+      // Save button on profile
+      $('#btnSaveProfileReadingSettings').on('click', () => {
+        this.savePreferences(true);
+        $('#profileReadingSettingsAlert').html(`
+          <div style="background: #E8F5E9; color: #2E7D32; padding: 12px 16px; border-radius: 8px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(46,125,50,0.25);">
+            <i class="fa-solid fa-circle-check"></i> Đã lưu cài đặt đọc truyện thành công! Các tùy chỉnh sẽ tự động áp dụng cho mọi truyện bạn đọc.
+          </div>
+        `).fadeIn();
+        setTimeout(() => { $('#profileReadingSettingsAlert').fadeOut(); }, 4000);
+      });
+
+      // Reset button on profile
+      $('#btnResetProfileReadingSettings').on('click', () => {
+        this.prefs.fontSize = ($(window).width() <= 768) ? 19 : 21;
+        this.prefs.fontFamily = 'sans-serif';
+        this.prefs.textColorLight = '#262626';
+        this.prefs.textColorDark = '#E5E7EB';
+        this.applyAllPreferences();
+        this.savePreferences(true);
+        $('#profileReadingSettingsAlert').html(`
+          <div style="background: #E8F5E9; color: #2E7D32; padding: 12px 16px; border-radius: 8px; font-size: 13.5px; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-check"></i> Đã khôi phục cài đặt đọc truyện về mặc định!
+          </div>
+        `).fadeIn();
+      });
+    },
+
+    // Drawer danh sách chương
+    bindChapterDrawerEvents() {
       const $drawerModal = $('#chapterDrawerModal');
       const $drawerOverlay = $('#chapterDrawerOverlay');
       const $drawerSearch = $('#chapterDrawerSearchInput');
@@ -241,12 +567,11 @@
       const $drawerItems = $('#chapterDrawerList .chapter-drawer-item');
       const $drawerNoResults = $('#chapterDrawerNoResults');
 
-      function openChapterDrawer() {
+      function openDrawer() {
         $drawerOverlay.fadeIn(180);
         $drawerModal.fadeIn(180);
         $('body').css('overflow', 'hidden');
 
-        // Cuộn tới chương đang đọc
         setTimeout(() => {
           const $current = $('#chapterDrawerList .is-current-chapter');
           if ($current.length) {
@@ -260,35 +585,32 @@
         }, 80);
       }
 
-      function closeChapterDrawer() {
+      function closeDrawer() {
         $drawerModal.fadeOut(150);
         $drawerOverlay.fadeOut(150);
         $('body').css('overflow', '');
       }
 
-      $(document).on('click', '.btn-chapter-drawer-toggle', function(e) {
+      $(document).on('click', '.btn-chapter-drawer-toggle', (e) => {
         e.preventDefault();
-        openChapterDrawer();
+        openDrawer();
       });
 
-      $('#btnCloseChapterDrawer, #chapterDrawerOverlay').on('click', function() {
-        closeChapterDrawer();
+      $('#btnCloseChapterDrawer, #chapterDrawerOverlay').on('click', () => {
+        closeDrawer();
       });
 
-      $(document).on('keydown', function(e) {
+      $(document).on('keydown', (e) => {
         if (e.key === 'Escape' && $drawerModal.is(':visible')) {
-          closeChapterDrawer();
+          closeDrawer();
         }
       });
 
-      // Tìm kiếm chương nhanh trong popup
+      // Live search
       $drawerSearch.on('input', function() {
         const q = $(this).val().toLowerCase().trim();
-        if (q.length > 0) {
-          $drawerClear.show();
-        } else {
-          $drawerClear.hide();
-        }
+        if (q.length > 0) $drawerClear.show();
+        else $drawerClear.hide();
 
         let visibleCount = 0;
         $drawerItems.each(function() {
@@ -301,18 +623,22 @@
           }
         });
 
-        if (visibleCount === 0) {
-          $drawerNoResults.show();
-        } else {
-          $drawerNoResults.hide();
-        }
+        if (visibleCount === 0) $drawerNoResults.show();
+        else $drawerNoResults.hide();
       });
 
-      $drawerClear.on('click', function() {
+      $drawerClear.on('click', () => {
         $drawerSearch.val('').trigger('input').focus();
       });
 
-      // Record reading history & view count
+      // Legacy fallback
+      $('#readingChapterSelect').on('change', function() {
+        const url = $(this).val();
+        if (url) window.location.href = url;
+      });
+    },
+
+    recordHistoryAndView() {
       const $readingWrapper = $('.chapter-reading-wrapper');
       if ($readingWrapper.length) {
         const storyId = $readingWrapper.data('story-id');
@@ -342,8 +668,9 @@
           }
         });
       }
+    },
 
-      // Bookmark / Tủ truyện Toggle
+    bindBookmarkToggle() {
       $(document).on('click', '#btnToggleBookmark', function(e) {
         e.preventDefault();
         const storyId = $(this).data('story-id');
@@ -383,11 +710,6 @@
           }
         });
       });
-    },
-
-    applyFontSize(size) {
-      $('.chapter-body-text').css('font-size', size + 'px');
-      localStorage.setItem('muop_reading_font_size', size);
     }
   };
 

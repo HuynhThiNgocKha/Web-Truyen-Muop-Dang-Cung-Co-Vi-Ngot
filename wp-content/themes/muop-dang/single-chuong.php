@@ -49,15 +49,15 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB DẠNG DỌC THEO ẢNH 2) -->
         <nav class="reading-vertical-breadcrumbs">
             <div class="bread-row">
-                <a href="<?php echo esc_url(home_url('/')); ?>">Trang chủ</a>
+                <a href="<?php echo esc_url(home_url('/')); ?>" class="bread-link">Trang chủ</a>
             </div>
             <div class="bread-row">
                 <i class="fa-solid fa-angle-right bread-caret"></i>
-                <a href="<?php echo esc_url($story_url); ?>"><?php echo esc_html($story_title); ?></a>
+                <a href="<?php echo esc_url($story_url); ?>" class="bread-link bread-story-link"><?php echo esc_html($story_title); ?></a>
             </div>
             <div class="bread-row bread-current">
                 <i class="fa-solid fa-angle-right bread-caret"></i>
-                <span><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
+                <span class="bread-chapter-name"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
             </div>
         </nav>
 
@@ -90,10 +90,13 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
                 <?php endif; ?>
             </div>
 
-            <!-- Điều chỉnh cỡ chữ (chuyển xuống dưới hàng chương trước / chương sau theo Ảnh 3) -->
+            <!-- Điều chỉnh cỡ chữ & mở popup cài đặt đọc truyện theo Ảnh 3 -->
             <div class="reading-font-bar">
                 <button type="button" class="font-size-btn" id="btnFontDec" title="Giảm cỡ chữ">A-</button>
                 <button type="button" class="font-size-btn" id="btnFontInc" title="Tăng cỡ chữ">A+</button>
+                <button type="button" class="font-size-btn btn-reading-settings-trigger" id="btnOpenReadingSettingsTop" title="Tùy chỉnh font chữ & màu sắc">
+                    <i class="fa-solid fa-palette"></i>
+                </button>
             </div>
         </div>
 
@@ -283,6 +286,100 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
         <a href="<?php echo esc_url($story_url); ?>" class="btn-drawer-story-link">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Xem thông tin truyện
         </a>
+    </div>
+</div>
+
+<!-- ==========================================================================
+     NÚT NỔI CHẾ ĐỘ CHÌM (FLOATING BUTTON)
+     Tự động xuất hiện khi lướt đọc truyện xuống. Ở chế độ chìm (mờ nhẹ),
+     chỉ khi nhấn vào mới mở popup tùy chỉnh cỡ chữ, font chữ và màu sắc.
+     ========================================================================== -->
+<button type="button" class="floating-reading-btn btn-reading-settings-trigger" id="btnFloatingReadingSettings" title="Tùy chỉnh đọc truyện (Font, Màu, Cỡ chữ)" style="display: none;">
+    <i class="fa-solid fa-sliders"></i>
+</button>
+
+<!-- ==========================================================================
+     POPUP / POPOVER TÙY CHỈNH ĐỌC TRUYỆN (FONT, MÀU CHỮ, CỠ CHỮ)
+     ========================================================================== -->
+<div id="readingSettingsOverlay" class="reading-settings-overlay" style="display: none;"></div>
+<div id="readingSettingsQuickModal" class="reading-settings-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="readingSettingsTitle">
+    <div class="reading-settings-header">
+        <h3 id="readingSettingsTitle" class="reading-settings-title">
+            <i class="fa-solid fa-sliders"></i> Tùy Chỉnh Đọc Truyện
+        </h3>
+        <button type="button" class="reading-settings-close" id="btnCloseReadingSettings" aria-label="Đóng">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <div class="reading-settings-body">
+        <!-- 1. CỠ CHỮ -->
+        <div class="setting-item-block">
+            <label class="setting-item-label"><i class="fa-solid fa-text-height"></i> Cỡ chữ nội dung</label>
+            <div class="setting-size-row">
+                <button type="button" class="font-size-btn-sm" id="btnQuickFontDec" title="Giảm cỡ chữ">A-</button>
+                <span class="setting-size-badge" id="settingSizeBadge">21px</span>
+                <button type="button" class="font-size-btn-sm" id="btnQuickFontInc" title="Tăng cỡ chữ">A+</button>
+            </div>
+        </div>
+
+        <!-- 2. KIỂU CHỮ (FONT) -->
+        <div class="setting-item-block">
+            <label class="setting-item-label"><i class="fa-solid fa-font"></i> Kiểu chữ (Font)</label>
+            <div class="setting-font-chips" id="readingFontChips">
+                <button type="button" class="font-chip-btn active" data-font="sans-serif">Sans-serif (Mặc định)</button>
+                <button type="button" class="font-chip-btn" data-font="merriweather">Merriweather (Sách báo)</button>
+                <button type="button" class="font-chip-btn" data-font="be-vietnam">Be Vietnam Pro</button>
+                <button type="button" class="font-chip-btn" data-font="georgia">Georgia (Cổ điển)</button>
+                <button type="button" class="font-chip-btn" data-font="times">Times New Roman</button>
+            </div>
+        </div>
+
+        <!-- 3. MÀU CHỮ (5 MÀU ĐỀ XUẤT + MÀU TÙY CHỌN) -->
+        <div class="setting-item-block">
+            <div class="setting-title-split">
+                <label class="setting-item-label"><i class="fa-solid fa-palette"></i> Màu chữ đọc truyện</label>
+                <span class="setting-hint-text" id="colorModeHint">5 màu đề xuất phổ biến:</span>
+            </div>
+            <!-- Grid 5 màu đề xuất -->
+            <div class="setting-colors-palette" id="settingColorsPalette"></div>
+
+            <!-- Tùy chọn màu tự do theo ý người dùng -->
+            <div class="custom-color-row">
+                <label for="inputCustomColorReader" class="custom-color-label">
+                    <i class="fa-solid fa-eye-dropper"></i> Tự chọn màu tùy thích:
+                </label>
+                <div class="custom-color-control">
+                    <input type="color" id="inputCustomColorReader" class="custom-color-input" value="#262626" />
+                    <span class="custom-color-hex" id="customColorHexReader">#262626</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. GIAO DIỆN SÁNG / TỐI -->
+        <div class="setting-item-block">
+            <label class="setting-item-label"><i class="fa-solid fa-circle-half-stroke"></i> Nền giao diện</label>
+            <div class="setting-theme-choice-row">
+                <button type="button" class="theme-choice-btn active" data-theme="light">
+                    <i class="fa-regular fa-sun"></i> Nền Sáng
+                </button>
+                <button type="button" class="theme-choice-btn" data-theme="dark">
+                    <i class="fa-solid fa-moon"></i> Nền Tối
+                </button>
+            </div>
+        </div>
+
+        <!-- 5. FOOTER: NÚT KHÔI PHỤC & LIÊN KẾT ĐẾN CÀI ĐẶT HỆ THỐNG -->
+        <div class="setting-modal-footer">
+            <button type="button" class="btn-link-reset" id="btnResetReadingPrefs">
+                <i class="fa-solid fa-arrow-rotate-left"></i> Khôi phục mặc định
+            </button>
+            <?php if (is_user_logged_in()) : ?>
+                <a href="<?php echo esc_url(home_url('/ho-so/#tabReadingSettings')); ?>" class="link-to-profile-settings" target="_blank">
+                    <i class="fa-solid fa-gear"></i> Trang Cài đặt tài khoản
+                </a>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
 

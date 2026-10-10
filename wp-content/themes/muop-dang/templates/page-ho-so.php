@@ -106,6 +106,9 @@ $preset_avatars = array(
             <button type="button" class="dash-tab-btn" data-tab="tabHistory">
                 <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Đọc (<?php echo count($history_rows); ?>)
             </button>
+            <button type="button" class="dash-tab-btn" data-tab="tabReadingSettings">
+                <i class="fa-solid fa-sliders"></i> Cài Đặt Đọc Truyện
+            </button>
         </div>
 
         <!-- ========================================== -->
@@ -346,6 +349,92 @@ $preset_avatars = array(
                     <p>Bạn chưa đọc chương truyện nào. Cùng khám phá truyện hay ngay thôi!</p>
                 </div>
             <?php endif; ?>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: CÀI ĐẶT ĐỌC TRUYỆN (ÁP DỤNG CHUNG) -->
+        <!-- ========================================== -->
+        <div id="tabReadingSettings" class="dash-tab-pane">
+            <div class="profile-form-card">
+                <div class="form-section-header">
+                    <h3><i class="fa-solid fa-sliders"></i> Cài Đặt Giao Diện Đọc Truyện</h3>
+                    <p>Tùy biến cỡ chữ, kiểu phông và màu sắc đọc truyện ưa thích. Áp dụng chung cho Độc giả, Dịch giả và Quản trị viên trên mọi thiết bị.</p>
+                </div>
+
+                <div id="profileReadingSettingsAlert"></div>
+
+                <!-- KHUNG XEM TRƯỚC THỜI GIAN THỰC (LIVE PREVIEW) -->
+                <div class="reading-preview-wrapper" id="profileReadingPreviewWrapper">
+                    <div class="preview-header-bar">
+                        <span class="preview-badge-tag"><i class="fa-solid fa-eye"></i> Xem Trước Trực Quan</span>
+                        <div class="preview-theme-toggles">
+                            <button type="button" class="btn-preview-theme active" data-preview-theme="light" title="Xem trên nền sáng"><i class="fa-regular fa-sun"></i> Sáng</button>
+                            <button type="button" class="btn-preview-theme" data-preview-theme="dark" title="Xem trên nền tối"><i class="fa-solid fa-moon"></i> Tối</button>
+                        </div>
+                    </div>
+                    <div class="preview-content-box" id="previewContentBox">
+                        <h4 class="preview-title" id="previewTitle">Chương 1: Khởi Đầu Mới</h4>
+                        <div class="preview-body-text" id="previewBodyText">
+                            <p>Mỗi câu chuyện mở ra một thế giới đầy màu sắc và cảm xúc. Khung xem trước này giúp bạn kiểm tra độ tương phản, kiểu chữ và kích thước hiển thị phù hợp nhất với thị giác của mình.</p>
+                            <p>Chúc bạn có những phút giây đọc truyện thật thư thái và trọn vẹn tại Mướp Đắng!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BỘ ĐIỀU KHIỂN CÀI ĐẶT -->
+                <div class="profile-settings-controls">
+                    <!-- 1. Cỡ chữ -->
+                    <div class="form-setting-group">
+                        <label class="form-setting-title"><i class="fa-solid fa-text-height"></i> Cỡ chữ nội dung:</label>
+                        <div class="size-adjuster-wrap">
+                            <button type="button" class="font-size-btn-sm" id="btnProfileFontDec" title="Giảm cỡ chữ">A-</button>
+                            <span class="size-val-display" id="profileSizeDisplay">21px</span>
+                            <button type="button" class="font-size-btn-sm" id="btnProfileFontInc" title="Tăng cỡ chữ">A+</button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Kiểu chữ (Font) -->
+                    <div class="form-setting-group">
+                        <label class="form-setting-title"><i class="fa-solid fa-font"></i> Kiểu phông chữ (Font):</label>
+                        <div class="setting-font-chips" id="profileFontChips">
+                            <button type="button" class="font-chip-btn active" data-font="sans-serif">Sans-serif (Mặc định)</button>
+                            <button type="button" class="font-chip-btn" data-font="merriweather">Merriweather (Sách báo)</button>
+                            <button type="button" class="font-chip-btn" data-font="be-vietnam">Be Vietnam Pro</button>
+                            <button type="button" class="font-chip-btn" data-font="georgia">Georgia (Cổ điển)</button>
+                            <button type="button" class="font-chip-btn" data-font="times">Times New Roman</button>
+                        </div>
+                    </div>
+
+                    <!-- 3. Màu chữ đọc truyện (5 màu đề xuất + màu tùy chọn) -->
+                    <div class="form-setting-group">
+                        <div class="setting-title-split">
+                            <label class="form-setting-title"><i class="fa-solid fa-palette"></i> Màu chữ đọc truyện:</label>
+                            <span class="setting-hint-text" id="profileColorModeHint">5 màu đề xuất phổ biến:</span>
+                        </div>
+                        <div class="setting-colors-palette" id="profileColorsPalette"></div>
+
+                        <div class="custom-color-row" style="margin-top: 10px;">
+                            <label for="inputProfileCustomColor" class="custom-color-label">
+                                <i class="fa-solid fa-eye-dropper"></i> Tự chọn màu tùy thích:
+                            </label>
+                            <div class="custom-color-control">
+                                <input type="color" id="inputProfileCustomColor" class="custom-color-input" value="#262626" />
+                                <span class="custom-color-hex" id="profileCustomColorHex">#262626</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Hàng nút Lưu & Khôi phục -->
+                    <div class="settings-submit-row" style="margin-top: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-primary" id="btnSaveProfileReadingSettings">
+                            <i class="fa-solid fa-check"></i> Lưu Cài Đặt Đọc Truyện
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="btnResetProfileReadingSettings">
+                            <i class="fa-solid fa-arrow-rotate-left"></i> Khôi Phục Mặc Định
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

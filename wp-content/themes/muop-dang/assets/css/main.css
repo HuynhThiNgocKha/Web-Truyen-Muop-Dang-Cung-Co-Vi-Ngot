@@ -1140,14 +1140,15 @@ img {
   margin: 0 auto;
 }
 
-/* 1. BREADCRUMBS DẠNG DỌC THEO ẢNH 2 */
+/* 1. BREADCRUMBS DẠNG DỌC THEO ẢNH 2 - TINH CHỈNH ĐẸP MẮT & HÀI HÒA */
 .reading-vertical-breadcrumbs {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 16px;
-  font-size: 14.5px;
-  line-height: 1.5;
+  gap: 5px;
+  margin-bottom: 18px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  padding: 2px 0 6px 0;
 }
 
 .reading-vertical-breadcrumbs .bread-row {
@@ -1159,26 +1160,54 @@ img {
 }
 
 .reading-vertical-breadcrumbs .bread-caret {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 10.5px;
+  color: #9CA3AF;
   margin-top: 5px;
   flex-shrink: 0;
+  transition: color 0.2s ease;
 }
 
-.reading-vertical-breadcrumbs a {
-  color: var(--text-main);
+.reading-vertical-breadcrumbs .bread-link {
+  color: #374151;
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.15s ease;
+  transition: all 0.18s ease;
+  line-height: 1.5;
 }
 
-.reading-vertical-breadcrumbs a:hover {
+.reading-vertical-breadcrumbs .bread-link:hover {
   color: var(--primary-green);
 }
 
-.reading-vertical-breadcrumbs .bread-current span {
-  color: var(--text-muted);
+.reading-vertical-breadcrumbs .bread-story-link {
+  color: #1F2937;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.reading-vertical-breadcrumbs .bread-current .bread-chapter-name {
+  color: #4B5563;
   font-weight: 500;
+}
+
+[data-theme="dark"] .reading-vertical-breadcrumbs .bread-caret {
+  color: #64748B;
+}
+
+[data-theme="dark"] .reading-vertical-breadcrumbs .bread-link {
+  color: #94A3B8;
+}
+
+[data-theme="dark"] .reading-vertical-breadcrumbs .bread-story-link {
+  color: #E2E8F0;
+}
+
+[data-theme="dark"] .reading-vertical-breadcrumbs .bread-link:hover {
+  color: #81C784;
+}
+
+[data-theme="dark"] .reading-vertical-breadcrumbs .bread-current .bread-chapter-name {
+  color: #94A3B8;
 }
 
 /* 2. TOOLBAR ĐIỀU HƯỚNG CHƯƠNG & NÚT 3 GẠCH */
@@ -1633,16 +1662,17 @@ img {
 }
 
 .chapter-body-text {
-  font-size: 19px;
-  line-height: 2.0;
+  font-size: 21px;
+  line-height: 2.05;
   color: var(--text-main);
   letter-spacing: 0.012em;
   word-break: break-word;
+  transition: color 0.15s ease, font-size 0.1s ease;
 }
 
 .chapter-body-text p {
   margin-bottom: 26px;
-  line-height: 2.0;
+  line-height: 2.05;
 }
 
 .chapter-body-text p:last-child {
@@ -1653,6 +1683,561 @@ img {
   display: block;
   content: "";
   margin-bottom: 18px;
+}
+
+/* Kiểu chữ đọc truyện (Reader Fonts) */
+.reader-font-sans-serif {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+}
+
+.reader-font-merriweather {
+  font-family: "Merriweather", Georgia, "Times New Roman", serif !important;
+}
+
+.reader-font-be-vietnam {
+  font-family: "Be Vietnam Pro", -apple-system, Roboto, sans-serif !important;
+}
+
+.reader-font-georgia {
+  font-family: Georgia, Cambria, "Times New Roman", Times, serif !important;
+}
+
+.reader-font-times {
+  font-family: "Times New Roman", Times, "Songti SC", serif !important;
+}
+
+/* ==========================================================================
+   FLOATING BUTTON (NÚT CHÌM TÙY CHỈNH ĐỌC TRUYỆN KHI CUỘN)
+   ========================================================================== */
+.floating-reading-btn {
+  position: fixed;
+  bottom: 85px;
+  right: 22px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(46, 125, 50, 0.28);
+  color: var(--primary-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  opacity: 0.55; /* Chế độ chìm khi đọc để không che mắt */
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 990;
+  user-select: none;
+}
+
+.floating-reading-btn:hover,
+.floating-reading-btn.is-active {
+  opacity: 1; /* Sáng rõ khi hover hoặc đang mở popup */
+  transform: scale(1.1);
+  background: var(--bg-card);
+  box-shadow: 0 6px 22px rgba(46, 125, 50, 0.28);
+  border-color: var(--primary-green);
+}
+
+[data-theme="dark"] .floating-reading-btn {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(129, 199, 132, 0.28);
+  color: #81C784;
+}
+
+[data-theme="dark"] .floating-reading-btn:hover,
+[data-theme="dark"] .floating-reading-btn.is-active {
+  background: var(--bg-card);
+  border-color: #81C784;
+}
+
+/* ==========================================================================
+   QUICK READING SETTINGS MODAL / POPOVER
+   ========================================================================== */
+.reading-settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 9998;
+}
+
+.reading-settings-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 480px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reading-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.reading-settings-title {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--primary-green);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reading-settings-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.reading-settings-close:hover {
+  background: var(--soft-green);
+  color: var(--primary-green);
+}
+
+.reading-settings-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.setting-item-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-item-label {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.setting-title-split {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.setting-hint-text {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Size controls */
+.setting-size-row, .size-adjuster-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.font-size-btn-sm {
+  background: var(--soft-green, #E8F5E9);
+  color: var(--primary-green, #2E7D32);
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.font-size-btn-sm:hover {
+  background: #DCEDC8;
+  transform: translateY(-1px);
+}
+
+.setting-size-badge, .size-val-display {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  min-width: 44px;
+  text-align: center;
+}
+
+/* Font Chips */
+.setting-font-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.font-chip-btn {
+  padding: 6px 13px;
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.font-chip-btn:hover {
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+}
+
+.font-chip-btn.active {
+  background: var(--soft-green);
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--primary-green);
+}
+
+/* Color swatches palette */
+.setting-colors-palette {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+
+.color-swatch-item {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.color-swatch-item:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+
+.color-swatch-item.active {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 2.5px var(--primary-green), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.color-swatch-item.active::after {
+  content: "\f00c";
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 12px;
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Custom color picker control */
+.custom-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.custom-color-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.custom-color-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.custom-color-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.custom-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.custom-color-input::-webkit-color-swatch {
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+}
+
+.custom-color-hex {
+  font-family: monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  background: var(--bg-body);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
+}
+
+/* Theme choice row */
+.setting-theme-choice-row {
+  display: flex;
+  gap: 10px;
+}
+
+.theme-choice-btn {
+  flex: 1;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-body);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 550;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.theme-choice-btn:hover {
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+}
+
+.theme-choice-btn.active {
+  background: var(--soft-green);
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+  font-weight: 700;
+}
+
+/* Modal footer */
+.setting-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+  gap: 10px;
+}
+
+.btn-link-reset {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-link-reset:hover {
+  color: var(--text-main);
+  text-decoration: underline;
+}
+
+.link-to-profile-settings {
+  font-size: 12px;
+  color: var(--primary-green);
+  text-decoration: none;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.link-to-profile-settings:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   TAB 5: CÀI ĐẶT ĐỌC TRUYỆN TRONG TRANG HỒ SƠ (LIVE PREVIEW)
+   ========================================================================== */
+.reading-preview-wrapper {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.preview-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.preview-badge-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-green);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-theme-toggles {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-preview-theme {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-body);
+  color: var(--text-main);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.btn-preview-theme.active {
+  background: var(--soft-green);
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+}
+
+.preview-content-box {
+  padding: 24px 28px;
+  min-height: 140px;
+  transition: background 0.2s ease, color 0.15s ease;
+}
+
+.preview-content-box.preview-theme-light {
+  background: #FFFFFF;
+}
+
+.preview-content-box.preview-theme-dark {
+  background: #1A202C;
+}
+
+.preview-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-green);
+}
+
+.preview-body-text {
+  font-size: 21px;
+  line-height: 1.95;
+  letter-spacing: 0.012em;
+}
+
+.preview-body-text p {
+  margin-bottom: 14px;
+}
+
+.preview-body-text p:last-child {
+  margin-bottom: 0;
+}
+
+.profile-settings-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-setting-title {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .reading-settings-modal {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 82vh;
+    animation: sheetSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .floating-reading-btn {
+    bottom: 74px;
+    right: 16px;
+    width: 42px;
+    height: 42px;
+    font-size: 16px;
+  }
 }
 
 /* Chapter content locked state (until Shopee click) */
@@ -3014,13 +3599,13 @@ img {
     font-size: 11.5px;
   }
   .chapter-body-text {
-    font-size: 17px;
-    line-height: 1.95;
+    font-size: 19px;
+    line-height: 2.0;
     letter-spacing: 0.012em;
   }
   .chapter-body-text p {
     margin-bottom: 24px;
-    line-height: 1.95;
+    line-height: 2.0;
   }
   .chapter-body-text p:last-child {
     margin-bottom: 0;

@@ -306,7 +306,7 @@ add_action('init', 'muop_create_required_pages');
 
 // 6. Enqueue Scripts and Styles
 function muop_enqueue_scripts() {
-    wp_enqueue_style('muop-google-fonts', 'https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap', array(), null);
+    wp_enqueue_style('muop-google-fonts', 'https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap', array(), null);
     wp_enqueue_style('muop-theme-style', get_stylesheet_uri(), array(), MUOP_THEME_VERSION);
     wp_enqueue_style('muop-main-style', MUOP_THEME_URI . '/assets/css/main.css', array('muop-theme-style'), MUOP_THEME_VERSION);
 
@@ -339,7 +339,8 @@ function muop_enqueue_scripts() {
         'previewMode'   => $preview_mode,
         'shopeeUrl'     => get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'),
         'tiktokUrl'     => get_option('muop_tiktok_url', 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ'),
-        'salaryRate'    => get_option('muop_salary_rate', 8)
+        'salaryRate'    => get_option('muop_salary_rate', 8),
+        'readingPrefs'  => is_user_logged_in() ? get_user_meta($current_user->ID, 'muop_reading_preferences', true) : null
     ));
 }
 add_action('wp_enqueue_scripts', 'muop_enqueue_scripts');
@@ -1158,3 +1159,27 @@ function muop_format_chapter_content($content) {
     return $content;
 }
 add_filter('the_content', 'muop_format_chapter_content', 99);
+
+// 11. AJAX: Save Reading Preferences (Đồng bộ cài đặt đọc truyện cho Độc giả, Dịch giả, Admin)
+add_action('wp_ajax_muop_save_reading_preferences', 'muop_ajax_save_reading_preferences_handler');
+add_action('wp_ajax_nopriv_muop_save_reading_preferences', 'muop_ajax_save_reading_preferences_handler');
+function muop_ajax_save_reading_preferences_handler() {
+    check_ajax_referer('muop_ajax_nonce', 'nonce');
+    if (!is_user_logged_in()) {
+        wp_send_json_success(array('message' => 'Đã lưu cài đặt trên trình duyệt của bạn!'));
+    }
+    $user_id = get_current_user_id();
+    $font_size = isset($_POST['font_size']) ? intval($_POST['font_size']) : 21;
+    $font_family = isset($_POST['font_family']) ? sanitize_text_field($_POST['font_family']) : 'sans-serif';
+    $text_color_light = isset($_POST['text_color_light']) ? sanitize_text_field($_POST['text_color_light']) : '#262626';
+    $text_color_dark = isset($_POST['text_color_dark']) ? sanitize_text_field($_POST['text_color_dark']) : '#E5E7EB';
+    
+    $prefs = array(
+        'font_size'        => $font_size,
+        'font_family'      => $font_family,
+        'text_color_light' => $text_color_light,
+        'text_color_dark'  => $text_color_dark,
+    );
+    update_user_meta($user_id, 'muop_reading_preferences', $prefs);
+    wp_send_json_success(array('message' => 'Đã lưu cài đặt đọc truyện thành công!', 'preferences' => $prefs));
+}
