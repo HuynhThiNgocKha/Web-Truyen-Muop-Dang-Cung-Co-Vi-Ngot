@@ -5,6 +5,11 @@
  */
 if (!defined('ABSPATH')) exit;
 
+if (!is_user_logged_in()) {
+    wp_redirect(home_url('/dang-nhap/?redirect_to=' . urlencode(home_url('/tu-truyen/'))));
+    exit;
+}
+
 get_header();
 
 global $wpdb;

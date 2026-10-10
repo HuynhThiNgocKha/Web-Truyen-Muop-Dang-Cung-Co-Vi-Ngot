@@ -429,8 +429,9 @@ function muop_ajax_login_handler() {
     }
 
     $roles = (array) $user->roles;
-    $redirect = home_url();
-    if (in_array('administrator', $roles)) {
+    if (!empty($_POST['redirect_to'])) {
+        $redirect = esc_url_raw($_POST['redirect_to']);
+    } elseif (in_array('administrator', $roles)) {
         $redirect = home_url('/quan-ly-admin/');
     } elseif (in_array('dich_gia', $roles)) {
         $redirect = home_url('/thong-tin-dich-gia/');

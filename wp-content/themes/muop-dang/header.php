@@ -233,16 +233,18 @@ $genres = get_terms(array(
                         <i class="fa-solid fa-circle-check"></i> Truyện full
                     </a>
                 </li>
-                <li class="<?php echo (is_page('team-dich') || is_tax('team_dich')) ? 'active' : ''; ?>">
-                    <a href="<?php echo esc_url(home_url('/team-dich/')); ?>">
-                        <i class="fa-solid fa-users"></i> Team Dịch
-                    </a>
-                </li>
-                <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
-                    <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>">
-                        <i class="fa-solid fa-bookmark"></i> Tủ Truyện
-                    </a>
-                </li>
+                <?php if ($is_logged_in) : ?>
+                    <li class="<?php echo (is_page('team-dich') || is_tax('team_dich')) ? 'active' : ''; ?>">
+                        <a href="<?php echo esc_url(home_url('/team-dich/')); ?>">
+                            <i class="fa-solid fa-users"></i> Team Dịch
+                        </a>
+                    </li>
+                    <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
+                        <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>">
+                            <i class="fa-solid fa-bookmark"></i> Tủ Truyện
+                        </a>
+                    </li>
+                <?php endif; ?>
 
                 <!-- Translator / Admin button: Đăng Truyện -->
                 <?php if ($user_role === 'dich_gia' || $user_role === 'administrator') : ?>
@@ -333,16 +335,18 @@ $genres = get_terms(array(
                         <span>Truyện Hot</span>
                     </a>
                 </li>
-                <li class="<?php echo (is_page('team-dich') || is_tax('team_dich')) ? 'active' : ''; ?>">
-                    <a href="<?php echo esc_url(home_url('/team-dich/')); ?>" class="drawer-nav-link">
-                        <span>Team Dịch</span>
-                    </a>
-                </li>
-                <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
-                    <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="drawer-nav-link">
-                        <span>Tủ truyện</span>
-                    </a>
-                </li>
+                <?php if ($is_logged_in) : ?>
+                    <li class="<?php echo (is_page('team-dich') || is_tax('team_dich')) ? 'active' : ''; ?>">
+                        <a href="<?php echo esc_url(home_url('/team-dich/')); ?>" class="drawer-nav-link">
+                            <span>Team Dịch</span>
+                        </a>
+                    </li>
+                    <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
+                        <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="drawer-nav-link">
+                            <span>Tủ truyện</span>
+                        </a>
+                    </li>
+                <?php endif; ?>
                 <?php if ($user_role === 'dich_gia' || $user_role === 'administrator') : ?>
                     <li>
                         <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>" class="drawer-nav-link" style="color: var(--primary-green); font-weight: 700;">

@@ -5,6 +5,11 @@
  */
 if (!defined('ABSPATH')) exit;
 
+if (!is_user_logged_in()) {
+    wp_redirect(home_url('/dang-nhap/?redirect_to=' . urlencode(home_url('/team-dich/'))));
+    exit;
+}
+
 get_header();
 
 // Lấy tất cả terms trong taxonomy team_dich

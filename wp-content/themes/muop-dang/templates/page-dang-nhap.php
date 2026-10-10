@@ -5,7 +5,8 @@
 if (!defined('ABSPATH')) exit;
 
 if (is_user_logged_in()) {
-    wp_redirect(home_url('/ho-so/'));
+    $redirect_url = !empty($_GET['redirect_to']) ? esc_url_raw($_GET['redirect_to']) : home_url('/ho-so/');
+    wp_redirect($redirect_url);
     exit;
 }
 
@@ -25,6 +26,9 @@ get_header();
         <div id="loginAlert" class="alert-box"></div>
 
         <form id="formMuopLogin">
+            <?php if (!empty($_GET['redirect_to'])) : ?>
+                <input type="hidden" name="redirect_to" value="<?php echo esc_url($_GET['redirect_to']); ?>" />
+            <?php endif; ?>
             <div class="form-group">
                 <label class="form-label" for="loginEmail">
                     <i class="fa-solid fa-envelope" style="color: var(--primary-green);"></i> Email / Tên Đăng Nhập
