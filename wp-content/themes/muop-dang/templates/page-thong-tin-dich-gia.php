@@ -216,11 +216,11 @@ if (!empty($story_ids)) {
                                         </a>
                                     </td>
                                     <td>
-                                        <?php if ($st_status === 'hoan_thanh') : ?>
-                                            <span class="badge badge-full">Full</span>
-                                        <?php else : ?>
-                                            <span class="badge badge-green">Đang ra</span>
-                                        <?php endif; ?>
+                                        <span class="badge <?php echo ($st_status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?> badge-editable btn-table-change-status" data-story-id="<?php echo $st->ID; ?>" data-current-status="<?php echo esc_attr($st_status ?: 'dang_ra'); ?>" title="Nhấn để đổi trạng thái truyện (Đang ra / Hoàn thành)">
+                                            <i class="fa-solid <?php echo ($st_status === 'hoan_thanh') ? 'fa-check' : 'fa-arrows-rotate'; ?>"></i>
+                                            <span class="table-status-text"><?php echo ($st_status === 'hoan_thanh') ? 'Full' : 'Đang ra'; ?></span>
+                                            <i class="fa-solid fa-pen" style="font-size: 9px; opacity: 0.7; margin-left: 2px;"></i>
+                                        </span>
                                     </td>
                                     <td><strong><?php echo $st_chaps; ?></strong> chương</td>
                                     <td><i class="fa-solid fa-eye"></i> <?php echo number_format($st_views); ?></td>

@@ -227,13 +227,22 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                                 </td>
                                 <td><?php echo esc_html($st_author); ?></td>
                                 <td>
-                                    <?php if ($st->post_status === 'publish') : ?>
-                                        <span class="badge badge-approved"><i class="fa-solid fa-check"></i> Đã duyệt</span>
-                                    <?php elseif ($st->post_status === 'pending') : ?>
-                                        <span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Chờ duyệt</span>
-                                    <?php else : ?>
-                                        <span class="badge badge-nominate">Bản nháp</span>
-                                    <?php endif; ?>
+                                    <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+                                        <?php if ($st->post_status === 'publish') : ?>
+                                            <span class="badge badge-approved"><i class="fa-solid fa-check"></i> Đã duyệt</span>
+                                        <?php elseif ($st->post_status === 'pending') : ?>
+                                            <span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Chờ duyệt</span>
+                                        <?php else : ?>
+                                            <span class="badge badge-nominate">Bản nháp</span>
+                                        <?php endif; ?>
+
+                                        <?php $st_progress = get_post_meta($st->ID, '_truyen_status', true); ?>
+                                        <span class="badge <?php echo ($st_progress === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?> badge-editable btn-table-change-status" data-story-id="<?php echo $st->ID; ?>" data-current-status="<?php echo esc_attr($st_progress ?: 'dang_ra'); ?>" title="Nhấn để đổi trạng thái truyện (Đang ra / Hoàn thành)">
+                                            <i class="fa-solid <?php echo ($st_progress === 'hoan_thanh') ? 'fa-check' : 'fa-arrows-rotate'; ?>"></i>
+                                            <span class="table-status-text"><?php echo ($st_progress === 'hoan_thanh') ? 'Full' : 'Đang ra'; ?></span>
+                                            <i class="fa-solid fa-pen" style="font-size: 8px; opacity: 0.7; margin-left: 2px;"></i>
+                                        </span>
+                                    </div>
                                 </td>
                                 <td><strong><?php echo $st_chaps; ?></strong> chương</td>
                                 <td><i class="fa-solid fa-eye"></i> <?php echo number_format($st_views); ?></td>

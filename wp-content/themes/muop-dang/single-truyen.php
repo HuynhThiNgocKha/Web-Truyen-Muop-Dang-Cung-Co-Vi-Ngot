@@ -24,10 +24,17 @@ $last_chap_url  = !empty($chapters) ? get_permalink(end($chapters)->ID) : '#';
 
 // Bookmarked check
 $is_bookmarked = false;
+$can_change_status = false;
 if (is_user_logged_in()) {
     global $wpdb;
+    $current_uid = get_current_user_id();
     $table_bm = $wpdb->prefix . 'reading_bookmarks';
-    $is_bookmarked = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_bm WHERE user_id = %d AND story_id = %d", get_current_user_id(), $story_id));
+    $is_bookmarked = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_bm WHERE user_id = %d AND story_id = %d", $current_uid, $story_id));
+
+    $post_author_id = (int) get_post_field('post_author', $story_id);
+    if (current_user_can('administrator') || ($post_author_id === $current_uid)) {
+        $can_change_status = true;
+    }
 }
 
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
@@ -91,15 +98,28 @@ if (!$thumb_url) {
                         </div>
                     </div>
 
-                    <div class="meta-item">
+                    <div class="meta-item meta-item-status">
                         <span class="meta-label"><i class="fa-solid fa-chart-line"></i> Trạng thái:</span>
-                        <span class="meta-value">
-                            <?php if ($status === 'hoan_thanh') : ?>
-                                <span class="badge badge-full"><i class="fa-solid fa-check"></i> Hoàn thành</span>
-                            <?php else : ?>
-                                <span class="badge badge-green"><i class="fa-solid fa-arrows-rotate"></i> Đang ra</span>
+                        <div class="meta-value status-interactive-wrap">
+                            <span class="badge <?php echo ($status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?> <?php echo $can_change_status ? 'badge-editable' : ''; ?>" id="storyStatusBadge" <?php if ($can_change_status) : ?>role="button" tabindex="0" title="Nhấn để đổi trạng thái truyện (Dịch giả & Admin)"<?php endif; ?>>
+                                <i class="fa-solid <?php echo ($status === 'hoan_thanh') ? 'fa-check' : 'fa-arrows-rotate'; ?>" id="storyStatusIcon"></i>
+                                <span id="storyStatusText"><?php echo ($status === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra'; ?></span>
+                                <?php if ($can_change_status) : ?>
+                                    <i class="fa-solid fa-chevron-down status-caret"></i>
+                                <?php endif; ?>
+                            </span>
+
+                            <?php if ($can_change_status) : ?>
+                                <div class="status-dropdown-menu" id="statusDropdownMenu" style="display: none;">
+                                    <button type="button" class="status-dropdown-item <?php echo ($status !== 'hoan_thanh') ? 'active' : ''; ?>" data-status="dang_ra" data-story-id="<?php echo $story_id; ?>">
+                                        <i class="fa-solid fa-arrows-rotate"></i> Đang ra
+                                    </button>
+                                    <button type="button" class="status-dropdown-item <?php echo ($status === 'hoan_thanh') ? 'active' : ''; ?>" data-status="hoan_thanh" data-story-id="<?php echo $story_id; ?>">
+                                        <i class="fa-solid fa-check"></i> Hoàn thành
+                                    </button>
+                                </div>
                             <?php endif; ?>
-                        </span>
+                        </div>
                     </div>
 
                     <div class="meta-item">

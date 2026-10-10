@@ -1079,6 +1079,53 @@ function muop_ajax_change_password_handler() {
     wp_send_json_success(array('message' => 'Đổi mật khẩu thành công! Mật khẩu mới của bạn đã có hiệu lực.'));
 }
 
+// 8.15 Update Story Status (Đổi trạng thái truyện: Đang ra / Hoàn thành - dành cho Dịch giả & Admin)
+add_action('wp_ajax_muop_update_story_status', 'muop_ajax_update_story_status_handler');
+add_action('wp_ajax_nopriv_muop_update_story_status', 'muop_ajax_update_story_status_handler');
+function muop_ajax_update_story_status_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện!'));
+    }
+
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $status   = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+
+    if (!$story_id) {
+        wp_send_json_error(array('message' => 'Truyện không tồn tại!'));
+    }
+
+    $post = get_post($story_id);
+    if (!$post || $post->post_type !== 'truyen') {
+        wp_send_json_error(array('message' => 'Không tìm thấy bộ truyện này!'));
+    }
+
+    $current_user_id = get_current_user_id();
+    $is_admin = current_user_can('administrator');
+    $is_author = ((int)$post->post_author === $current_user_id);
+
+    if (!$is_admin && !$is_author) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thay đổi trạng thái của bộ truyện này!'));
+    }
+
+    if (!in_array($status, array('dang_ra', 'hoan_thanh'))) {
+        wp_send_json_error(array('message' => 'Trạng thái không hợp lệ!'));
+    }
+
+    update_post_meta($story_id, '_truyen_status', $status);
+
+    $label = ($status === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra';
+
+    wp_send_json_success(array(
+        'message' => 'Đã đổi trạng thái truyện thành: ' . $label,
+        'status'  => $status,
+        'label'   => $label,
+        'is_full' => ($status === 'hoan_thanh')
+    ));
+}
+
 // 9. Prevent Locked Users from logging in
 function muop_check_user_lock($user, $username, $password) {
     if (!is_wp_error($user)) {

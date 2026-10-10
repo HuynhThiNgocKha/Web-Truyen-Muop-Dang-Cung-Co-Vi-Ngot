@@ -1140,6 +1140,148 @@
     }
   };
 
+  // 12. STORY STATUS MANAGER (Dịch giả & Admin đổi trạng thái truyện)
+  const StoryStatusManager = {
+    init() {
+      // Toggle dropdown on single-truyen page
+      $(document).on('click', '#storyStatusBadge.badge-editable', function(e) {
+        e.stopPropagation();
+        const $wrap = $(this).closest('.status-interactive-wrap');
+        const $menu = $wrap.find('#statusDropdownMenu');
+        $wrap.toggleClass('open');
+        $menu.fadeToggle(150);
+      });
+
+      // Close dropdown when clicking outside
+      $(document).on('click', (e) => {
+        if (!$(e.target).closest('.status-interactive-wrap').length) {
+          $('.status-interactive-wrap').removeClass('open');
+          $('#statusDropdownMenu').fadeOut(100);
+        }
+      });
+
+      // Select new status from single-truyen dropdown
+      $(document).on('click', '.status-dropdown-item', function(e) {
+        e.preventDefault();
+        const $item = $(this);
+        const storyId = $item.data('story-id');
+        const newStatus = $item.data('status');
+        const $wrap = $item.closest('.status-interactive-wrap');
+        const $badge = $wrap.find('#storyStatusBadge');
+        const $icon = $wrap.find('#storyStatusIcon');
+        const $text = $wrap.find('#storyStatusText');
+        const $menu = $wrap.find('#statusDropdownMenu');
+
+        if ($item.hasClass('active')) {
+          $menu.fadeOut(100);
+          $wrap.removeClass('open');
+          return;
+        }
+
+        $menu.fadeOut(100);
+        $wrap.removeClass('open');
+
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const nonce = (typeof muopConfig !== 'undefined') ? muopConfig.nonce : '';
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_update_story_status',
+            nonce: nonce,
+            story_id: storyId,
+            status: newStatus
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
+            }
+            if (res && res.success) {
+              if (res.data && res.data.is_full) {
+                $badge.removeClass('badge-green').addClass('badge-full');
+                $icon.removeClass('fa-arrows-rotate').addClass('fa-check');
+                $text.text('Hoàn thành');
+              } else {
+                $badge.removeClass('badge-full').addClass('badge-green');
+                $icon.removeClass('fa-check').addClass('fa-arrows-rotate');
+                $text.text('Đang ra');
+              }
+              $wrap.find('.status-dropdown-item').removeClass('active');
+              $item.addClass('active');
+
+              alert(getAjaxMsg(res, 'Đã cập nhật trạng thái truyện thành công!'));
+            } else {
+              alert(getAjaxMsg(res, 'Lỗi cập nhật trạng thái!'));
+            }
+          },
+          error: (xhr) => {
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            alert(errorMsg);
+          }
+        });
+      });
+
+      // Quick toggle in dashboard tables (Dịch giả & Admin)
+      $(document).on('click', '.btn-table-change-status', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+        const currentStatus = $btn.data('current-status') || 'dang_ra';
+        const nextStatus = (currentStatus === 'hoan_thanh') ? 'dang_ra' : 'hoan_thanh';
+        const nextLabel = (nextStatus === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra';
+
+        if (!confirm(`Bạn có muốn đổi trạng thái bộ truyện này sang "${nextLabel}" không?`)) {
+          return;
+        }
+
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const nonce = (typeof muopConfig !== 'undefined') ? muopConfig.nonce : '';
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_update_story_status',
+            nonce: nonce,
+            story_id: storyId,
+            status: nextStatus
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
+            }
+            if (res && res.success) {
+              $btn.data('current-status', nextStatus);
+              if (res.data && res.data.is_full) {
+                $btn.removeClass('badge-green').addClass('badge-full');
+                $btn.find('i.fa-solid:first').removeClass('fa-arrows-rotate').addClass('fa-check');
+                $btn.find('.table-status-text').text('Full');
+              } else {
+                $btn.removeClass('badge-full').addClass('badge-green');
+                $btn.find('i.fa-solid:first').removeClass('fa-check').addClass('fa-arrows-rotate');
+                $btn.find('.table-status-text').text('Đang ra');
+              }
+              alert(getAjaxMsg(res, 'Đã cập nhật trạng thái truyện thành công!'));
+            } else {
+              alert(getAjaxMsg(res, 'Lỗi cập nhật trạng thái!'));
+            }
+          },
+          error: (xhr) => {
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            alert(errorMsg);
+          }
+        });
+      });
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     localStorage.removeItem('muop_accent_color');
@@ -1155,6 +1297,7 @@
     DropdownManager.init();
     MobileNavManager.init();
     ProfileManager.init();
+    StoryStatusManager.init();
   });
 
 })(jQuery);
