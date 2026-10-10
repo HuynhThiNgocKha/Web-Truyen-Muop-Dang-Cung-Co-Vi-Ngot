@@ -119,6 +119,9 @@ $genres = get_terms(array(
                             <a href="<?php echo esc_url(home_url('/ho-so/')); ?>">
                                 <i class="fa-solid fa-id-card"></i> <span>Thông tin</span>
                             </a>
+                            <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>">
+                                <i class="fa-solid fa-bookmark"></i> <span>Tủ truyện của tôi</span>
+                            </a>
                             <a href="<?php echo esc_url(home_url('/ho-so/#tabPassword')); ?>">
                                 <i class="fa-solid fa-key"></i> <span>Đổi mật khẩu</span>
                             </a>
@@ -230,6 +233,16 @@ $genres = get_terms(array(
                         <i class="fa-solid fa-circle-check"></i> Truyện full
                     </a>
                 </li>
+                <li class="<?php echo (is_page('team-dich') || is_tax('team_dich')) ? 'active' : ''; ?>">
+                    <a href="<?php echo esc_url(home_url('/team-dich/')); ?>">
+                        <i class="fa-solid fa-users"></i> Team Dịch
+                    </a>
+                </li>
+                <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
+                    <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>">
+                        <i class="fa-solid fa-bookmark"></i> Tủ Truyện
+                    </a>
+                </li>
 
                 <!-- Translator / Admin button: Đăng Truyện -->
                 <?php if ($user_role === 'dich_gia' || $user_role === 'administrator') : ?>
@@ -318,6 +331,16 @@ $genres = get_terms(array(
                 <li class="<?php echo is_page('truyen-hot') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/truyen-hot/')); ?>" class="drawer-nav-link">
                         <span>Truyện Hot</span>
+                    </a>
+                </li>
+                <li class="<?php echo (is_page('team-dich') || is_tax('team_dich')) ? 'active' : ''; ?>">
+                    <a href="<?php echo esc_url(home_url('/team-dich/')); ?>" class="drawer-nav-link">
+                        <span>Team Dịch</span>
+                    </a>
+                </li>
+                <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
+                    <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="drawer-nav-link">
+                        <span>Tủ truyện</span>
                     </a>
                 </li>
                 <?php if ($user_role === 'dich_gia' || $user_role === 'administrator') : ?>

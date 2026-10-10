@@ -4743,3 +4743,143 @@ img {
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   PAGE: DANH SÁCH TEAM DỊCH & TỦ TRUYỆN
+   ========================================================================== */
+.team-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.team-list-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.team-list-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-green);
+}
+
+.team-card-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-green), var(--avocado-green));
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(63, 117, 35, 0.25);
+  border: 3px solid #ffffff;
+}
+
+.team-card-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.team-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.team-card-name {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.team-card-name a {
+  color: var(--text-main);
+  transition: color 0.2s ease;
+}
+
+.team-card-name a:hover {
+  color: var(--primary-green);
+}
+
+.team-card-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.team-card-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.team-card-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 8px 14px !important;
+  font-size: 13px !important;
+}
+
+/* Tủ Truyện Remove Button */
+.btn-remove-from-cupboard {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(239, 68, 68, 0.9);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  z-index: 5;
+}
+
+.btn-remove-from-cupboard:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+@media (max-width: 900px) {
+  .team-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .team-card-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .team-list-card {
+    padding: 18px 14px;
+  }
+}

@@ -1979,6 +1979,47 @@
           }
         });
       });
+
+      // Remove from cupboard in page-tu-truyen
+      $(document).on('click', '.btn-remove-from-cupboard', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+        const $item = $(`#tuTruyenItem-${storyId}`);
+
+        if (!storyId) return;
+
+        if (!confirm('Bạn có chắc chắn muốn bỏ lưu bộ truyện này khỏi Tủ truyện?')) {
+          return;
+        }
+
+        $btn.prop('disabled', true);
+        const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_toggle_bookmark',
+            nonce: nonce,
+            story_id: storyId
+          },
+          success: (res) => {
+            $item.fadeOut(250, function() {
+              $(this).remove();
+              if ($('#tuTruyenStoryGrid .tu-truyen-item-wrap').length === 0) {
+                location.reload();
+              }
+            });
+          },
+          error: () => {
+            $btn.prop('disabled', false);
+            alert('Lỗi kết nối máy chủ!');
+          }
+        });
+      });
     }
   };
 

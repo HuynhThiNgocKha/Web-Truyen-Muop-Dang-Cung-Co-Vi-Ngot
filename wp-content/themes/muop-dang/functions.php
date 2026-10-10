@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.0.2');
+define('MUOP_THEME_VERSION', '2.0.3');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -239,6 +239,14 @@ function muop_create_required_pages() {
         'the-loai' => array(
             'title'    => 'Thể Loại Truyện',
             'template' => 'page-the-loai.php'
+        ),
+        'team-dich' => array(
+            'title'    => 'Danh Sách Team Dịch',
+            'template' => 'page-team-dich.php'
+        ),
+        'tu-truyen' => array(
+            'title'    => 'Tủ Truyện',
+            'template' => 'page-tu-truyen.php'
         ),
         'gioi-thieu' => array(
             'title'    => 'Giới Thiệu',
