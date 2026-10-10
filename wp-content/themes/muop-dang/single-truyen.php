@@ -133,7 +133,7 @@ if (!$thumb_url) {
                     </div>
 
                     <div class="meta-item">
-                        <span class="meta-label"><i class="fa-solid fa-clock"></i> Cập nhật gần nhất:</span>
+                        <span class="meta-label"><i class="fa-solid fa-clock"></i> Cập nhật:</span>
                         <span class="meta-value"><?php echo esc_html($updated); ?></span>
                     </div>
                 </div>

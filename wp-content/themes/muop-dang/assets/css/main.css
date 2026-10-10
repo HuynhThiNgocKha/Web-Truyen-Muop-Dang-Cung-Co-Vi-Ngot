@@ -1021,26 +1021,63 @@ img {
 .story-info-meta-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 22px;
   font-size: 14px;
+  text-align: left;
 }
 
 .meta-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 12px;
+  line-height: 1.5;
+  text-align: left;
 }
 
 .meta-label {
-  width: 130px;
+  width: 125px;
+  min-width: 125px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-muted);
   font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.meta-label i {
+  width: 16px;
+  text-align: center;
+  color: var(--primary-green);
+  flex-shrink: 0;
+  font-size: 13.5px;
 }
 
 .meta-value {
+  flex: 1;
+  min-width: 0;
   color: var(--text-main);
   font-weight: 500;
+  line-height: 1.5;
+  text-align: left;
+  word-break: break-word;
+}
+
+.meta-item-status {
+  align-items: center;
+}
+
+.meta-item-status .meta-label {
+  line-height: 1.2;
+}
+
+.meta-item-status .status-interactive-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 .genre-tag-list {
@@ -3564,13 +3601,125 @@ img {
     text-align: center !important;
     white-space: nowrap !important;
   }
+  .story-detail-wrapper {
+    padding: 16px 12px !important;
+  }
   .story-detail-top {
     flex-direction: column;
     align-items: center;
     text-align: center;
+    gap: 16px;
+    margin-bottom: 20px;
   }
   .story-cover-col {
-    width: 160px;
+    width: 150px;
+    margin: 0 auto;
+  }
+  .story-info-col {
+    width: 100%;
+    text-align: center;
+  }
+  .story-info-title {
+    font-size: 20px !important;
+    line-height: 1.35;
+    text-align: center;
+    margin-bottom: 14px;
+    padding: 0 4px;
+  }
+  /* KHỐI THÔNG TIN CHI TIẾT TRUYỆN TRÊN ĐIỆN THOẠI */
+  .story-info-meta-list {
+    max-width: 360px;
+    width: 100%;
+    margin: 0 auto 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    font-size: 13.5px;
+    text-align: left;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    background: var(--pastel-green);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+  }
+  .meta-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    text-align: left;
+    line-height: 1.45;
+  }
+  .meta-label {
+    width: 105px;
+    min-width: 105px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    text-align: left;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 600;
+    line-height: 1.45;
+  }
+  .meta-label i {
+    width: 15px;
+    text-align: center;
+    color: var(--primary-green);
+    flex-shrink: 0;
+    font-size: 13px;
+  }
+  .meta-value {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-main);
+    word-break: break-word;
+  }
+  .meta-item-status {
+    align-items: center;
+  }
+  .meta-item-status .meta-label {
+    line-height: 1.2;
+  }
+  .genre-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .genre-pill {
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+  .story-actions-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 14px;
+  }
+  .story-actions-bar .btn {
+    padding: 8px 14px !important;
+    font-size: 13px !important;
+    border-radius: var(--radius-full) !important;
+  }
+  @media (max-width: 380px) {
+    .story-info-meta-list {
+      padding: 10px 10px;
+    }
+    .meta-label {
+      width: 98px;
+      min-width: 98px;
+      font-size: 12.5px;
+      gap: 5px;
+    }
+    .meta-value {
+      font-size: 12.5px;
+    }
   }
   .chapter-grid {
     grid-template-columns: 1fr;
