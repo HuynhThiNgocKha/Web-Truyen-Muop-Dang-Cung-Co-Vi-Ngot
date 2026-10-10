@@ -227,10 +227,89 @@
         }
       });
 
-      // Chapter change dropdown
+      // Chapter change dropdown (fallback)
       $('#readingChapterSelect').on('change', function() {
         const url = $(this).val();
         if (url) window.location.href = url;
+      });
+
+      // Chapter Drawer / Modal Handler (Nút 3 gạch mở danh sách chương)
+      const $drawerModal = $('#chapterDrawerModal');
+      const $drawerOverlay = $('#chapterDrawerOverlay');
+      const $drawerSearch = $('#chapterDrawerSearchInput');
+      const $drawerClear = $('#chapterDrawerSearchClear');
+      const $drawerItems = $('#chapterDrawerList .chapter-drawer-item');
+      const $drawerNoResults = $('#chapterDrawerNoResults');
+
+      function openChapterDrawer() {
+        $drawerOverlay.fadeIn(180);
+        $drawerModal.fadeIn(180);
+        $('body').css('overflow', 'hidden');
+
+        // Cuộn tới chương đang đọc
+        setTimeout(() => {
+          const $current = $('#chapterDrawerList .is-current-chapter');
+          if ($current.length) {
+            const container = $('.chapter-drawer-body')[0];
+            if (container) {
+              const itemTop = $current.position().top;
+              const containerHalf = container.clientHeight / 2;
+              container.scrollTop = container.scrollTop + itemTop - containerHalf + ($current.outerHeight() / 2);
+            }
+          }
+        }, 80);
+      }
+
+      function closeChapterDrawer() {
+        $drawerModal.fadeOut(150);
+        $drawerOverlay.fadeOut(150);
+        $('body').css('overflow', '');
+      }
+
+      $(document).on('click', '.btn-chapter-drawer-toggle', function(e) {
+        e.preventDefault();
+        openChapterDrawer();
+      });
+
+      $('#btnCloseChapterDrawer, #chapterDrawerOverlay').on('click', function() {
+        closeChapterDrawer();
+      });
+
+      $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && $drawerModal.is(':visible')) {
+          closeChapterDrawer();
+        }
+      });
+
+      // Tìm kiếm chương nhanh trong popup
+      $drawerSearch.on('input', function() {
+        const q = $(this).val().toLowerCase().trim();
+        if (q.length > 0) {
+          $drawerClear.show();
+        } else {
+          $drawerClear.hide();
+        }
+
+        let visibleCount = 0;
+        $drawerItems.each(function() {
+          const title = $(this).data('title') || '';
+          if (!q || title.indexOf(q) !== -1) {
+            $(this).show();
+            visibleCount++;
+          } else {
+            $(this).hide();
+          }
+        });
+
+        if (visibleCount === 0) {
+          $drawerNoResults.show();
+        } else {
+          $drawerNoResults.hide();
+        }
+      });
+
+      $drawerClear.on('click', function() {
+        $drawerSearch.val('').trigger('input').focus();
       });
 
       // Record reading history & view count

@@ -46,52 +46,54 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
          data-chapter-id="<?php echo esc_attr($chapter_id); ?>" 
          data-chapter-num="<?php echo esc_attr($chap_num); ?>">
 
-        <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB) -->
-        <nav class="breadcrumbs" style="margin-bottom: 14px;">
-            <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
-            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <a href="<?php echo esc_url($story_url); ?>"><?php echo esc_html($story_title); ?></a>
-            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
+        <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB DẠNG DỌC THEO ẢNH 2) -->
+        <nav class="reading-vertical-breadcrumbs">
+            <div class="bread-row">
+                <a href="<?php echo esc_url(home_url('/')); ?>">Trang chủ</a>
+            </div>
+            <div class="bread-row">
+                <i class="fa-solid fa-angle-right bread-caret"></i>
+                <a href="<?php echo esc_url($story_url); ?>"><?php echo esc_html($story_title); ?></a>
+            </div>
+            <div class="bread-row bread-current">
+                <i class="fa-solid fa-angle-right bread-caret"></i>
+                <span><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
+            </div>
         </nav>
 
-        <!-- CENTER 2: TOOLBAR ĐIỀU HƯỚNG CHƯƠNG TRƯỚC, DANH SÁCH, CHƯƠNG SAU -->
+        <!-- CENTER 2: TOOLBAR ĐIỀU HƯỚNG CHƯƠNG TRƯỚC, 3 GẠCH DANH SÁCH, CHƯƠNG SAU & ĐIỀU CHỈNH CỠ CHỮ -->
         <div class="reading-toolbar-top">
             <div class="chapter-nav-btns">
                 <?php if ($prev_chap_url) : ?>
-                    <a href="<?php echo esc_url($prev_chap_url); ?>" class="btn btn-secondary" style="padding: 6px 14px;">
+                    <a href="<?php echo esc_url($prev_chap_url); ?>" class="btn btn-secondary btn-chap-prev">
                         <i class="fa-solid fa-arrow-left"></i> Chương Trước
                     </a>
                 <?php else : ?>
-                    <button class="btn btn-secondary" disabled style="opacity: 0.5; padding: 6px 14px;">
+                    <button class="btn btn-secondary btn-chap-prev" disabled style="opacity: 0.5;">
                         <i class="fa-solid fa-arrow-left"></i> Chương Trước
                     </button>
                 <?php endif; ?>
 
-                <!-- Dropdown Chọn chương nhanh -->
-                <select id="readingChapterSelect" class="chapter-select-dropdown">
-                    <?php foreach ($all_chapters as $c) : ?>
-                        <option value="<?php echo esc_url(get_permalink($c->ID)); ?>" <?php selected($c->ID, $chapter_id); ?>>
-                            <?php echo esc_html(muop_get_clean_chapter_title($c->post_title)); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <!-- Nút 3 gạch mở danh sách chương -->
+                <button type="button" class="btn btn-secondary btn-chapter-drawer-toggle" id="btnOpenChapterDrawer" title="Danh sách chương">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
 
                 <?php if ($next_chap_url) : ?>
-                    <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter" style="padding: 6px 14px;">
+                    <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter btn-chap-next">
                         Chương Sau <i class="fa-solid fa-arrow-right"></i>
                     </a>
                 <?php else : ?>
-                    <button class="btn btn-primary" disabled style="opacity: 0.5; padding: 6px 14px;">
+                    <button class="btn btn-primary btn-chap-next" disabled style="opacity: 0.5;">
                         Chương Sau <i class="fa-solid fa-arrow-right"></i>
                     </button>
                 <?php endif; ?>
             </div>
 
-            <!-- Chỉnh cỡ chữ -->
-            <div class="font-controls">
-                <button type="button" class="font-btn" id="btnFontDec" title="Giảm cỡ chữ">A-</button>
-                <button type="button" class="font-btn" id="btnFontInc" title="Tăng cỡ chữ">A+</button>
+            <!-- Điều chỉnh cỡ chữ (chuyển xuống dưới hàng chương trước / chương sau theo Ảnh 3) -->
+            <div class="reading-font-bar">
+                <button type="button" class="font-size-btn" id="btnFontDec" title="Giảm cỡ chữ">A-</button>
+                <button type="button" class="font-size-btn" id="btnFontInc" title="Tăng cỡ chữ">A+</button>
             </div>
         </div>
 
@@ -116,19 +118,23 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
                     <i class="fa-solid fa-arrow-left"></i> Chương Trước
                 </a>
             <?php else : ?>
-                <div></div>
+                <button class="btn btn-secondary" disabled style="opacity: 0.5;">
+                    <i class="fa-solid fa-arrow-left"></i> Chương Trước
+                </button>
             <?php endif; ?>
 
-            <a href="<?php echo esc_url($story_url); ?>" class="btn btn-secondary">
-                <i class="fa-solid fa-list-ul"></i> Mục Lục Truyện
-            </a>
+            <button type="button" class="btn btn-secondary btn-chapter-drawer-toggle" id="btnOpenChapterDrawerBottom" title="Danh sách chương">
+                <i class="fa-solid fa-bars"></i> Danh Sách Chương
+            </button>
 
             <?php if ($next_chap_url) : ?>
                 <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter">
                     Chương Sau <i class="fa-solid fa-arrow-right"></i>
                 </a>
             <?php else : ?>
-                <div></div>
+                <button class="btn btn-primary" disabled style="opacity: 0.5;">
+                    Chương Sau <i class="fa-solid fa-arrow-right"></i>
+                </button>
             <?php endif; ?>
         </div>
 
@@ -210,6 +216,73 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
         <p class="shopee-modal-note">
             <i class="fa-solid fa-circle-check" style="color: var(--primary-green);"></i> Chỉ cần 1 lượt click ủng hộ, chương truyện sẽ được mở khóa ngay lập tức!
         </p>
+    </div>
+</div>
+
+<!-- ==========================================================================
+     POPUP DANH SÁCH CHƯƠNG (DRAWER / MODAL)
+     Mở ra khi nhấn vào nút 3 gạch (fa-bars) ở thanh điều hướng đọc truyện
+     ========================================================================== -->
+<div id="chapterDrawerOverlay" class="chapter-drawer-overlay" style="display: none;"></div>
+<div id="chapterDrawerModal" class="chapter-drawer-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="chapterDrawerTitle">
+    <div class="chapter-drawer-header">
+        <div class="chapter-drawer-title-wrap">
+            <h3 id="chapterDrawerTitle" class="chapter-drawer-title">
+                <i class="fa-solid fa-bars-staggered"></i> Danh Sách Chương
+            </h3>
+            <span class="chapter-drawer-count">(<?php echo count($all_chapters); ?> chương)</span>
+        </div>
+        <button type="button" class="chapter-drawer-close" id="btnCloseChapterDrawer" aria-label="Đóng">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <div class="chapter-drawer-story-info">
+        <span class="story-name-badge"><i class="fa-solid fa-book"></i> <?php echo esc_html($story_title); ?></span>
+    </div>
+
+    <!-- Ô tìm kiếm chương nhanh -->
+    <div class="chapter-drawer-search-wrap">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="chapterDrawerSearchInput" class="chapter-drawer-search-input" placeholder="Tìm kiếm chương..." autocomplete="off">
+        <button type="button" id="chapterDrawerSearchClear" class="search-clear-btn" style="display: none;" title="Xóa tìm kiếm">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <!-- Danh sách các chương -->
+    <div class="chapter-drawer-body">
+        <ul class="chapter-drawer-list" id="chapterDrawerList">
+            <?php foreach ($all_chapters as $idx => $c) : 
+                $is_current = ($c->ID == $chapter_id);
+                $chap_clean_title = muop_get_clean_chapter_title($c->post_title);
+            ?>
+                <li class="chapter-drawer-item <?php echo $is_current ? 'is-current-chapter' : ''; ?>" data-title="<?php echo esc_attr(mb_strtolower($chap_clean_title)); ?>">
+                    <a href="<?php echo esc_url(get_permalink($c->ID)); ?>" class="chapter-drawer-link">
+                        <span class="chapter-drawer-name">
+                            <?php if ($is_current) : ?>
+                                <i class="fa-solid fa-book-open current-icon"></i>
+                            <?php else : ?>
+                                <i class="fa-regular fa-file-lines item-icon"></i>
+                            <?php endif; ?>
+                            <?php echo esc_html($chap_clean_title); ?>
+                        </span>
+                        <?php if ($is_current) : ?>
+                            <span class="chapter-current-badge">Đang đọc</span>
+                        <?php endif; ?>
+                    </a>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+        <div id="chapterDrawerNoResults" class="chapter-drawer-no-results" style="display: none;">
+            <i class="fa-regular fa-face-frown"></i> Không tìm thấy chương phù hợp.
+        </div>
+    </div>
+
+    <div class="chapter-drawer-footer">
+        <a href="<?php echo esc_url($story_url); ?>" class="btn-drawer-story-link">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Xem thông tin truyện
+        </a>
     </div>
 </div>
 
