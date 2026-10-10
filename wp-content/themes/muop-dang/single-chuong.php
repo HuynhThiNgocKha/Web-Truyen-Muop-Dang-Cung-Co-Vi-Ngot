@@ -47,12 +47,12 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
          data-chapter-num="<?php echo esc_attr($chap_num); ?>">
 
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB) -->
-        <nav class="breadcrumbs" style="margin-bottom: 16px;">
+        <nav class="breadcrumbs" style="margin-bottom: 14px;">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
             <a href="<?php echo esc_url($story_url); ?>"><?php echo esc_html($story_title); ?></a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--primary-green); font-weight: 600;"><?php the_title(); ?></span>
+            <span style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
         </nav>
 
         <!-- CENTER 2: TOOLBAR ĐIỀU HƯỚNG CHƯƠNG TRƯỚC, DANH SÁCH, CHƯƠNG SAU -->
@@ -72,7 +72,7 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
                 <select id="readingChapterSelect" class="chapter-select-dropdown">
                     <?php foreach ($all_chapters as $c) : ?>
                         <option value="<?php echo esc_url(get_permalink($c->ID)); ?>" <?php selected($c->ID, $chapter_id); ?>>
-                            <?php echo esc_html($c->post_title); ?>
+                            <?php echo esc_html(muop_get_clean_chapter_title($c->post_title)); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -97,12 +97,12 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
 
         <!-- CENTER 3: NỘI DUNG TRUYỆN CỦA CHƯƠNG (CHỐNG COPY) -->
         <article class="chapter-content-box">
-            <h1 class="chapter-heading-title"><?php the_title(); ?></h1>
-            <div style="text-align: center; font-size: 13px; color: var(--text-muted); margin-bottom: 24px;">
-                <span><i class="fa-regular fa-clock"></i> Đăng: <?php echo get_the_date('d/m/Y'); ?></span>
-                <span style="margin: 0 8px;">•</span>
-                <span><i class="fa-solid fa-shield-halved" style="color: var(--avocado-green);"></i> Nội dung có bản quyền chống sao chép</span>
-            </div>
+            <header class="chapter-header-compact">
+                <h1 class="chapter-heading-title"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></h1>
+                <div class="chapter-meta-date">
+                    <i class="fa-regular fa-clock"></i> <?php echo get_the_date('d/m/Y'); ?>
+                </div>
+            </header>
 
             <div class="chapter-body-text">
                 <?php the_content(); ?>

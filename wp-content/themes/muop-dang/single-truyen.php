@@ -197,7 +197,7 @@ if (!$thumb_url) {
                         $chap_num = get_post_meta($chap->ID, '_chuong_number', true) ?: 1;
                     ?>
                         <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
-                            <span><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html($chap->post_title); ?></span>
+                            <span><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
                             <span style="font-size: 11px; color: var(--text-muted);"><?php echo get_the_time('d/m', $chap->ID); ?></span>
                         </a>
                     <?php endforeach; ?>

@@ -354,6 +354,12 @@ function muop_get_story_status($story_id) {
     return ($st === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra';
 }
 
+function muop_get_clean_chapter_title($title) {
+    if (empty($title)) return '';
+    $clean = preg_replace('/^chương\s+\d+\s*[:\-\.]\s*/iu', '', trim($title));
+    return !empty($clean) ? trim($clean) : trim($title);
+}
+
 function muop_get_story_chapters($story_id, $order = 'ASC') {
     return get_posts(array(
         'post_type'      => 'chuong',
@@ -785,12 +791,15 @@ function muop_ajax_submit_chapter_handler() {
         wp_send_json_error(array('message' => 'Bạn chỉ có thể thêm chương vào truyện của mình!'));
     }
 
-    $full_title = 'Chương ' . $chap_num . ': ' . $chap_title;
+    $clean_title = muop_get_clean_chapter_title($chap_title);
+    if (empty($clean_title)) {
+        $clean_title = 'Chương ' . $chap_num;
+    }
     $is_admin = current_user_can('administrator');
     $post_status = $is_admin ? 'publish' : 'publish'; // Chapters published or moderation
 
     $chapter_id = wp_insert_post(array(
-        'post_title'   => $full_title,
+        'post_title'   => $clean_title,
         'post_content' => $content,
         'post_status'  => $post_status,
         'post_type'    => 'chuong',

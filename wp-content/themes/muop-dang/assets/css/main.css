@@ -1210,14 +1210,30 @@ img {
   -ms-user-select: none;
 }
 
+.chapter-header-compact {
+  text-align: center;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
 .chapter-heading-title {
   text-align: center;
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 22px;
+  font-weight: 750;
   color: var(--primary-green);
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-light);
+  margin: 0 0 6px 0;
+  padding: 0;
+  border-bottom: none;
+  line-height: 1.4;
+}
+
+.chapter-meta-date {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .chapter-body-text {
@@ -2552,8 +2568,40 @@ img {
     gap: 8px;
     text-align: center;
   }
+  .chapter-reading-wrapper .breadcrumbs {
+    font-size: 12px;
+    margin-bottom: 10px;
+    gap: 5px;
+    line-height: 1.4;
+  }
+  .reading-toolbar-top {
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    gap: 6px;
+  }
+  .chapter-select-dropdown {
+    padding: 5px 8px;
+    font-size: 12.5px;
+    max-width: 135px;
+  }
+  .chapter-nav-btns .btn {
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+  }
   .chapter-content-box {
-    padding: 18px 14px;
+    padding: 16px 13px;
+    border-radius: 10px;
+  }
+  .chapter-header-compact {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+  }
+  .chapter-heading-title {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+  .chapter-meta-date {
+    font-size: 11.5px;
   }
   .chapter-body-text {
     font-size: 17px;
