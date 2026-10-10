@@ -88,9 +88,7 @@ if (!$thumb_url) {
                             <span class="meta-label"><i class="fa-solid fa-users"></i> Team dịch:</span>
                             <div class="meta-value">
                                 <a href="<?php echo esc_url($team_url); ?>" class="team-badge-btn" title="Xem trang của Team <?php echo esc_attr($team); ?>">
-                                    <i class="fa-solid fa-users-viewfinder"></i>
-                                    <span><?php echo esc_html($team); ?></span>
-                                    <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 10px; margin-left: 3px; opacity: 0.75;"></i>
+                                    <?php echo esc_html($team); ?>
                                 </a>
                             </div>
                         </div>
