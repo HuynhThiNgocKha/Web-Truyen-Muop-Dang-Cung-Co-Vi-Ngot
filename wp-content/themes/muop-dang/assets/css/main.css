@@ -1711,12 +1711,12 @@ img {
    ========================================================================== */
 .floating-reading-btn {
   position: fixed;
-  bottom: 85px;
-  right: 22px;
+  top: 140px; /* Nằm ở trên theo yêu cầu */
+  right: 18px;
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.76);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(46, 125, 50, 0.28);
@@ -1725,12 +1725,18 @@ img {
   align-items: center;
   justify-content: center;
   font-size: 18px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  cursor: grab;
   opacity: 0.55; /* Chế độ chìm khi đọc để không che mắt */
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
   z-index: 990;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none; /* Cho phép kéo thả tùy ý di chuyển trên mobile */
+}
+
+.floating-reading-btn:active {
+  cursor: grabbing;
 }
 
 .floating-reading-btn:hover,
@@ -2062,6 +2068,39 @@ img {
   font-weight: 700;
 }
 
+.setting-apply-wrap {
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+
+.btn-apply-reading-settings {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 14.5px;
+  font-weight: 700;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--primary-green);
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(46, 125, 50, 0.25);
+  transition: all 0.18s ease;
+}
+
+.btn-apply-reading-settings:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(46, 125, 50, 0.35);
+}
+
+.btn-apply-reading-settings:active {
+  transform: scale(0.98);
+}
+
 /* Modal footer */
 .setting-modal-footer {
   display: flex;
@@ -2232,8 +2271,8 @@ img {
   }
 
   .floating-reading-btn {
-    bottom: 74px;
-    right: 16px;
+    top: 120px;
+    right: 14px;
     width: 42px;
     height: 42px;
     font-size: 16px;

@@ -394,24 +394,151 @@
         }
       });
 
-      // Open settings triggers
-      $(document).on('click', '.btn-reading-settings-trigger', (e) => {
+      // Open settings triggers (từ nút trên thanh font-bar)
+      $('#btnOpenReadingSettingsTop').on('click', (e) => {
         e.preventDefault();
         this.openQuickModal();
       });
     },
 
-    // Floating Button (Chế độ chìm khi cuộn đọc truyện)
+    // Floating Button (Chế độ chìm khi cuộn đọc truyện & Kéo thả tùy ý di chuyển)
     bindFloatingButtonEvents() {
       const $floatingBtn = $('#btnFloatingReadingSettings');
       if (!$floatingBtn.length) return;
 
+      // Khôi phục vị trí người dùng đã kéo thả trước đó (nếu có)
+      const savedPos = localStorage.getItem('muop_floating_btn_pos');
+      if (savedPos) {
+        try {
+          const pos = JSON.parse(savedPos);
+          if (pos && typeof pos.top === 'number' && typeof pos.left === 'number') {
+            const winW = $(window).width();
+            const winH = $(window).height();
+            const clampedLeft = Math.min(Math.max(10, pos.left), winW - 55);
+            const clampedTop = Math.min(Math.max(60, pos.top), winH - 60);
+            $floatingBtn.css({
+              top: clampedTop + 'px',
+              left: clampedLeft + 'px',
+              right: 'auto',
+              bottom: 'auto'
+            });
+          }
+        } catch (e) {}
+      }
+
+      // Hiện / ẩn khi cuộn trang
       $(window).on('scroll', () => {
         const scrollY = $(window).scrollTop();
-        if (scrollY > 160) {
+        if (scrollY > 140) {
           $floatingBtn.fadeIn(220);
         } else {
           $floatingBtn.fadeOut(200);
+        }
+      });
+
+      // Tùy ý di chuyển (Drag-to-move hỗ trợ cả Chuột máy tính và Cảm ứng điện thoại)
+      let isDragging = false;
+      let hasDragged = false;
+      let startX = 0, startY = 0;
+      let initialLeft = 0, initialTop = 0;
+
+      const onDragStart = (clientX, clientY) => {
+        isDragging = true;
+        hasDragged = false;
+        startX = clientX;
+        startY = clientY;
+
+        const rect = $floatingBtn[0].getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        $floatingBtn.css({
+          transition: 'none',
+          cursor: 'grabbing'
+        });
+      };
+
+      const onDragMove = (clientX, clientY) => {
+        if (!isDragging) return;
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+          hasDragged = true;
+        }
+
+        const winW = $(window).width();
+        const winH = $(window).height();
+
+        let newLeft = initialLeft + dx;
+        let newTop = initialTop + dy;
+
+        newLeft = Math.min(Math.max(10, newLeft), winW - 56);
+        newTop = Math.min(Math.max(60, newTop), winH - 60);
+
+        $floatingBtn.css({
+          left: newLeft + 'px',
+          top: newTop + 'px',
+          right: 'auto',
+          bottom: 'auto'
+        });
+      };
+
+      const onDragEnd = () => {
+        if (!isDragging) return;
+        isDragging = false;
+
+        $floatingBtn.css({
+          cursor: 'grab',
+          transition: 'opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease'
+        });
+
+        if (hasDragged) {
+          const rect = $floatingBtn[0].getBoundingClientRect();
+          localStorage.setItem('muop_floating_btn_pos', JSON.stringify({
+            left: rect.left,
+            top: rect.top
+          }));
+        }
+      };
+
+      // Mouse drag events
+      $floatingBtn.on('mousedown', (e) => {
+        onDragStart(e.clientX, e.clientY);
+      });
+
+      $(document).on('mousemove', (e) => {
+        if (isDragging) {
+          onDragMove(e.clientX, e.clientY);
+        }
+      });
+
+      $(document).on('mouseup', () => {
+        onDragEnd();
+      });
+
+      // Touch drag events (Mobile)
+      $floatingBtn.on('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          onDragStart(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      });
+
+      $(document).on('touchmove', (e) => {
+        if (isDragging && e.touches.length === 1) {
+          onDragMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      });
+
+      $(document).on('touchend touchcancel', () => {
+        onDragEnd();
+      });
+
+      // Click event: chỉ mở modal khi người dùng bấm chuột/chạm mà không kéo rê
+      $floatingBtn.on('click', (e) => {
+        e.preventDefault();
+        if (!hasDragged) {
+          this.openQuickModal();
         }
       });
     },
@@ -471,6 +598,21 @@
         ThemeManager.setTheme(theme);
         $('.setting-theme-choice-row .theme-choice-btn').removeClass('active');
         $(this).addClass('active');
+      });
+
+      // Nút Áp Dụng (Lưu cài đặt và đóng popup)
+      $('#btnApplyReadingSettings').on('click', (e) => {
+        e.preventDefault();
+        const $btn = $(e.currentTarget);
+        this.savePreferences(true);
+
+        const originalHtml = $btn.html();
+        $btn.html('<i class="fa-solid fa-circle-check"></i> Đã Áp Dụng!').prop('disabled', true);
+
+        setTimeout(() => {
+          $btn.html(originalHtml).prop('disabled', false);
+          this.closeQuickModal();
+        }, 320);
       });
 
       // Reset Defaults

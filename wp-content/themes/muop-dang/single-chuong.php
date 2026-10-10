@@ -369,7 +369,14 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
             </div>
         </div>
 
-        <!-- 5. FOOTER: NÚT KHÔI PHỤC & LIÊN KẾT ĐẾN CÀI ĐẶT HỆ THỐNG -->
+        <!-- 5. HÀNG NÚT ÁP DỤNG -->
+        <div class="setting-apply-wrap">
+            <button type="button" class="btn btn-primary btn-apply-reading-settings" id="btnApplyReadingSettings">
+                <i class="fa-solid fa-check"></i> Áp Dụng
+            </button>
+        </div>
+
+        <!-- 6. FOOTER: NÚT KHÔI PHỤC & LIÊN KẾT ĐẾN CÀI ĐẶT HỆ THỐNG -->
         <div class="setting-modal-footer">
             <button type="button" class="btn-link-reset" id="btnResetReadingPrefs">
                 <i class="fa-solid fa-arrow-rotate-left"></i> Khôi phục mặc định
