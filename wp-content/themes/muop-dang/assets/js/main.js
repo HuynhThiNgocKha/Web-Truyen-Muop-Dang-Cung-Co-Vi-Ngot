@@ -2499,39 +2499,24 @@
         });
       });
 
-      // 3. Mở Master Modal Chỉnh Sửa Truyện & Chương
+      // 3. Mở Modal Chỉnh Sửa Thông Tin Truyện (Popup 1)
       $(document).on('click', '.btn-edit-story', function(e) {
         e.preventDefault();
         const storyId = $(this).data('story-id');
         if (!storyId) return;
 
-        const $modal = $('#modalEditStoryMaster');
+        const $modal = $('#modalEditStoryInfo').length ? $('#modalEditStoryInfo') : $('#modalEditStoryMaster');
         if (!$modal.length) return;
 
         // Reset modal state
-        $('#editStoryAlert, #editChapterAlert').hide();
+        $('#editStoryAlert').hide();
         $('#editStoryCoverInfo').hide();
         $('#editStoryCoverFile').val('');
-        $('#formEditStoryMaster')[0].reset();
+        if ($('#formEditStoryMaster').length) {
+          $('#formEditStoryMaster')[0].reset();
+        }
         $('#editStoryId').val(storyId);
         $('#modalStoryTitleText').text('Đang tải dữ liệu...');
-        $('#selectEditChapter').empty().append('<option value="">-- Đang nạp danh sách chương... --</option>');
-        $('#formEditChapterFields').hide();
-        $('#editNoChaptersMsg').hide();
-
-        // Active Tab 1
-        $('.modal-tab-nav').removeClass('active').css({
-          'color': 'var(--text-muted)',
-          'border-bottom-color': 'transparent',
-          'font-weight': '600'
-        });
-        $('.modal-tab-nav[data-target="paneEditStoryInfo"]').addClass('active').css({
-          'color': 'var(--primary-green)',
-          'border-bottom-color': 'var(--primary-green)',
-          'font-weight': '700'
-        });
-        $('.modal-tab-pane').removeClass('active').hide();
-        $('#paneEditStoryInfo').addClass('active').show();
 
         $modal.css('display', 'flex');
 
@@ -2571,28 +2556,6 @@
                   $(`#editGenresCheckboxList input[value="${catId}"]`).prop('checked', true);
                 });
               }
-
-              // Chapters
-              const $select = $('#selectEditChapter');
-              $select.empty();
-              if (data.chapters && data.chapters.length) {
-                $select.append('<option value="">-- Chọn một chương để xem & chỉnh sửa --</option>');
-                data.chapters.forEach(ch => {
-                  const statusLabel = (ch.status === 'draft') ? ' (Bản nháp)' : '';
-                  $select.append(`<option value="${ch.id}">Chương ${ch.number}: ${ch.title}${statusLabel}</option>`);
-                });
-                $('#editNoChaptersMsg').hide();
-
-                if (window._targetChapterIdToSelect) {
-                  $select.val(window._targetChapterIdToSelect).trigger('change');
-                  window._targetChapterIdToSelect = null;
-                }
-              } else {
-                $select.append('<option value="">-- Bộ truyện chưa có chương nào --</option>');
-                const siteUrl = (typeof muopConfig !== 'undefined' && muopConfig.siteUrl) ? muopConfig.siteUrl : '';
-                $('#btnGoAddChapterFromModal').attr('href', siteUrl + '/them-chuong/?story_id=' + storyId);
-                $('#editNoChaptersMsg').show();
-              }
             } else {
               alert(getAjaxMsg(res, 'Không thể tải thông tin truyện!'));
               $modal.hide();
@@ -2607,31 +2570,13 @@
         });
       });
 
-      // 4. Chuyển Tab trong Modal
-      $(document).on('click', '.modal-tab-nav', function(e) {
+      // Đóng Modal Thông Tin Truyện
+      $('#btnCloseStoryInfoModal, #btnCloseStoryMasterModal, .btn-close-modal-story-info, .btn-close-modal-action').on('click', function(e) {
         e.preventDefault();
-        const targetId = $(this).data('target');
-        $('.modal-tab-nav').removeClass('active').css({
-          'color': 'var(--text-muted)',
-          'border-bottom-color': 'transparent',
-          'font-weight': '600'
-        });
-        $(this).addClass('active').css({
-          'color': 'var(--primary-green)',
-          'border-bottom-color': 'var(--primary-green)',
-          'font-weight': '700'
-        });
-        $('.modal-tab-pane').removeClass('active').hide();
-        $('#' + targetId).addClass('active').show();
+        $('#modalEditStoryInfo, #modalEditStoryMaster').hide();
       });
 
-      // 5. Đóng Modal
-      $('#btnCloseStoryMasterModal, .btn-close-modal-action').on('click', function(e) {
-        e.preventDefault();
-        $('#modalEditStoryMaster').hide();
-      });
-
-      $('#modalEditStoryMaster').on('click', function(e) {
+      $('#modalEditStoryInfo, #modalEditStoryMaster').on('click', function(e) {
         if (e.target === this) {
           $(this).hide();
         }
@@ -2818,7 +2763,7 @@
         });
       });
 
-      // 11. Cây bút ở từng chương (Hình 3): Mở Master Modal -> Tab 2 -> nạp chương đó
+      // 11. Cây bút ở từng chương (Popup 2: Chỉnh Sửa Nội Dung Chương Truyện)
       $(document).on('click', '.btn-edit-chapter-direct', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -2826,26 +2771,75 @@
         const chapterId = $(this).data('chapter-id');
         if (!storyId || !chapterId) return;
 
-        window._targetChapterIdToSelect = chapterId;
+        const $modal = $('#modalEditChapterContent');
+        if (!$modal.length) return;
 
-        // Kích hoạt nút .btn-edit-story để mở Master Modal
-        const $editBtn = $(`.btn-edit-story[data-story-id="${storyId}"]`);
-        if ($editBtn.length) {
-          $editBtn.trigger('click');
-        } else {
-          $('<button>')
-            .addClass('btn-edit-story')
-            .attr('data-story-id', storyId)
-            .hide()
-            .appendTo('body')
-            .trigger('click')
-            .remove();
+        $('#editChapterAlert').hide();
+        $('#editChapterId').val('');
+        $('#selectEditChapter').empty().append('<option value="">-- Đang nạp danh sách chương... --</option>');
+        $('#formEditChapterFields').hide();
+        $('#editNoChaptersMsg').hide();
+        $('#modalChapterStoryTitleText').text('Đang tải dữ liệu...');
+
+        $modal.css('display', 'flex');
+
+        // Nạp danh sách chương của bộ truyện
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_get_story_data',
+            nonce: muopConfig.nonce,
+            story_id: storyId
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data) {
+              const data = res.data;
+              $('#modalChapterStoryTitleText').text(data.title);
+
+              const $select = $('#selectEditChapter');
+              $select.empty();
+              if (data.chapters && data.chapters.length) {
+                $select.append('<option value="">-- Chọn một chương để xem & chỉnh sửa --</option>');
+                data.chapters.forEach(ch => {
+                  const statusLabel = (ch.status === 'draft') ? ' (Bản nháp)' : '';
+                  $select.append(`<option value="${ch.id}">Chương ${ch.number}: ${ch.title}${statusLabel}</option>`);
+                });
+                $('#editNoChaptersMsg').hide();
+
+                // Tự động chọn đúng chương vừa click và nạp nội dung ngay
+                $select.val(chapterId).trigger('change');
+              } else {
+                $select.append('<option value="">-- Bộ truyện chưa có chương nào --</option>');
+                $('#editNoChaptersMsg').show();
+              }
+            } else {
+              alert(getAjaxMsg(res, 'Không thể tải danh sách chương!'));
+              $modal.hide();
+            }
+          },
+          error: (xhr) => {
+            let err = 'Lỗi kết nối khi tải danh sách chương!';
+            if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+            alert(err);
+            $modal.hide();
+          }
+        });
+      });
+
+      // Đóng Modal Chương Truyện
+      $('#btnCloseChapterContentModal, .btn-close-modal-chapter').on('click', function(e) {
+        e.preventDefault();
+        $('#modalEditChapterContent').hide();
+      });
+
+      $('#modalEditChapterContent').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
         }
-
-        // Tự động chuyển ngay sang Tab 2 (Chỉnh sửa nội dung chương)
-        setTimeout(() => {
-          $('.modal-tab-nav[data-target="paneEditChapterContent"]').trigger('click');
-        }, 80);
       });
 
       // 12. Cây bút mờ trên ảnh bìa truyện (Hình 1): Đổi ảnh bìa nhanh

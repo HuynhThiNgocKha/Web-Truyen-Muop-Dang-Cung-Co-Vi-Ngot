@@ -5420,22 +5420,22 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.58);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  gap: 7px;
+  padding: 7px 16px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.25s ease;
-  opacity: 0.9;
+  opacity: 0.95;
   z-index: 5;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
 }
 
 .btn-change-cover-overlay:hover {
@@ -5443,47 +5443,53 @@ img {
   opacity: 1;
   border-color: transparent;
   transform: translateX(-50%) translateY(-2px);
-  box-shadow: 0 4px 14px rgba(46, 125, 50, 0.4);
+  box-shadow: 0 4px 14px rgba(46, 125, 50, 0.45);
   color: #ffffff;
 }
 
 .btn-change-cover-overlay i {
-  font-size: 11.5px;
+  font-size: 13px;
 }
 
 .story-title-header-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   margin-bottom: 12px;
-  flex-wrap: wrap;
 }
 
-.story-title-header-wrap .story-info-title {
+.story-info-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-main);
   margin-bottom: 0;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .btn-edit-title-inline {
   background: var(--pastel-green);
   border: 1px solid var(--border-color);
   color: var(--primary-green);
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  vertical-align: middle;
+  margin-left: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  position: relative;
+  top: -2px;
+  line-height: 1;
 }
 
 .btn-edit-title-inline:hover {
   background: var(--primary-green);
   color: #ffffff;
   border-color: var(--primary-green);
-  transform: scale(1.08);
+  transform: scale(1.1);
   box-shadow: 0 2px 8px rgba(46, 125, 50, 0.25);
 }
 
@@ -5521,6 +5527,80 @@ img {
   border-color: var(--primary-green);
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(46, 125, 50, 0.25);
+}
+
+/* Modal Headers: Chữ "Chỉnh Sửa" nằm ngang ở trên, tên truyện ở dưới (Web & Điện thoại) */
+.modal-header-top-box {
+  padding: 16px 20px;
+  background: var(--pastel-green);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 14px;
+}
+
+.modal-title-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-action-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--primary-green);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.2;
+  letter-spacing: 0.3px;
+}
+
+.modal-story-title-sub {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* Modal Form Grids (Desktop) */
+.modal-form-grid-2-1 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.modal-form-grid-1-1 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.modal-form-grid-chap {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.modal-genres-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  max-height: 140px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
 }
 
 .preset-cover-card {
@@ -5567,6 +5647,35 @@ img {
   height: 100%;
   object-fit: cover;
 }
+
+/* -------------------------------------------------------------
+ * RESPONSIVE MOBILE CHO MODAL (< 640px)
+ * Đổi các phần tên truyện, trạng thái, tác giả, dịch giả thành 1 hàng dọc!
+ * ----------------------------------------------------------- */
+@media (max-width: 640px) {
+  .modal-form-grid-2-1,
+  .modal-form-grid-1-1,
+  .modal-form-grid-chap {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .modal-genres-list {
+    grid-template-columns: 1fr !important;
+    max-height: 160px !important;
+  }
+
+  .modal-story-title-sub {
+    font-size: 14.5px !important;
+  }
+
+  .btn-change-cover-overlay {
+    padding: 6px 12px;
+    font-size: 11.5px;
+  }
+}
+
 
 
 

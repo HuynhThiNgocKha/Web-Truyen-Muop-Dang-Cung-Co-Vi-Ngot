@@ -61,10 +61,9 @@ if (!$thumb_url) {
                 <div class="story-cover-frame" id="storyCoverFrame">
                     <img id="mainStoryCoverImg" src="<?php echo esc_url($thumb_url); ?>" alt="<?php the_title_attribute(); ?>" />
                     <?php if ($can_manage_story) : ?>
-                        <button type="button" class="btn-change-cover-overlay" id="btnChangeCoverOverlay" data-story-id="<?php echo $story_id; ?>" title="Đổi ảnh bìa truyện (Admin & Dịch giả)">
+                        <button type="button" class="btn-change-cover-overlay" id="btnChangeCoverOverlay" data-story-id="<?php echo $story_id; ?>" title="Thay đổi ảnh bìa truyện (Admin & Dịch giả)">
                             <i class="fa-solid fa-camera"></i>
-                            <i class="fa-solid fa-pen"></i>
-                            <span>Đổi ảnh</span>
+                            <span>Thay đổi ảnh bìa</span>
                         </button>
                     <?php endif; ?>
                 </div>
@@ -73,12 +72,7 @@ if (!$thumb_url) {
             <!-- Right: Thông tin truyện -->
             <div class="story-info-col">
                 <div class="story-title-header-wrap">
-                    <h1 class="story-info-title" id="storyTitleText"><?php the_title(); ?></h1>
-                    <?php if ($can_manage_story) : ?>
-                        <button type="button" class="btn-edit-title-inline" id="btnEditTitleInline" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa tên truyện (Admin & Dịch giả)">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
-                    <?php endif; ?>
+                    <h1 class="story-info-title"><span id="storyTitleText"><?php the_title(); ?></span><?php if ($can_manage_story) : ?><button type="button" class="btn-edit-title-inline" id="btnEditTitleInline" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa tên truyện (Admin & Dịch giả)"><i class="fa-solid fa-pen-to-square"></i></button><?php endif; ?></h1>
                 </div>
 
                 <div class="story-info-meta-list">

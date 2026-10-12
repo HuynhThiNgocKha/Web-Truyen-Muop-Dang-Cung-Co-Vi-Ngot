@@ -10,11 +10,14 @@ if (!defined('ABSPATH')) exit;
 <div id="modalChangeCoverDirect" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
     <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 580px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
         
-        <!-- Header -->
-        <div style="padding: 16px 20px; background: var(--pastel-green); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--primary-green); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-camera"></i> Thay Đổi Ảnh Bìa Truyện
-            </h3>
+        <!-- Header (Dòng 1: Chỉnh Sửa | Dòng 2: Thay Đổi Ảnh Bìa Truyện) -->
+        <div class="modal-header-top-box">
+            <div class="modal-title-stacked">
+                <span class="modal-action-label">
+                    <i class="fa-solid fa-camera"></i> Chỉnh Sửa
+                </span>
+                <h3 class="modal-story-title-sub" id="quickCoverModalStoryTitle">Thay Đổi Ảnh Bìa Truyện</h3>
+            </div>
             <button type="button" class="btn-close-quick-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
                 <i class="fa-solid fa-xmark"></i>
             </button>
@@ -84,11 +87,14 @@ if (!defined('ABSPATH')) exit;
 <div id="modalEditTitleDirect" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
     <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 480px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden;">
         
-        <!-- Header -->
-        <div style="padding: 16px 20px; background: var(--pastel-green); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--primary-green); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-pen-to-square"></i> Đổi Tên Truyện
-            </h3>
+        <!-- Header (Dòng 1: Chỉnh Sửa | Dòng 2: Đổi Tên Truyện) -->
+        <div class="modal-header-top-box">
+            <div class="modal-title-stacked">
+                <span class="modal-action-label">
+                    <i class="fa-solid fa-pen-to-square"></i> Chỉnh Sửa
+                </span>
+                <h3 class="modal-story-title-sub" id="quickTitleModalStoryTitle">Đổi Tên Truyện</h3>
+            </div>
             <button type="button" class="btn-close-quick-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
                 <i class="fa-solid fa-xmark"></i>
             </button>
