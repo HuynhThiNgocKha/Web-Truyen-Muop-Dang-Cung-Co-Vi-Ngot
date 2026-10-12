@@ -54,11 +54,9 @@ $all_team_stories = get_posts($all_team_stories_args);
 $total_stories_count = count($all_team_stories);
 
 global $wpdb;
-$table_bookmarks = $wpdb->prefix . 'reading_bookmarks';
 
 $total_team_views = 0;
-$top_story        = null;
-$top_story_score  = -1;
+$top_stories      = array();
 $earliest_time    = null;
 $first_author_id  = 0;
 
@@ -66,17 +64,10 @@ foreach ($all_team_stories as $st) {
     $v = (int) get_post_meta($st->ID, '_truyen_views', true);
     $total_team_views += $v;
 
-    // Đếm số lượt lưu vào Tủ truyện
-    $bks = 0;
-    if ($wpdb->get_var("SHOW TABLES LIKE '$table_bookmarks'") === $table_bookmarks) {
-        $bks = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_bookmarks WHERE story_id = %d", $st->ID));
-    }
-
-    // Điểm yêu thích: Số lượt lưu * 10 + Tổng view
-    $score = ($bks * 10) + $v;
-    if ($score > $top_story_score) {
-        $top_story_score = $score;
-        $top_story = $st;
+    // Chỉ đưa vào danh sách truyện yêu thích nếu có từ 50 lượt view trở lên (dưới 50 view không xuất hiện)
+    if ($v >= 50) {
+        $st->story_views = $v;
+        $top_stories[]   = $st;
     }
 
     $p_time = strtotime($st->post_date);
@@ -87,6 +78,14 @@ foreach ($all_team_stories as $st) {
     if (!$first_author_id) {
         $first_author_id = (int) $st->post_author;
     }
+}
+
+// Sắp xếp giảm dần theo lượt view và lấy tối đa 5 truyện nhiều view nhất
+if (!empty($top_stories)) {
+    usort($top_stories, function($a, $b) {
+        return $b->story_views <=> $a->story_views;
+    });
+    $top_stories = array_slice($top_stories, 0, 5);
 }
 
 // Xác định ngày tham gia
@@ -282,58 +281,80 @@ if (is_user_logged_in() && $team_id > 0) {
             </div>
         </div>
 
-        <!-- SPOTLIGHT: TRUYỆN ĐƯỢC YÊU THÍCH NHẤT -->
-        <?php if ($top_story) : 
-            $top_id        = $top_story->ID;
-            $top_thumb_url = get_the_post_thumbnail_url($top_id, 'muop-cover');
-            if (!$top_thumb_url) {
-                $top_thumb_url = MUOP_THEME_URI . '/assets/images/default-cover.svg';
-            }
-            $top_views     = (int) get_post_meta($top_id, '_truyen_views', true);
-            $top_author    = get_post_meta($top_id, '_truyen_author_name', true) ?: 'Đang cập nhật';
-            $top_status    = get_post_meta($top_id, '_truyen_status', true);
-            $top_chaps     = muop_get_story_chapters($top_id, 'ASC');
-            $top_chap_cnt  = count($top_chaps);
-            $top_first_url = !empty($top_chaps) ? get_permalink($top_chaps[0]->ID) : get_permalink($top_id);
-            $top_excerpt   = wp_strip_all_tags($top_story->post_content);
-            if (mb_strlen($top_excerpt) > 170) {
-                $top_excerpt = mb_substr($top_excerpt, 0, 170) . '...';
-            }
-        ?>
+        <!-- SPOTLIGHT: TOP TRUYỆN ĐƯỢC YÊU THÍCH NHẤT (TỐI ĐA 5 TRUYỆN, VIEW >= 50) -->
+        <?php if (!empty($top_stories)) : ?>
             <div class="team-spotlight-box">
                 <div class="team-spotlight-badge">
-                    <i class="fa-solid fa-crown" style="color: #f59e0b;"></i> Truyện Được Yêu Thích Nhất Của Team
+                    <i class="fa-solid fa-crown" style="color: #f59e0b;"></i> <?php echo (count($top_stories) > 1) ? 'Top Truyện Được Yêu Thích Của Team' : 'Truyện Được Yêu Thích Nhất Của Team'; ?>
                 </div>
-                <div class="team-spotlight-content">
-                    <a href="<?php echo esc_url(get_permalink($top_id)); ?>" class="team-spotlight-thumb">
-                        <img src="<?php echo esc_url($top_thumb_url); ?>" alt="<?php echo esc_attr(get_the_title($top_id)); ?>" />
-                    </a>
-                    <div class="team-spotlight-details">
-                        <h2 class="team-spotlight-title">
-                            <a href="<?php echo esc_url(get_permalink($top_id)); ?>">
-                                <?php echo esc_html(get_the_title($top_id)); ?>
-                            </a>
-                        </h2>
-                        <div class="team-spotlight-meta">
-                            <span><i class="fa-solid fa-pen-nib"></i> <?php echo esc_html($top_author); ?></span>
-                            <span><i class="fa-solid fa-book-open"></i> <?php echo $top_chap_cnt; ?> chương</span>
-                            <span><i class="fa-solid fa-eye"></i> <?php echo number_format($top_views); ?> lượt đọc</span>
-                            <span class="badge <?php echo ($top_status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?>">
-                                <?php echo ($top_status === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra'; ?>
-                            </span>
+
+                <div class="team-spotlight-list">
+                    <?php foreach ($top_stories as $rank_idx => $story_item) : 
+                        $item_id        = $story_item->ID;
+                        $item_thumb_url = get_the_post_thumbnail_url($item_id, 'muop-cover');
+                        if (!$item_thumb_url) {
+                            $item_thumb_url = MUOP_THEME_URI . '/assets/images/default-cover.svg';
+                        }
+                        $item_views     = (int) get_post_meta($item_id, '_truyen_views', true);
+                        $item_author    = get_post_meta($item_id, '_truyen_author_name', true) ?: 'Đang cập nhật';
+                        $item_status    = get_post_meta($item_id, '_truyen_status', true);
+                        $item_chaps     = muop_get_story_chapters($item_id, 'ASC');
+                        $item_chap_cnt  = count($item_chaps);
+                        $item_first_url = !empty($item_chaps) ? get_permalink($item_chaps[0]->ID) : get_permalink($item_id);
+                        $item_excerpt   = wp_strip_all_tags($story_item->post_content);
+                        if (mb_strlen($item_excerpt) > 170) {
+                            $item_excerpt = mb_substr($item_excerpt, 0, 170) . '...';
+                        }
+                        $rank_num = $rank_idx + 1;
+                    ?>
+                        <div class="team-spotlight-item">
+                            <?php if (count($top_stories) > 1) : ?>
+                                <div class="spotlight-rank-badge rank-<?php echo $rank_num; ?>">
+                                    <?php if ($rank_num === 1) : ?>
+                                        <i class="fa-solid fa-crown"></i> Top 1
+                                    <?php elseif ($rank_num === 2) : ?>
+                                        <i class="fa-solid fa-medal"></i> Top 2
+                                    <?php elseif ($rank_num === 3) : ?>
+                                        <i class="fa-solid fa-medal"></i> Top 3
+                                    <?php else : ?>
+                                        Top <?php echo $rank_num; ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <div class="team-spotlight-content">
+                                <a href="<?php echo esc_url(get_permalink($item_id)); ?>" class="team-spotlight-thumb">
+                                    <img src="<?php echo esc_url($item_thumb_url); ?>" alt="<?php echo esc_attr(get_the_title($item_id)); ?>" />
+                                </a>
+                                <div class="team-spotlight-details">
+                                    <h2 class="team-spotlight-title">
+                                        <a href="<?php echo esc_url(get_permalink($item_id)); ?>">
+                                            <?php echo esc_html(get_the_title($item_id)); ?>
+                                        </a>
+                                    </h2>
+                                    <div class="team-spotlight-meta">
+                                        <span><i class="fa-solid fa-pen-nib"></i> <?php echo esc_html($item_author); ?></span>
+                                        <span><i class="fa-solid fa-book-open"></i> <?php echo $item_chap_cnt; ?> chương</span>
+                                        <span style="color: var(--primary-green); font-weight: 700;"><i class="fa-solid fa-eye"></i> <?php echo number_format($item_views); ?> lượt đọc</span>
+                                        <span class="badge <?php echo ($item_status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?>">
+                                            <?php echo ($item_status === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra'; ?>
+                                        </span>
+                                    </div>
+                                    <p class="team-spotlight-desc">
+                                        <?php echo esc_html($item_excerpt); ?>
+                                    </p>
+                                    <div class="team-spotlight-actions">
+                                        <a href="<?php echo esc_url($item_first_url); ?>" class="btn btn-primary" style="padding: 7px 18px; font-size: 13.5px;">
+                                            <i class="fa-solid fa-book-reader"></i> Đọc Ngay
+                                        </a>
+                                        <a href="<?php echo esc_url(get_permalink($item_id)); ?>" class="btn btn-secondary" style="padding: 7px 16px; font-size: 13.5px;">
+                                            <i class="fa-solid fa-circle-info"></i> Chi Tiết Truyện
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <p class="team-spotlight-desc">
-                            <?php echo esc_html($top_excerpt); ?>
-                        </p>
-                        <div class="team-spotlight-actions">
-                            <a href="<?php echo esc_url($top_first_url); ?>" class="btn btn-primary" style="padding: 7px 18px; font-size: 13.5px;">
-                                <i class="fa-solid fa-book-reader"></i> Đọc Ngay
-                            </a>
-                            <a href="<?php echo esc_url(get_permalink($top_id)); ?>" class="btn btn-secondary" style="padding: 7px 16px; font-size: 13.5px;">
-                                <i class="fa-solid fa-circle-info"></i> Chi Tiết Truyện
-                            </a>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
         <?php endif; ?>
