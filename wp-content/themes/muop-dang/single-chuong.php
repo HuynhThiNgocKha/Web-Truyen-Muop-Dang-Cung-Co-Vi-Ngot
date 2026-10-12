@@ -47,12 +47,12 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
          data-chapter-num="<?php echo esc_attr($chap_num); ?>">
 
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB DẠNG NGANG TRÊN WEB) -->
-        <nav class="breadcrumbs">
+        <nav class="breadcrumbs reading-chapter-breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <a href="<?php echo esc_url($story_url); ?>"><?php echo esc_html($story_title); ?></a>
-            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
+            <a href="<?php echo esc_url($story_url); ?>" class="breadcrumb-story-title-link"><?php echo esc_html($story_title); ?></a>
+            <i class="fa-solid fa-angle-right breadcrumb-chapter-sep" style="font-size: 11px;"></i>
+            <span class="breadcrumb-chapter-current" style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
         </nav>
 
         <!-- CENTER 2: TOOLBAR ĐIỀU HƯỚNG CHƯƠNG TRƯỚC, 3 GẠCH DANH SÁCH, CHƯƠNG SAU & ĐIỀU CHỈNH CỠ CHỮ -->

@@ -1043,6 +1043,17 @@ img {
   text-overflow: ellipsis;
 }
 
+.reading-chapter-breadcrumbs .breadcrumb-story-title-link {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.reading-chapter-breadcrumbs .breadcrumb-story-title-link:hover {
+  color: var(--primary-green);
+}
+
 .story-detail-top {
   display: flex;
   gap: 28px;
@@ -4270,6 +4281,24 @@ img {
   .breadcrumbs a,
   .breadcrumbs span {
     white-space: normal;
+  }
+  /* Breadcrumbs trang đọc chương trên điện thoại giống hệt trang truyện (Ảnh 2) */
+  .reading-chapter-breadcrumbs .breadcrumb-chapter-sep,
+  .reading-chapter-breadcrumbs .breadcrumb-chapter-current {
+    display: none !important;
+  }
+  .reading-chapter-breadcrumbs .breadcrumb-story-title-link {
+    color: var(--primary-green) !important;
+    font-weight: 600 !important;
+    white-space: normal !important;
+    line-height: 1.45 !important;
+    display: block !important;
+    flex-basis: 100% !important;
+    width: 100% !important;
+    text-decoration: none !important;
+  }
+  [data-theme="dark"] .reading-chapter-breadcrumbs .breadcrumb-story-title-link {
+    color: #81C784 !important;
   }
   .reading-vertical-breadcrumbs .bread-caret {
     font-size: 10px;
