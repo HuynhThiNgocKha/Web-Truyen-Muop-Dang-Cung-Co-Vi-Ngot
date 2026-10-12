@@ -80,16 +80,17 @@ $all_teams = get_terms(array(
                                 </span>
                             </div>
 
-                            <div class="team-card-stats">
-                                <div class="team-card-stat">
+                            <?php $break_views = ($total_views >= 1000); ?>
+                            <div class="team-card-stats<?php echo $break_views ? ' has-high-views' : ''; ?>">
+                                <div class="team-card-stat stat-stories">
                                     <i class="fa-solid fa-book-bookmark"></i>
                                     <strong><?php echo $story_count; ?></strong> truyện
                                 </div>
-                                <div class="team-card-stat">
+                                <div class="team-card-stat stat-views<?php echo $break_views ? ' stat-break-line' : ''; ?>">
                                     <i class="fa-solid fa-eye"></i>
                                     <strong><?php echo number_format($total_views); ?></strong> lượt đọc
                                 </div>
-                                <div class="team-card-stat" style="color: #e91e63;">
+                                <div class="team-card-stat stat-fav" style="color: #e91e63;">
                                     <i class="fa-solid fa-heart"></i>
                                     <strong><?php echo number_format($fav_count); ?></strong> yêu thích
                                 </div>

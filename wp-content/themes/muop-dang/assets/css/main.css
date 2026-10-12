@@ -5584,6 +5584,20 @@ img {
   width: 100%;
 }
 
+.stat-break-line {
+  flex-basis: 100% !important;
+  width: 100% !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+.team-card-stats.has-high-views .stat-stories,
+.team-card-stats.has-high-views .stat-fav {
+  flex-basis: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
 .team-card-stat {
   display: inline-flex;
   align-items: center;
@@ -5709,6 +5723,17 @@ img {
     align-items: center !important;
     text-align: center !important;
     width: 100% !important;
+  }
+  .team-card-stats.has-high-views {
+    gap: 4px 0 !important;
+  }
+  .team-card-stats.has-high-views .stat-break-line,
+  .team-card-stats.has-high-views .stat-stories,
+  .team-card-stats.has-high-views .stat-fav {
+    flex-basis: 100% !important;
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
   }
   .team-card-btn {
     padding: 7px 4px !important;
