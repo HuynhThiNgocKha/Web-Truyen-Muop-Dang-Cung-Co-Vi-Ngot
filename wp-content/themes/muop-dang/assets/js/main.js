@@ -1908,6 +1908,22 @@
 
     // Handle hash and tab switching
     initTabs() {
+      // Redirect legacy hashes to dedicated standalone pages
+      if (window.location.pathname.indexOf('/ho-so') !== -1) {
+        if (window.location.hash === '#tabPassword') {
+          window.location.replace('/doi-mat-khau/');
+          return;
+        }
+        if (window.location.hash === '#tabReadingSettings') {
+          window.location.replace('/cai-dat-doc-truyen/');
+          return;
+        }
+        if (window.location.hash === '#tabBookmarks') {
+          window.location.replace('/tu-truyen/');
+          return;
+        }
+      }
+
       const switchTab = (tabId) => {
         if (!tabId) return;
         const cleanId = tabId.replace(/^#/, '');
@@ -1921,7 +1937,7 @@
         }
       };
 
-      // Check URL hash on load (e.g. #tabPassword from header dropdown)
+      // Check URL hash on load
       if (window.location.hash) {
         switchTab(window.location.hash);
       }
@@ -1933,9 +1949,11 @@
         }
       });
 
-      // Tab button clicks: also update window.location.hash
-      $('.dash-tab-btn').on('click', function() {
+      // Tab button clicks: only for elements with data-tab
+      $('.dash-tab-btn[data-tab]').on('click', function() {
         const tabId = $(this).data('tab');
+        if (!tabId) return;
+        switchTab(tabId);
         if (history.replaceState) {
           history.replaceState(null, null, '#' + tabId);
         } else {

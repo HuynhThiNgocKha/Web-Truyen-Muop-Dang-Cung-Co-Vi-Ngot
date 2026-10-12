@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.8');
+define('MUOP_THEME_VERSION', '2.2.9');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -268,6 +268,14 @@ function muop_create_required_pages() {
         'ho-so' => array(
             'title'    => 'Hồ Sơ Cá Nhân',
             'template' => 'page-ho-so.php'
+        ),
+        'doi-mat-khau' => array(
+            'title'    => 'Đổi Mật Khẩu',
+            'template' => 'page-doi-mat-khau.php'
+        ),
+        'cai-dat-doc-truyen' => array(
+            'title'    => 'Cài Đặt Đọc Truyện',
+            'template' => 'page-cai-dat-doc-truyen.php'
         ),
         'dang-truyen' => array(
             'title'    => 'Đăng Truyện Mới',

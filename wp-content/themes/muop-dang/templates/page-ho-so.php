@@ -92,23 +92,23 @@ $preset_avatars = array(
             </div>
         </div>
 
-        <!-- TABS NAV -->
+        <!-- TABS NAV / ACCOUNT SUBNAV -->
         <div class="dash-tabs-nav">
             <button type="button" class="dash-tab-btn active" data-tab="tabProfile">
                 <i class="fa-solid fa-user-pen"></i> Thông Tin Cá Nhân
             </button>
-            <button type="button" class="dash-tab-btn" data-tab="tabPassword">
+            <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>" class="dash-tab-btn">
                 <i class="fa-solid fa-key"></i> Đổi Mật Khẩu
-            </button>
-            <button type="button" class="dash-tab-btn" data-tab="tabBookmarks">
+            </a>
+            <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="dash-tab-btn">
                 <i class="fa-solid fa-bookmark"></i> Tủ Truyện (<?php echo count($bookmarked_ids); ?>)
-            </button>
+            </a>
             <button type="button" class="dash-tab-btn" data-tab="tabHistory">
                 <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Đọc (<?php echo count($history_rows); ?>)
             </button>
-            <button type="button" class="dash-tab-btn" data-tab="tabReadingSettings">
+            <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>" class="dash-tab-btn">
                 <i class="fa-solid fa-sliders"></i> Cài Đặt Đọc Truyện
-            </button>
+            </a>
         </div>
 
         <!-- ========================================== -->
@@ -215,89 +215,31 @@ $preset_avatars = array(
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 2: ĐỔI MẬT KHẨU                        -->
+        <!-- TAB 2: ĐỔI MẬT KHẨU (ĐÃ TÁCH TRANG RIÊNG)  -->
         <!-- ========================================== -->
         <div id="tabPassword" class="dash-tab-pane">
-            <div class="profile-form-card" style="max-width: 620px;">
-                <div id="passwordAlertContainer"></div>
-
-                <div class="form-section-header">
-                    <h3><i class="fa-solid fa-lock"></i> Đổi Mật Khẩu Tài Khoản</h3>
-                    <p>Để bảo vệ tài khoản, hãy sử dụng mật khẩu mạnh có tối thiểu 6 ký tự</p>
-                </div>
-
-                <form id="passwordChangeForm">
-                    <input type="hidden" name="action" value="muop_change_password" />
-                    <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
-
-                    <div class="form-group" style="margin-bottom: 16px;">
-                        <label class="form-label" for="oldPasswordInput">Mật khẩu hiện tại: <span style="color: #e53935;">*</span></label>
-                        <div class="password-input-wrap">
-                            <input type="password" id="oldPasswordInput" name="old_password" class="form-input" required placeholder="Nhập mật khẩu hiện tại của bạn" />
-                            <button type="button" class="btn-toggle-pwd" data-target="oldPasswordInput" aria-label="Xem mật khẩu">
-                                <i class="fa-solid fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom: 16px;">
-                        <label class="form-label" for="newPasswordInput">Mật khẩu mới: <span style="color: #e53935;">*</span></label>
-                        <div class="password-input-wrap">
-                            <input type="password" id="newPasswordInput" name="new_password" class="form-input" required minlength="6" placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)" />
-                            <button type="button" class="btn-toggle-pwd" data-target="newPasswordInput" aria-label="Xem mật khẩu">
-                                <i class="fa-solid fa-eye"></i>
-                            </button>
-                        </div>
-                        <small class="form-hint">Mật khẩu phải dài ít nhất 6 ký tự.</small>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom: 24px;">
-                        <label class="form-label" for="confirmPasswordInput">Xác nhận mật khẩu mới: <span style="color: #e53935;">*</span></label>
-                        <div class="password-input-wrap">
-                            <input type="password" id="confirmPasswordInput" name="confirm_password" class="form-input" required minlength="6" placeholder="Nhập lại mật khẩu mới" />
-                            <button type="button" class="btn-toggle-pwd" data-target="confirmPasswordInput" aria-label="Xem mật khẩu">
-                                <i class="fa-solid fa-eye"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <button type="submit" class="btn btn-primary" id="btnSubmitPassword" style="padding: 10px 24px; font-size: 14px; font-weight: 700;">
-                            <i class="fa-solid fa-key"></i> Cập Nhật Mật Khẩu
-                        </button>
-                        <span id="passwordSavingSpinner" style="display: none; color: var(--text-muted); font-size: 13px;">
-                            <i class="fa-solid fa-circle-notch fa-spin"></i> Đang xử lý...
-                        </span>
-                    </div>
-                </form>
+            <div class="profile-form-card" style="max-width: 620px; text-align: center; padding: 40px 24px; margin: 0 auto;">
+                <i class="fa-solid fa-key" style="font-size: 36px; color: var(--primary-green); margin-bottom: 12px; display: inline-block;"></i>
+                <h3 style="font-size: 18px; margin-bottom: 8px; color: var(--text-main);">Đổi Mật Khẩu Tài Khoản</h3>
+                <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">Tính năng đổi mật khẩu đã được chuyển sang trang chuyên biệt để bạn quản lý thuận tiện và an toàn hơn.</p>
+                <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>" class="btn btn-primary" style="padding: 10px 24px; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-arrow-right"></i> Đi Đến Trang Đổi Mật Khẩu
+                </a>
             </div>
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 3: TỦ TRUYỆN ĐÃ LƯU                     -->
+        <!-- TAB 3: TỦ TRUYỆN (ĐÃ TÁCH TRANG RIÊNG)     -->
         <!-- ========================================== -->
         <div id="tabBookmarks" class="dash-tab-pane">
-            <?php if (!empty($bookmarked_ids)) : ?>
-                <div class="story-grid">
-                    <?php
-                    $query_bm = new WP_Query(array(
-                        'post_type'      => 'truyen',
-                        'post__in'       => $bookmarked_ids,
-                        'posts_per_page' => -1,
-                        'post_status'    => 'publish'
-                    ));
-                    while ($query_bm->have_posts()) : $query_bm->the_post();
-                        get_template_part('template-parts/story-card');
-                    endwhile;
-                    wp_reset_postdata();
-                    ?>
-                </div>
-            <?php else : ?>
-                <div style="text-align: center; padding: 40px; background: var(--pastel-green); border-radius: var(--radius-md); color: var(--text-muted);">
-                    <i class="fa-regular fa-bookmark" style="font-size: 36px; color: var(--avocado-green); margin-bottom: 10px;"></i>
-                    <p>Tủ truyện của bạn đang trống. Hãy nhấn "Lưu Vào Tủ Truyện" ở trang mô tả để lưu truyện yêu thích nhé!</p>
-                </div>
-            <?php endif; ?>
+            <div class="profile-form-card" style="max-width: 620px; text-align: center; padding: 40px 24px; margin: 0 auto;">
+                <i class="fa-solid fa-bookmark" style="font-size: 36px; color: var(--primary-green); margin-bottom: 12px; display: inline-block;"></i>
+                <h3 style="font-size: 18px; margin-bottom: 8px; color: var(--text-main);">Tủ Truyện Cá Nhân</h3>
+                <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">Danh sách tất cả các bộ truyện bạn đã lưu hiện được quản lý tại trang Tủ Truyện chuyên biệt.</p>
+                <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="btn btn-primary" style="padding: 10px 24px; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-arrow-right"></i> Đi Đến Trang Tủ Truyện
+                </a>
+            </div>
         </div>
 
         <!-- ========================================== -->
@@ -352,104 +294,16 @@ $preset_avatars = array(
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 5: CÀI ĐẶT ĐỌC TRUYỆN (ÁP DỤNG CHUNG) -->
+        <!-- TAB 5: CÀI ĐẶT ĐỌC TRUYỆN (ĐÃ TÁCH RIÊNG) -->
         <!-- ========================================== -->
         <div id="tabReadingSettings" class="dash-tab-pane">
-            <div class="profile-form-card">
-                <div class="form-section-header">
-                    <h3><i class="fa-solid fa-sliders"></i> Cài Đặt Giao Diện Đọc Truyện</h3>
-                    <p>Tùy biến cỡ chữ, kiểu phông và màu sắc đọc truyện ưa thích. Áp dụng chung cho Độc giả, Dịch giả và Quản trị viên trên mọi thiết bị.</p>
-                </div>
-
-                <div id="profileReadingSettingsAlert"></div>
-
-                <!-- KHUNG XEM TRƯỚC THỜI GIAN THỰC (LIVE PREVIEW) -->
-                <div class="reading-preview-wrapper" id="profileReadingPreviewWrapper">
-                    <div class="preview-header-bar">
-                        <span class="preview-badge-tag"><i class="fa-solid fa-eye"></i> Xem Trước Trực Quan</span>
-                        <div class="preview-theme-toggles">
-                            <button type="button" class="btn-preview-theme active" data-preview-theme="light" title="Xem trên nền sáng"><i class="fa-regular fa-sun"></i> Sáng</button>
-                            <button type="button" class="btn-preview-theme" data-preview-theme="dark" title="Xem trên nền tối"><i class="fa-solid fa-moon"></i> Tối</button>
-                        </div>
-                    </div>
-                    <div class="preview-content-box" id="previewContentBox">
-                        <h4 class="preview-title" id="previewTitle">Chương 1: Khởi Đầu Mới</h4>
-                        <div class="preview-body-text" id="previewBodyText">
-                            <p>Mỗi câu chuyện mở ra một thế giới đầy màu sắc và cảm xúc. Khung xem trước này giúp bạn kiểm tra độ tương phản, kiểu chữ và kích thước hiển thị phù hợp nhất với thị giác của mình.</p>
-                            <p>Chúc bạn có những phút giây đọc truyện thật thư thái và trọn vẹn tại Mướp Đắng!</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- BỘ ĐIỀU KHIỂN CÀI ĐẶT -->
-                <div class="profile-settings-controls">
-                    <!-- 1. Cỡ chữ -->
-                    <div class="form-setting-group">
-                        <label class="form-setting-title"><i class="fa-solid fa-text-height"></i> Cỡ chữ nội dung:</label>
-                        <div class="size-adjuster-wrap">
-                            <button type="button" class="font-size-btn-sm" id="btnProfileFontDec" title="Giảm cỡ chữ">A-</button>
-                            <span class="size-val-display" id="profileSizeDisplay">21px</span>
-                            <button type="button" class="font-size-btn-sm" id="btnProfileFontInc" title="Tăng cỡ chữ">A+</button>
-                        </div>
-                    </div>
-
-                    <!-- 2. Khoảng cách các đoạn -->
-                    <div class="form-setting-group">
-                        <label class="form-setting-title"><i class="fa-solid fa-arrows-up-down"></i> Khoảng cách các đoạn:</label>
-                        <div class="setting-spacing-chips" id="profileSpacingChips">
-                            <button type="button" class="spacing-chip-btn" data-spacing="8">Gọn (8px)</button>
-                            <button type="button" class="spacing-chip-btn active" data-spacing="14">Vừa (14px)</button>
-                            <button type="button" class="spacing-chip-btn" data-spacing="20">Thoáng (20px)</button>
-                            <button type="button" class="spacing-chip-btn" data-spacing="26">Rộng (26px)</button>
-                        </div>
-                        <div class="size-adjuster-wrap" style="margin-top: 8px;">
-                            <button type="button" class="font-size-btn-sm" id="btnProfileSpacingDec" title="Giảm khoảng cách đoạn"><i class="fa-solid fa-minus"></i></button>
-                            <span class="size-val-display" id="profileSpacingDisplay">14px</span>
-                            <button type="button" class="font-size-btn-sm" id="btnProfileSpacingInc" title="Tăng khoảng cách đoạn"><i class="fa-solid fa-plus"></i></button>
-                        </div>
-                    </div>
-
-                    <!-- 3. Kiểu chữ (Font) -->
-                    <div class="form-setting-group">
-                        <label class="form-setting-title"><i class="fa-solid fa-font"></i> Kiểu phông chữ (Font):</label>
-                        <div class="setting-font-chips" id="profileFontChips">
-                            <button type="button" class="font-chip-btn active" data-font="sans-serif">Sans-serif (Mặc định)</button>
-                            <button type="button" class="font-chip-btn" data-font="merriweather">Merriweather (Sách báo)</button>
-                            <button type="button" class="font-chip-btn" data-font="be-vietnam">Be Vietnam Pro</button>
-                            <button type="button" class="font-chip-btn" data-font="georgia">Georgia (Cổ điển)</button>
-                            <button type="button" class="font-chip-btn" data-font="times">Times New Roman</button>
-                        </div>
-                    </div>
-
-                    <!-- 3. Màu chữ đọc truyện (5 màu đề xuất + màu tùy chọn) -->
-                    <div class="form-setting-group">
-                        <div class="setting-title-split">
-                            <label class="form-setting-title"><i class="fa-solid fa-palette"></i> Màu chữ đọc truyện:</label>
-                            <span class="setting-hint-text" id="profileColorModeHint">5 màu đề xuất phổ biến:</span>
-                        </div>
-                        <div class="setting-colors-palette" id="profileColorsPalette"></div>
-
-                        <div class="custom-color-row" style="margin-top: 10px;">
-                            <label for="inputProfileCustomColor" class="custom-color-label">
-                                <i class="fa-solid fa-eye-dropper"></i> Tự chọn màu tùy thích:
-                            </label>
-                            <div class="custom-color-control">
-                                <input type="color" id="inputProfileCustomColor" class="custom-color-input" value="#262626" />
-                                <span class="custom-color-hex" id="profileCustomColorHex">#262626</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 4. Hàng nút Lưu & Khôi phục -->
-                    <div class="settings-submit-row" style="margin-top: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-primary" id="btnSaveProfileReadingSettings">
-                            <i class="fa-solid fa-check"></i> Lưu Cài Đặt Đọc Truyện
-                        </button>
-                        <button type="button" class="btn btn-secondary" id="btnResetProfileReadingSettings">
-                            <i class="fa-solid fa-arrow-rotate-left"></i> Khôi Phục Mặc Định
-                        </button>
-                    </div>
-                </div>
+            <div class="profile-form-card" style="max-width: 620px; text-align: center; padding: 40px 24px; margin: 0 auto;">
+                <i class="fa-solid fa-sliders" style="font-size: 36px; color: var(--primary-green); margin-bottom: 12px; display: inline-block;"></i>
+                <h3 style="font-size: 18px; margin-bottom: 8px; color: var(--text-main);">Cài Đặt Giao Diện Đọc Truyện</h3>
+                <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">Tính năng tùy biến cỡ chữ, kiểu phông, khoảng cách đoạn và màu sắc đọc truyện đã được tách thành trang chuyên biệt.</p>
+                <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>" class="btn btn-primary" style="padding: 10px 24px; display: inline-flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-arrow-right"></i> Đi Đến Trang Cài Đặt Đọc Truyện
+                </a>
             </div>
         </div>
     </div>

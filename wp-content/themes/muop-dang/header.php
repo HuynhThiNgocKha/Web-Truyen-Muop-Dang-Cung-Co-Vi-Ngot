@@ -122,10 +122,10 @@ $genres = get_terms(array(
                             <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>">
                                 <i class="fa-solid fa-bookmark"></i> <span>Tủ truyện của tôi</span>
                             </a>
-                            <a href="<?php echo esc_url(home_url('/ho-so/#tabPassword')); ?>">
+                            <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>">
                                 <i class="fa-solid fa-key"></i> <span>Đổi mật khẩu</span>
                             </a>
-                            <a href="<?php echo esc_url(home_url('/ho-so/#tabReadingSettings')); ?>">
+                            <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>">
                                 <i class="fa-solid fa-sliders"></i> <span>Cài đặt đọc truyện</span>
                             </a>
 
