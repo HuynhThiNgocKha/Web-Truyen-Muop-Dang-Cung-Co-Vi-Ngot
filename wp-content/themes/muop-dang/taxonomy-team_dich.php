@@ -206,9 +206,6 @@ if (is_user_logged_in() && $team_id > 0) {
                                 <i class="fa-solid fa-pen-to-square"></i>
                             </button>
                         <?php endif; ?>
-                        <span class="badge badge-green">
-                            <i class="fa-solid fa-feather-pointed"></i> Team Dịch Chính Thức
-                        </span>
                     </div>
 
                     <div class="team-hero-bio-row">

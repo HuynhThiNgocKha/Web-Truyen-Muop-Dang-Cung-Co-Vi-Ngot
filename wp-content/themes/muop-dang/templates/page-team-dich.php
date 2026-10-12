@@ -69,15 +69,18 @@ $all_teams = get_terms(array(
                         </div>
 
                         <div class="team-card-body">
+                            <?php 
+                            $formatted_name = esc_html($team->name);
+                            if (mb_strpos($team->name, 'Có Vị') !== false) {
+                                $formatted_name = str_replace('Có Vị', 'Có<br>Vị', $formatted_name);
+                            }
+                            ?>
                             <div class="team-card-header">
                                 <h2 class="team-card-name">
                                     <a href="<?php echo esc_url($team_link); ?>">
-                                        <?php echo esc_html($team->name); ?>
+                                        <?php echo $formatted_name; ?>
                                     </a>
                                 </h2>
-                                <span class="badge badge-green" style="font-size: 11px;">
-                                    <i class="fa-solid fa-feather-pointed"></i> Dịch Giả
-                                </span>
                             </div>
 
                             <?php $break_views = ($total_views >= 1000); ?>
