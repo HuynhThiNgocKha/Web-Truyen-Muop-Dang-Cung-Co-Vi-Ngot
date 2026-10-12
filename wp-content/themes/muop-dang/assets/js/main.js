@@ -1886,6 +1886,10 @@
         const $wrapper = $(this).closest('.user-menu-wrapper');
         const $panel = $wrapper.find('.user-dropdown-panel');
         
+        // Close notification dropdown if open
+        $('#notifDropdownPanel').removeClass('show');
+        $('#notifToggleBtn').attr('aria-expanded', 'false');
+
         $wrapper.toggleClass('active');
         $panel.toggleClass('show');
 

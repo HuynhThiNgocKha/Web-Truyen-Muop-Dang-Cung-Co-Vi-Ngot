@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.24');
+define('MUOP_THEME_VERSION', '2.2.25');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -2616,11 +2616,21 @@ function muop_ajax_get_notifications_handler() {
             $report_id = intval($matches[1]);
         }
 
+        $msg = $n->message;
+        if ($n->type === 'chapter_report') {
+            // Thay thế chữ "Độc giả vừa báo lỗi" hoặc "Một độc giả báo lỗi" cũ bằng tên thật của người gửi (ví dụ: Bơ vừa báo lỗi)
+            if (strpos($msg, 'Độc giả vừa báo lỗi') !== false || strpos($msg, 'Một độc giả') !== false || strpos($msg, 'Độc giả báo lỗi') !== false) {
+                $sender = $n->sender_id ? get_userdata($n->sender_id) : null;
+                $s_name = $sender ? $sender->display_name : 'Độc giả';
+                $msg = preg_replace('/(Một độc giả ẩn danh|Một độc giả|Độc giả)\s*(vừa\s*)?báo lỗi/u', $s_name . ' vừa báo lỗi', $msg);
+            }
+        }
+
         $items[] = array(
             'id'         => (int) $n->id,
             'type'       => $n->type,
             'title'      => esc_html($n->title),
-            'message'    => esc_html($n->message),
+            'message'    => esc_html($msg),
             'link'       => $n->link,
             'report_id'  => $report_id,
             'image'      => esc_url($n->image),
@@ -2731,7 +2741,7 @@ function muop_ajax_submit_chapter_report_handler() {
             'sender_id' => $user_id,
             'type'      => 'chapter_report',
             'title'     => 'Báo lỗi Chương ' . $chapter_num . ' - ' . $story->post_title,
-            'message'   => $sender_name . ' báo lỗi (' . $issue_type . '): "' . wp_trim_words($description, 14) . '"',
+            'message'   => $sender_name . ' vừa báo lỗi (' . $issue_type . '): "' . wp_trim_words($description, 14) . '"',
             'link'      => '#report-' . $inserted_id
         ));
     }
