@@ -46,19 +46,13 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
          data-chapter-id="<?php echo esc_attr($chapter_id); ?>" 
          data-chapter-num="<?php echo esc_attr($chap_num); ?>">
 
-        <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB DẠNG DỌC THEO ẢNH 2) -->
-        <nav class="reading-vertical-breadcrumbs">
-            <div class="bread-row">
-                <a href="<?php echo esc_url(home_url('/')); ?>" class="bread-link">Trang chủ</a>
-            </div>
-            <div class="bread-row">
-                <i class="fa-solid fa-angle-right bread-caret"></i>
-                <a href="<?php echo esc_url($story_url); ?>" class="bread-link bread-story-link"><?php echo esc_html($story_title); ?></a>
-            </div>
-            <div class="bread-row bread-current">
-                <i class="fa-solid fa-angle-right bread-caret"></i>
-                <span class="bread-chapter-name"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
-            </div>
+        <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB DẠNG NGANG TRÊN WEB) -->
+        <nav class="breadcrumbs">
+            <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
+            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
+            <a href="<?php echo esc_url($story_url); ?>"><?php echo esc_html($story_title); ?></a>
+            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
+            <span style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
         </nav>
 
         <!-- CENTER 2: TOOLBAR ĐIỀU HƯỚNG CHƯƠNG TRƯỚC, 3 GẠCH DANH SÁCH, CHƯƠNG SAU & ĐIỀU CHỈNH CỠ CHỮ -->

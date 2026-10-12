@@ -993,10 +993,35 @@ img {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 18px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.breadcrumbs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.2s;
 }
 
 .breadcrumbs a:hover {
   color: var(--primary-green);
+}
+
+.breadcrumbs i.fa-angle-right {
+  font-size: 11px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.breadcrumbs span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .story-detail-top {
@@ -1289,33 +1314,35 @@ img {
    CHAPTER READING PAGE (TRANG ĐỌC TRUYỆN & CHỐNG COPY)
    ========================================================================== */
 .chapter-reading-wrapper {
-  max-width: 880px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
 }
 
-/* 1. BREADCRUMBS DẠNG DỌC THEO ẢNH 2 - TINH CHỈNH ĐẸP MẮT & HÀI HÒA */
+/* 1. BREADCRUMBS TRANG ĐỌC CHƯƠNG (NẰM NGANG ĐỒNG NHẤT VỚI TRANG TRUYỆN) */
 .reading-vertical-breadcrumbs {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  align-items: center;
+  flex-direction: row;
+  gap: 8px;
   margin-bottom: 18px;
   font-size: 13.5px;
   line-height: 1.55;
   padding: 2px 0 6px 0;
+  white-space: nowrap;
 }
 
 .reading-vertical-breadcrumbs .bread-row {
-  display: flex;
-  align-items: flex-start;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
   color: var(--text-main);
-  word-break: break-word;
+  white-space: nowrap;
 }
 
 .reading-vertical-breadcrumbs .bread-caret {
   font-size: 10.5px;
   color: #9CA3AF;
-  margin-top: 5px;
   flex-shrink: 0;
   transition: color 0.2s ease;
 }
@@ -3916,10 +3943,17 @@ img {
     padding-top: 12px;
     text-align: center;
   }
+  .breadcrumbs,
   .reading-vertical-breadcrumbs {
-    font-size: 13px;
-    gap: 3px;
+    font-size: 12.5px;
+    gap: 6px;
     margin-bottom: 12px;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .breadcrumbs a,
+  .breadcrumbs span {
+    white-space: normal;
   }
   .reading-vertical-breadcrumbs .bread-caret {
     font-size: 10px;
