@@ -27,6 +27,33 @@ if (!defined('ABSPATH')) exit;
     </div>
 </footer>
 
+<!-- POPUP MODAL THÔNG BÁO TOÀN TRANG (CĂN GIỮA MÀN HÌNH CÓ NỀN MỜ) -->
+<?php if (is_user_logged_in()) : 
+    $notif_unread_count_global = muop_get_unread_notification_count(get_current_user_id());
+?>
+<div class="modal-backdrop notif-modal-backdrop" id="notifModalBackdrop" style="display: none;" aria-hidden="true">
+    <div class="modal-content notif-modal-card" id="notifDropdownPanel">
+        <div class="notif-header">
+            <div class="notif-header-title">
+                <i class="fa-solid fa-bell"></i> <span>Thông Báo</span>
+                <span class="notif-unread-count-pill" id="notifUnreadCountPill"><?php echo $notif_unread_count_global; ?> chưa đọc</span>
+            </div>
+            <div class="notif-header-actions" style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="notif-mark-all-btn" id="notifMarkAllReadBtn" title="Đánh dấu tất cả đã đọc">
+                    <i class="fa-solid fa-check-double"></i> Đã đọc tất cả
+                </button>
+                <button type="button" class="btn-close-modal" id="btnCloseNotifModal" aria-label="Đóng" title="Đóng thông báo">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+        <div class="notif-body" id="notifListContainer">
+            <div class="notif-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải thông báo...</div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Modal Xem Ảnh Bill Chuyển Khoản Nhuận Bút -->
 <div class="modal-backdrop" id="billPreviewModal" style="display: none;" aria-hidden="true">
     <div class="modal-content" style="max-width: 520px; padding: 20px; text-align: center; border-radius: var(--radius-lg);">

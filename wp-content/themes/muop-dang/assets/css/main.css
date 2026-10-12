@@ -3639,28 +3639,21 @@ img {
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18) !important;
   }
 
-  /* Căn chỉnh popup dropdown thông báo trên mobile qua bên phải (đồng bộ với Ảnh 2) */
-  .header-actions {
+  /* Modal popup thông báo trên mobile: căn giữa màn hình với border-radius 20px */
+  .notif-modal-backdrop {
+    padding: 16px !important;
+  }
+
+  .notif-modal-card {
     position: relative !important;
-  }
-
-  .notif-wrapper {
-    position: static !important;
-  }
-
-  .notif-dropdown-panel {
-    position: absolute !important;
-    right: 0 !important;
-    top: calc(100% + 8px) !important;
-    width: calc(100vw - 28px) !important;
-    max-width: 350px !important;
-    max-height: 450px !important;
-    border-radius: 12px !important;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18) !important;
-    border: 1px solid var(--border-color) !important;
-    overflow: hidden !important;
-    transform-origin: top right !important;
-    animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    top: auto !important;
+    right: auto !important;
+    width: 94% !important;
+    max-width: 440px !important;
+    max-height: 82vh !important;
+    border-radius: 20px !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.32) !important;
+    margin: auto !important;
   }
 
   .notif-header {
@@ -6342,27 +6335,85 @@ img {
   box-sizing: border-box;
 }
 
-/* Dropdown Panel */
-.notif-dropdown-panel {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  width: 380px;
-  max-width: 92vw;
-  max-height: 490px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
-  z-index: 99999;
-  display: none;
-  flex-direction: column;
-  overflow: hidden;
-  animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+/* Modal Popup Thông Báo Toàn Trang (Popup căn giữa màn hình có backdrop) */
+.notif-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
 }
 
-.notif-dropdown-panel.show {
-  display: flex;
+.notif-modal-card {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: 100% !important;
+  max-width: 460px !important;
+  max-height: 84vh !important;
+  background: var(--bg-card, #ffffff) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid var(--border-color) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.notif-modal-card .notif-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 14px 18px !important;
+  background: var(--pastel-green, #f0f7ec) !important;
+  border-bottom: 1px solid var(--border-light) !important;
+  flex-shrink: 0 !important;
+}
+
+.notif-modal-card .notif-header-title {
+  font-size: 15px !important;
+  font-weight: 750 !important;
+  color: var(--primary-green, #2e7d32) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.notif-modal-card .btn-close-modal {
+  background: none !important;
+  border: none !important;
+  font-size: 19px !important;
+  cursor: pointer !important;
+  color: var(--text-muted) !important;
+  padding: 4px 6px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.notif-modal-card .btn-close-modal:hover {
+  color: #dc2626 !important;
+  background: rgba(220, 38, 38, 0.08) !important;
+}
+
+.notif-modal-card .notif-body {
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  max-height: calc(84vh - 65px) !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 .notif-header {

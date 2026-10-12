@@ -3625,45 +3625,35 @@
   // 17. NOTIFICATIONS & BILL PREVIEW
   const NotificationManager = {
     init() {
-      // Toggle dropdown panel
+      // Toggle popup modal thông báo khi click chuông
       $(document).on('click', '#notifToggleBtn', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const $panel = $('#notifDropdownPanel');
-        const isOpen = $panel.hasClass('show');
 
-        // Close user dropdown if open
-        $('#userDropdownPanel').removeClass('show');
-        $('#userMenuWrapper').removeClass('active');
-
-        if (isOpen) {
-          $panel.removeClass('show');
-          $('#notifToggleBtn').attr('aria-expanded', 'false');
+        if ($('#notifModalBackdrop').is(':visible')) {
+          NotificationManager.closeModal();
         } else {
-          $panel.addClass('show');
-          $('#notifToggleBtn').attr('aria-expanded', 'true');
-          this.fetchNotifications();
+          NotificationManager.openModal();
         }
       });
 
-      // Prevent closing when clicking inside notif dropdown
-      $(document).on('click', '#notifDropdownPanel', (e) => {
-        e.stopPropagation();
+      // Nút đóng modal X
+      $(document).on('click', '#btnCloseNotifModal', (e) => {
+        e.preventDefault();
+        NotificationManager.closeModal();
       });
 
-      // Close dropdown when clicking outside
-      $(document).on('click', (e) => {
-        if (!$(e.target).closest('#notifWrapper').length) {
-          $('#notifDropdownPanel').removeClass('show');
-          $('#notifToggleBtn').attr('aria-expanded', 'false');
+      // Đóng modal khi click ra nền mờ bên ngoài
+      $(document).on('click', '#notifModalBackdrop', function(e) {
+        if (e.target === this) {
+          NotificationManager.closeModal();
         }
       });
 
-      // Close on Escape
+      // Đóng modal khi bấm Escape
       $(document).on('keydown', (e) => {
-        if (e.key === 'Escape') {
-          $('#notifDropdownPanel').removeClass('show');
-          $('#notifToggleBtn').attr('aria-expanded', 'false');
+        if (e.key === 'Escape' && $('#notifModalBackdrop').is(':visible')) {
+          NotificationManager.closeModal();
         }
       });
 
@@ -3729,8 +3719,7 @@
         // 1. Nếu là báo lỗi chương hoặc phản hồi báo lỗi -> MỞ MODAL ĐỐI THOẠI KHÔNG RELOAD / GIỮ NGUYÊN TÀI KHOẢN
         if (repId || notifType === 'chapter_report' || notifType === 'report_reply' || (link && link.indexOf('#report-') !== -1)) {
           e.preventDefault();
-          $('#notifDropdownPanel').removeClass('show');
-          $('#notifToggleBtn').attr('aria-expanded', 'false');
+          NotificationManager.closeModal();
           if (repId) {
             ReportDialogueManager.openModal(repId);
           }
@@ -3742,6 +3731,7 @@
           e.preventDefault();
           const billUrl = hasBill || $(e.target).closest('.notif-bill-preview-btn').data('bill-url');
           if (billUrl) {
+            NotificationManager.closeModal();
             NotificationManager.openBillModal(billUrl);
           }
           return;
@@ -3749,6 +3739,7 @@
 
         // 3. Các thông báo thông thường khác
         if (link && !$(e.target).closest('.notif-bill-preview-btn').length) {
+          NotificationManager.closeModal();
           window.location.href = link;
         }
       });
@@ -3771,6 +3762,21 @@
           $(this).hide();
         }
       });
+    },
+
+    openModal() {
+      // Đóng dropdown user nếu đang mở
+      $('#userDropdownPanel').removeClass('show');
+      $('#userMenuWrapper').removeClass('active');
+
+      $('#notifModalBackdrop').css('display', 'flex');
+      $('#notifToggleBtn').attr('aria-expanded', 'true');
+      this.fetchNotifications();
+    },
+
+    closeModal() {
+      $('#notifModalBackdrop').hide();
+      $('#notifToggleBtn').attr('aria-expanded', 'false');
     },
 
     openBillModal(billUrl) {

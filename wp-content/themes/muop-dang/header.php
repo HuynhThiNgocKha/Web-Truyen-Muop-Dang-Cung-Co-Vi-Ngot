@@ -88,22 +88,6 @@ $genres = get_terms(array(
                                 <?php echo ($unread_notifs_count > 99) ? '99+' : $unread_notifs_count; ?>
                             </span>
                         </button>
-
-                        <!-- Panel Dropdown Thông Báo -->
-                        <div class="notif-dropdown-panel" id="notifDropdownPanel" aria-hidden="true">
-                            <div class="notif-header">
-                                <div class="notif-header-title">
-                                    <i class="fa-solid fa-bell"></i> Thông Báo
-                                    <span class="notif-unread-count-pill" id="notifUnreadCountPill"><?php echo $unread_notifs_count; ?> chưa đọc</span>
-                                </div>
-                                <button type="button" class="notif-mark-all-btn" id="notifMarkAllReadBtn" title="Đánh dấu tất cả đã đọc">
-                                    <i class="fa-solid fa-check-double"></i> Đã đọc tất cả
-                                </button>
-                            </div>
-                            <div class="notif-body" id="notifListContainer">
-                                <div class="notif-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải thông báo...</div>
-                            </div>
-                        </div>
                     </div>
                 <?php endif; ?>
 
