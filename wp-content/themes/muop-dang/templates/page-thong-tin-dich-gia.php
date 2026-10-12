@@ -189,56 +189,64 @@ if (!empty($story_ids)) {
             </div>
         </div>
 
-        <!-- TABS NAV -->
-        <div class="dash-tabs-nav">
-            <button type="button" class="dash-tab-btn active" data-tab="tabMyStories">
-                <i class="fa-solid fa-book-bookmark"></i> Quản Lý Truyện Của Tôi (<?php echo $story_count; ?>)
-            </button>
-            <button type="button" class="dash-tab-btn" data-tab="tabComments">
-                <i class="fa-solid fa-comments"></i> Bình Luận Từ Độc Giả (<?php echo count($comments_on_stories); ?>)
-            </button>
-        </div>
+        <!-- PHẦN 1: QUẢN LÝ TRUYỆN CỦA TÔI -->
+        <div class="translator-section-block">
+            <div class="dash-section-header">
+                <h2 class="dash-section-title">
+                    <i class="fa-solid fa-book-bookmark"></i> Quản Lý Truyện Của Tôi 
+                    <span class="count-badge">(<?php echo $story_count; ?>)</span>
+                </h2>
+                <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>" class="btn btn-primary" style="padding: 6px 14px; font-size: 13px;">
+                    <i class="fa-solid fa-plus-circle"></i> Đăng Truyện Mới
+                </a>
+            </div>
 
-        <!-- TAB 1: QUẢN LÝ TRUYỆN ĐÃ ĐĂNG -->
-        <div id="tabMyStories" class="dash-tab-pane active">
+            <div class="table-scroll-hint">
+                <i class="fa-solid fa-arrows-left-right"></i> Vuốt ngang để xem đầy đủ các cột
+            </div>
+
             <?php if (!empty($my_stories)) : ?>
                 <div class="table-responsive">
-                    <table class="data-table">
+                    <table class="data-table translator-stories-table">
                         <thead>
                             <tr>
-                                <th>Tên Truyện</th>
-                                <th>Trạng Thái</th>
-                                <th>Số Chương</th>
-                                <th>Lượt Xem</th>
-                                <th>Nhuận Bút (8đ)</th>
-                                <th>Kiểm Duyệt</th>
-                                <th>Hành Động</th>
+                                <th class="col-stt">STT</th>
+                                <th class="col-title">Tên Truyện</th>
+                                <th class="col-status">Trạng Thái</th>
+                                <th class="col-chaps">Số Chương</th>
+                                <th class="col-views">Lượt Xem</th>
+                                <th class="col-salary">Nhuận Bút (8đ)</th>
+                                <th class="col-review">Kiểm Duyệt</th>
+                                <th class="col-actions">Hành Động</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($my_stories as $st) : 
+                            <?php foreach ($my_stories as $index => $st) : 
                                 $st_views  = muop_get_story_views($st->ID);
                                 $st_status = get_post_meta($st->ID, '_truyen_status', true);
                                 $st_chaps  = count(muop_get_story_chapters($st->ID));
                                 $st_money  = $st_views * $rate;
                             ?>
                                 <tr>
-                                    <td>
-                                        <a href="<?php echo esc_url(get_permalink($st->ID)); ?>" style="font-weight: 700; color: var(--primary-green);">
+                                    <td class="col-stt">
+                                        <?php echo esc_html($index + 1); ?>
+                                    </td>
+                                    <td class="col-title">
+                                        <a href="<?php echo esc_url(get_permalink($st->ID)); ?>" class="table-story-title" title="<?php echo esc_attr($st->post_title); ?>">
                                             <?php echo esc_html($st->post_title); ?>
                                         </a>
                                     </td>
-                                    <td>
+                                    <td class="col-status">
                                         <span class="badge <?php echo ($st_status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?> badge-editable btn-table-change-status" data-story-id="<?php echo $st->ID; ?>" data-current-status="<?php echo esc_attr($st_status ?: 'dang_ra'); ?>" title="Nhấn để đổi trạng thái truyện (Đang ra / Hoàn thành)">
                                             <i class="fa-solid <?php echo ($st_status === 'hoan_thanh') ? 'fa-check' : 'fa-arrows-rotate'; ?>"></i>
                                             <span class="table-status-text"><?php echo ($st_status === 'hoan_thanh') ? 'Full' : 'Đang ra'; ?></span>
                                             <i class="fa-solid fa-pen" style="font-size: 9px; opacity: 0.7; margin-left: 2px;"></i>
                                         </span>
                                     </td>
-                                    <td><strong><?php echo $st_chaps; ?></strong> chương</td>
-                                    <td><i class="fa-solid fa-eye"></i> <?php echo number_format($st_views); ?></td>
-                                    <td style="color: #2E7D32; font-weight: 700;"><?php echo number_format($st_money); ?> đ</td>
-                                    <td>
+                                    <td class="col-chaps"><strong><?php echo $st_chaps; ?></strong> chương</td>
+                                    <td class="col-views"><i class="fa-solid fa-eye"></i> <?php echo number_format($st_views); ?></td>
+                                    <td class="col-salary" style="color: #2E7D32; font-weight: 700;"><?php echo number_format($st_money); ?> đ</td>
+                                    <td class="col-review">
                                         <?php if ($st->post_status === 'publish') : ?>
                                             <span class="badge badge-approved"><i class="fa-solid fa-check"></i> Đã duyệt</span>
                                         <?php elseif ($st->post_status === 'pending') : ?>
@@ -247,8 +255,8 @@ if (!empty($story_ids)) {
                                             <span class="badge badge-hot">Bản nháp</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
-                                        <div style="display: flex; gap: 6px; align-items: center;">
+                                    <td class="col-actions">
+                                        <div style="display: flex; gap: 6px; align-items: center; justify-content: center;">
                                             <a href="<?php echo esc_url(add_query_arg('story_id', $st->ID, home_url('/them-chuong/'))); ?>" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" title="Thêm chương">
                                                 <i class="fa-solid fa-plus"></i> Chương
                                             </a>
@@ -266,7 +274,7 @@ if (!empty($story_ids)) {
                     </table>
                 </div>
             <?php else : ?>
-                <div style="text-align: center; padding: 40px; background: var(--pastel-green); border-radius: var(--radius-md); color: var(--text-muted);">
+                <div style="text-align: center; padding: 40px; background: var(--pastel-green); border-radius: var(--radius-md); color: var(--text-muted); margin-bottom: 24px;">
                     <i class="fa-solid fa-feather" style="font-size: 36px; color: var(--avocado-green); margin-bottom: 10px;"></i>
                     <p>Bạn chưa đăng bộ truyện nào. Hãy bắt đầu ngay để kiếm nhuận bút 8đ cho mỗi lượt đọc nhé!</p>
                     <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>" class="btn btn-primary" style="margin-top: 14px;">
@@ -276,8 +284,15 @@ if (!empty($story_ids)) {
             <?php endif; ?>
         </div>
 
-        <!-- TAB 2: BÌNH LUẬN TỪ ĐỘC GIẢ & TRẢ LỜI -->
-        <div id="tabComments" class="dash-tab-pane">
+        <!-- PHẦN 2: BÌNH LUẬN TỪ ĐỘC GIẢ (ĐƯA XUỐNG PHÍA DƯỚI) -->
+        <div class="translator-section-block" style="margin-top: 36px;">
+            <div class="dash-section-header">
+                <h2 class="dash-section-title">
+                    <i class="fa-solid fa-comments"></i> Bình Luận Từ Độc Giả 
+                    <span class="count-badge">(<?php echo count($comments_on_stories); ?>)</span>
+                </h2>
+            </div>
+
             <?php if (!empty($comments_on_stories)) : ?>
                 <ul class="comment-list-ul">
                     <?php foreach ($comments_on_stories as $cmt) : 
