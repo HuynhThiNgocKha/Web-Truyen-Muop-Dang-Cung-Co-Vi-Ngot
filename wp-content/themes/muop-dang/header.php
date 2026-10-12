@@ -43,7 +43,7 @@ $genres = get_terms(array(
                     <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>" alt="Logo Mướp Đắng" class="brand-icon-img" />
                 </div>
                 <div class="brand-text">
-                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png'); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" />
+                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . MUOP_THEME_VERSION); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" />
                     <h1 class="sr-only"><?php bloginfo('name'); ?></h1>
                 </div>
             </a>
@@ -274,7 +274,7 @@ $genres = get_terms(array(
                 <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>" alt="Logo Mướp Đắng" class="brand-icon-img" />
             </div>
             <div class="brand-text">
-                <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png'); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" style="height: 32px;" />
+                <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . MUOP_THEME_VERSION); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" style="height: 32px;" />
             </div>
         </a>
         <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Đóng menu">
