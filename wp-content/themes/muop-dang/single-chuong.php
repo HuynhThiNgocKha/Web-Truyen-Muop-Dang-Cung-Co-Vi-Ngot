@@ -98,8 +98,12 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
         <article class="chapter-content-box">
             <header class="chapter-header-compact">
                 <h1 class="chapter-heading-title"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></h1>
-                <div class="chapter-meta-date">
-                    <i class="fa-regular fa-clock"></i> <?php echo get_the_date('d/m/Y'); ?>
+                <div class="chapter-meta-date" title="<?php echo esc_attr(get_the_date('d/m/Y H:i')); ?>">
+                    <i class="fa-regular fa-clock"></i> <?php 
+                        $current_chap_ts = get_post_timestamp(get_the_ID(), 'date') ?: get_post_time('U', true, get_the_ID());
+                        $current_chap_time = muop_time_ago($current_chap_ts) ?: get_the_date('d/m/Y');
+                        echo esc_html($current_chap_time); 
+                    ?>
                 </div>
             </header>
 

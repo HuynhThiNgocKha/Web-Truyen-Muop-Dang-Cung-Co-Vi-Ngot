@@ -227,8 +227,13 @@ if (!$thumb_url) {
             ?>
                 <div class="chapter-grid">
                     <?php foreach ($chapters_desc as $chap) : 
-                        $chap_num   = get_post_meta($chap->ID, '_chuong_number', true) ?: 1;
-                        $chap_views = muop_get_chapter_views($chap->ID);
+                        $chap_num      = get_post_meta($chap->ID, '_chuong_number', true) ?: 1;
+                        $chap_views    = muop_get_chapter_views($chap->ID);
+                        $chap_ts       = get_post_timestamp($chap->ID, 'date') ?: get_post_time('U', true, $chap->ID);
+                        $chap_time_ago = muop_time_ago($chap_ts);
+                        if (empty($chap_time_ago)) {
+                            $chap_time_ago = get_the_time('d/m/Y', $chap->ID);
+                        }
                     ?>
                         <div class="chapter-item-row">
                             <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
@@ -237,7 +242,7 @@ if (!$thumb_url) {
                                     <span class="chapter-item-views" title="Lượt xem">
                                         <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
                                     </span>
-                                    <span class="chapter-item-date"><?php echo get_the_time('d/m/Y', $chap->ID); ?></span>
+                                    <span class="chapter-item-date" title="<?php echo esc_attr(get_the_time('d/m/Y H:i', $chap->ID)); ?>"><?php echo esc_html($chap_time_ago); ?></span>
                                 </span>
                             </a>
                             <?php if ($can_manage_story) : ?>

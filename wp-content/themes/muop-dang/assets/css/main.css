@@ -1299,6 +1299,7 @@ img {
 .chapter-item-date {
   font-size: 11px;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .chapter-item:hover {
