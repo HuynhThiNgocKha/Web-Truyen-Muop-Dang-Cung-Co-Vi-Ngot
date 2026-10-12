@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.10');
+define('MUOP_THEME_VERSION', '2.2.11');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -2075,4 +2075,142 @@ function muop_ajax_update_story_title_handler() {
         'updated' => muop_get_story_last_updated($story_id)
     ));
 }
+
+// 24. AJAX: Update Team Info (Đổi Avatar, Bio, Tên Team Dịch)
+add_action('wp_ajax_muop_update_team_info', 'muop_ajax_update_team_info_handler');
+function muop_ajax_update_team_info_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện!'));
+    }
+
+    $team_id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+    $term = get_term($team_id, 'team_dich');
+    if (!$term || is_wp_error($term)) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thông tin team dịch!'));
+    }
+
+    $current_uid = get_current_user_id();
+    $can_edit = false;
+
+    if (current_user_can('administrator')) {
+        $can_edit = true;
+    } elseif (current_user_can('dich_gia')) {
+        // Kiểm tra xem dịch giả có truyện nào thuộc team này không
+        $posts_in_team = get_posts(array(
+            'post_type'      => 'truyen',
+            'posts_per_page' => 1,
+            'post_status'    => 'any',
+            'author'         => $current_uid,
+            'tax_query'      => array(
+                array(
+                    'taxonomy' => 'team_dich',
+                    'field'    => 'term_id',
+                    'terms'    => $team_id
+                )
+            )
+        ));
+        if (!empty($posts_in_team)) {
+            $can_edit = true;
+        }
+    }
+
+    if (!$can_edit) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa thông tin của team dịch này!'));
+    }
+
+    // 1. Xử lý ảnh đại diện (Avatar)
+    $team_avatar_url = get_term_meta($team_id, '_team_avatar', true);
+    if (!empty($_FILES['team_avatar_file']) && !empty($_FILES['team_avatar_file']['name'])) {
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        $allowed_mimes = array(
+            'jpg|jpeg|jpe' => 'image/jpeg',
+            'png'          => 'image/png',
+            'webp'         => 'image/webp',
+            'gif'          => 'image/gif',
+        );
+
+        $file = $_FILES['team_avatar_file'];
+        $check = wp_check_filetype_and_ext($file['tmp_name'], $file['name'], $allowed_mimes);
+        if (!$check['ext']) {
+            wp_send_json_error(array('message' => 'Định dạng ảnh không hợp lệ! Vui lòng tải file JPG, PNG, hoặc WEBP.'));
+        }
+
+        $upload = wp_handle_upload($file, array('test_form' => false, 'mimes' => $allowed_mimes));
+        if (!empty($upload['error'])) {
+            wp_send_json_error(array('message' => 'Lỗi tải ảnh đại diện: ' . $upload['error']));
+        }
+
+        $team_avatar_url = $upload['url'];
+        update_term_meta($team_id, '_team_avatar', $team_avatar_url);
+    } elseif (isset($_POST['team_avatar_url'])) {
+        $input_avatar_url = esc_url_raw(trim($_POST['team_avatar_url']));
+        if (!empty($input_avatar_url)) {
+            $team_avatar_url = $input_avatar_url;
+            update_term_meta($team_id, '_team_avatar', $team_avatar_url);
+        }
+    }
+
+    // 2. Xử lý Lời giới thiệu (Bio)
+    $team_bio = '';
+    if (isset($_POST['team_bio'])) {
+        $team_bio = sanitize_textarea_field(trim($_POST['team_bio']));
+        wp_update_term($team_id, 'team_dich', array('description' => $team_bio));
+        update_term_meta($team_id, '_team_bio', $team_bio);
+    }
+
+    // 3. Xử lý Tên Team Dịch
+    $new_name = isset($_POST['team_name']) ? sanitize_text_field(trim($_POST['team_name'])) : '';
+    $redirect_url = '';
+    if (!empty($new_name) && $new_name !== $term->name) {
+        $new_slug = sanitize_title($new_name);
+        $update_term_res = wp_update_term($team_id, 'team_dich', array(
+            'name' => $new_name,
+            'slug' => $new_slug
+        ));
+
+        if (is_wp_error($update_term_res)) {
+            wp_send_json_error(array('message' => 'Không thể đổi tên team: ' . $update_term_res->get_error_message()));
+        }
+
+        // Đồng bộ post_meta _truyen_team ở tất cả truyện thuộc team
+        $stories_in_team = get_posts(array(
+            'post_type'      => 'truyen',
+            'posts_per_page' => -1,
+            'post_status'    => 'any',
+            'tax_query'      => array(
+                array(
+                    'taxonomy' => 'team_dich',
+                    'field'    => 'term_id',
+                    'terms'    => $team_id
+                )
+            )
+        ));
+        foreach ($stories_in_team as $st) {
+            update_post_meta($st->ID, '_truyen_team', $new_name);
+        }
+
+        $link_res = get_term_link($team_id, 'team_dich');
+        if (!is_wp_error($link_res)) {
+            $redirect_url = $link_res;
+        }
+    }
+
+    $final_name = !empty($new_name) ? $new_name : $term->name;
+
+    wp_send_json_success(array(
+        'message'      => 'Cập nhật thông tin team dịch thành công!',
+        'team_id'      => $team_id,
+        'team_name'    => $final_name,
+        'team_bio'     => $team_bio,
+        'avatar_url'   => $team_avatar_url,
+        'redirect_url' => $redirect_url
+    ));
+}
+
 

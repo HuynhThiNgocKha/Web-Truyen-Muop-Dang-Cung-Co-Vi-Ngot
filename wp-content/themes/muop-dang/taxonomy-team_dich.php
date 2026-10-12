@@ -139,6 +139,32 @@ if ($team_term) {
 
 $team_query = new WP_Query($query_args);
 $avatar_initial = !empty($team_name) ? mb_strtoupper(mb_substr($team_name, 0, 1, 'UTF-8'), 'UTF-8') : 'T';
+
+// Lấy Avatar và Bio của Team
+$team_avatar_url = $team_id > 0 ? get_term_meta($team_id, '_team_avatar', true) : '';
+$team_bio = '';
+if ($team_term) {
+    $team_bio = !empty($team_term->description) ? $team_term->description : get_term_meta($team_id, '_team_bio', true);
+}
+if (empty($team_bio)) {
+    $team_bio = 'Chào mừng bạn đến với trang tác phẩm của ' . $team_name . '. Chúc các bạn độc giả có những giây phút đọc truyện ngọt ngào và thư giãn nhất!';
+}
+
+// Quyền quản lý và chỉnh sửa Team Dịch
+$can_edit_team = false;
+if (is_user_logged_in() && $team_id > 0) {
+    if (current_user_can('administrator')) {
+        $can_edit_team = true;
+    } elseif (current_user_can('dich_gia')) {
+        $current_uid = get_current_user_id();
+        foreach ($all_team_stories as $st) {
+            if ((int)$st->post_author === $current_uid) {
+                $can_edit_team = true;
+                break;
+            }
+        }
+    }
+}
 ?>
 
 <div class="container">
@@ -149,32 +175,62 @@ $avatar_initial = !empty($team_name) ? mb_strtoupper(mb_substr($team_name, 0, 1,
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
             <a href="<?php echo esc_url(home_url('/team-dich/')); ?>">Team Dịch</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html($team_name); ?></span>
+            <span style="color: var(--primary-green); font-weight: 600;" id="breadcrumbTeamName"><?php echo esc_html($team_name); ?></span>
         </nav>
 
         <!-- HERO HEADER: THÔNG TIN TEAM DỊCH -->
         <div class="team-hero-card">
             <div class="team-hero-top">
                 <div class="team-avatar-wrap">
-                    <div class="team-avatar-circle">
-                        <?php echo esc_html($avatar_initial); ?>
+                    <div class="team-avatar-circle" id="teamAvatarDisplay">
+                        <?php if (!empty($team_avatar_url)) : ?>
+                            <img src="<?php echo esc_url($team_avatar_url); ?>" alt="<?php echo esc_attr($team_name); ?>" class="team-avatar-img" id="teamAvatarImg" />
+                            <span id="teamAvatarChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
+                        <?php else : ?>
+                            <span id="teamAvatarChar"><?php echo esc_html($avatar_initial); ?></span>
+                            <img src="" alt="<?php echo esc_attr($team_name); ?>" class="team-avatar-img" id="teamAvatarImg" style="display: none;" />
+                        <?php endif; ?>
+
+                        <?php if ($can_edit_team) : ?>
+                            <button type="button" class="btn-change-team-avatar-badge" id="btnChangeTeamAvatarBadge" title="Thay đổi ảnh đại diện Team">
+                                <i class="fa-solid fa-camera"></i>
+                            </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <div class="team-hero-info">
                     <div class="team-hero-title-row">
-                        <h1 class="team-hero-name"><?php echo esc_html($team_name); ?></h1>
+                        <h1 class="team-hero-name" id="teamHeroNameDisplay"><?php echo esc_html($team_name); ?></h1>
+                        <?php if ($can_edit_team) : ?>
+                            <button type="button" class="btn-edit-team-inline" id="btnEditTeamNameInline" title="Chỉnh sửa tên team dịch">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        <?php endif; ?>
                         <span class="badge badge-green">
                             <i class="fa-solid fa-feather-pointed"></i> Team Dịch Chính Thức
                         </span>
                     </div>
-                    <p class="team-hero-bio">
-                        Chào mừng bạn đến với trang tác phẩm của <strong><?php echo esc_html($team_name); ?></strong>. Chúc các bạn độc giả có những giây phút đọc truyện ngọt ngào và thư giãn nhất!
-                    </p>
+
+                    <div class="team-hero-bio-row">
+                        <p class="team-hero-bio" id="teamHeroBioDisplay"><?php echo esc_html($team_bio); ?></p>
+                        <?php if ($can_edit_team) : ?>
+                            <button type="button" class="btn-edit-team-inline" id="btnEditTeamBioInline" title="Chỉnh sửa lời giới thiệu team">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
-                <!-- NÚT YÊU THÍCH / THEO DÕI TEAM -->
+                <!-- NÚT CHỈNH SỬA & YÊU THÍCH / THEO DÕI TEAM -->
                 <div class="team-hero-action">
+                    <?php if ($can_edit_team) : ?>
+                        <button type="button" class="btn btn-secondary btn-edit-team-all" id="btnOpenEditTeamModal" title="Chỉnh sửa thông tin Team Dịch">
+                            <i class="fa-solid fa-gear"></i>
+                            <span>Chỉnh Sửa Team</span>
+                        </button>
+                    <?php endif; ?>
+
                     <button type="button" class="btn <?php echo $is_favorited ? 'btn-primary' : 'btn-secondary'; ?> btn-favorite-team" id="btnToggleFavoriteTeam" data-team-id="<?php echo esc_attr($team_id); ?>" data-team-name="<?php echo esc_attr($team_name); ?>">
                         <i class="fa-<?php echo $is_favorited ? 'solid' : 'regular'; ?> fa-heart" id="favTeamHeartIcon"></i>
                         <span id="favTeamBtnText"><?php echo $is_favorited ? 'Đã Yêu Thích Team' : 'Yêu Thích Team'; ?></span>
@@ -321,6 +377,96 @@ $avatar_initial = !empty($team_name) ? mb_strtoupper(mb_substr($team_name, 0, 1,
         <?php endif; ?>
     </div>
 </div>
+
+<?php if ($can_edit_team) : ?>
+<!-- MODAL CHỈNH SỬA THÔNG TIN TEAM DỊCH -->
+<div id="modalEditTeamInfo" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 560px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+        
+        <!-- Header -->
+        <div class="modal-header-top-box">
+            <div class="modal-title-stacked">
+                <span class="modal-action-label">
+                    <i class="fa-solid fa-gear"></i> Quản Lý Team Dịch
+                </span>
+                <h3 class="modal-story-title-sub">Chỉnh Sửa Thông Tin Team</h3>
+            </div>
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <div id="editTeamAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+            <form id="formEditTeamInfo" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="muop_update_team_info" />
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+                <input type="file" name="team_avatar_file" id="inputTeamAvatarFile" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+
+                <!-- PHẦN 1: ẢNH ĐẠI DIỆN TEAM -->
+                <div class="team-edit-section" style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border-light);">
+                    <label class="form-label" style="font-weight: 700; margin-bottom: 10px; display: block;">
+                        <i class="fa-solid fa-image"></i> Ảnh Đại Diện Team (Avatar)
+                    </label>
+                    <div style="display: flex; gap: 16px; align-items: center;">
+                        <div class="avatar-preview-circle" style="width: 72px; height: 72px; border-radius: 50%; border: 3px solid #ffffff; overflow: hidden; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 12px rgba(63, 117, 35, 0.3);">
+                            <?php if (!empty($team_avatar_url)) : ?>
+                                <img id="teamModalAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                                <span id="teamModalAvatarPreviewChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
+                            <?php else : ?>
+                                <span id="teamModalAvatarPreviewChar"><?php echo esc_html($avatar_initial); ?></span>
+                                <img id="teamModalAvatarPreviewImg" src="" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+                            <?php endif; ?>
+                        </div>
+
+                        <div style="flex: 1; min-width: 0;">
+                            <button type="button" id="btnTriggerTeamAvatarUpload" class="btn btn-secondary" style="padding: 8px 14px; font-size: 13px; margin-bottom: 6px;">
+                                <i class="fa-solid fa-upload"></i> Tải ảnh từ thiết bị
+                            </button>
+                            <div id="teamAvatarFileName" style="font-size: 12px; color: var(--text-muted); word-break: break-all;">Chưa chọn tệp (Hỗ trợ JPG, PNG, WEBP)</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 12px;">
+                        <label for="inputTeamAvatarUrl" class="form-label" style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px;">Hoặc dán đường dẫn (URL) ảnh avatar online:</label>
+                        <input type="url" id="inputTeamAvatarUrl" name="team_avatar_url" class="form-input" style="height: 38px; font-size: 13px;" placeholder="https://example.com/avatar-team.jpg" value="<?php echo esc_attr($team_avatar_url); ?>" />
+                    </div>
+                </div>
+
+                <!-- PHẦN 2: TÊN TEAM DỊCH -->
+                <div class="team-edit-section" style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border-light);">
+                    <label class="form-label" for="inputTeamName" style="font-weight: 700; margin-bottom: 6px; display: block;">
+                        <i class="fa-solid fa-users"></i> Tên Team Dịch (*)
+                    </label>
+                    <input type="text" id="inputTeamName" name="team_name" class="form-input" style="height: 40px; font-size: 14px;" required value="<?php echo esc_attr($team_name); ?>" placeholder="Nhập tên team dịch..." />
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 0 0;">
+                        Lưu ý: Khi đổi tên team dịch, hệ thống sẽ tự động cập nhật tên team ở tất cả các tác phẩm của team.
+                    </p>
+                </div>
+
+                <!-- PHẦN 3: DÒNG GIỚI THIỆU (BIO) -->
+                <div class="team-edit-section" style="margin-bottom: 10px;">
+                    <label class="form-label" for="inputTeamBio" style="font-weight: 700; margin-bottom: 6px; display: block;">
+                        <i class="fa-solid fa-align-left"></i> Lời Giới Thiệu / Bio Team
+                    </label>
+                    <textarea id="inputTeamBio" name="team_bio" class="form-input" rows="3" style="font-size: 13.5px; line-height: 1.5; resize: vertical;" placeholder="Nhập lời chào mừng hoặc giới thiệu về team dịch..."><?php echo esc_textarea($team_bio); ?></textarea>
+                </div>
+
+                <!-- Footer buttons -->
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+                    <button type="submit" id="btnSubmitTeamInfo" class="btn btn-primary" style="padding: 8px 22px;">
+                        <i class="fa-solid fa-check"></i> Lưu Thay Đổi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php
 get_footer();

@@ -2474,6 +2474,154 @@
           }
         });
       });
+
+      // 15.1 Mở & Đóng Modal Chỉnh Sửa Team Dịch
+      function openEditTeamModal(focusTarget) {
+        const $modal = $('#modalEditTeamInfo');
+        if (!$modal.length) return;
+        $('#editTeamAlert').hide();
+        $modal.css('display', 'flex');
+        if (focusTarget) {
+          setTimeout(() => {
+            $(focusTarget).trigger('focus');
+          }, 100);
+        }
+      }
+
+      $('#btnChangeTeamAvatarBadge').on('click', function(e) {
+        e.preventDefault();
+        openEditTeamModal('#btnTriggerTeamAvatarUpload');
+      });
+
+      $('#btnEditTeamNameInline').on('click', function(e) {
+        e.preventDefault();
+        openEditTeamModal('#inputTeamName');
+      });
+
+      $('#btnEditTeamBioInline').on('click', function(e) {
+        e.preventDefault();
+        openEditTeamModal('#inputTeamBio');
+      });
+
+      $('#btnOpenEditTeamModal').on('click', function(e) {
+        e.preventDefault();
+        openEditTeamModal('#inputTeamName');
+      });
+
+      $('.btn-close-team-modal').on('click', function(e) {
+        e.preventDefault();
+        $('#modalEditTeamInfo').hide();
+      });
+
+      $('#modalEditTeamInfo').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Tải ảnh avatar team từ thiết bị
+      $('#btnTriggerTeamAvatarUpload').on('click', function(e) {
+        e.preventDefault();
+        $('#inputTeamAvatarFile').trigger('click');
+      });
+
+      $('#inputTeamAvatarFile').on('change', function() {
+        const file = this.files && this.files[0];
+        if (file) {
+          $('#teamAvatarFileName').html('<strong>Đã chọn:</strong> ' + file.name);
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            $('#teamModalAvatarPreviewImg').attr('src', e.target.result).show();
+            $('#teamModalAvatarPreviewChar').hide();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // Nhập URL avatar
+      $('#inputTeamAvatarUrl').on('input paste', function() {
+        const url = $(this).val().trim();
+        if (url) {
+          $('#teamModalAvatarPreviewImg').attr('src', url).show();
+          $('#teamModalAvatarPreviewChar').hide();
+        }
+      });
+
+      // Submit Form Chỉnh Sửa Team
+      $('#formEditTeamInfo').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSubmitTeamInfo');
+        const $alert = $('#editTeamAlert');
+        const teamName = $('#inputTeamName').val().trim();
+        $alert.hide();
+
+        if (!teamName) {
+          $alert.removeClass('alert-success').addClass('alert-error').text('Vui lòng nhập tên team dịch!').fadeIn();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+
+        const formData = new FormData(this);
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thay Đổi');
+            if (typeof res === 'string') {
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (err) {}
+            }
+
+            if (res && res.success) {
+              $alert.removeClass('alert-error').addClass('alert-success').text(res.data.message || 'Cập nhật thành công!').fadeIn();
+
+              // Cập nhật tên team
+              if (res.data.team_name) {
+                $('#teamHeroNameDisplay').text(res.data.team_name);
+                $('#breadcrumbTeamName').text(res.data.team_name);
+                $('#btnToggleFavoriteTeam').data('team-name', res.data.team_name);
+              }
+
+              // Cập nhật bio
+              if (res.data.team_bio !== undefined) {
+                $('#teamHeroBioDisplay').text(res.data.team_bio);
+              }
+
+              // Cập nhật avatar
+              if (res.data.avatar_url) {
+                $('#teamAvatarImg').attr('src', res.data.avatar_url).show();
+                $('#teamAvatarChar').hide();
+              }
+
+              // Nếu có redirect url (do đổi slug)
+              if (res.data.redirect_url && window.location.href !== res.data.redirect_url) {
+                setTimeout(() => {
+                  window.location.href = res.data.redirect_url;
+                }, 800);
+              } else {
+                setTimeout(() => {
+                  $('#modalEditTeamInfo').fadeOut(200);
+                  $alert.hide();
+                }, 1000);
+              }
+            } else {
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Không thể cập nhật thông tin team!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thay Đổi');
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
+          }
+        });
+      });
     }
   };
 

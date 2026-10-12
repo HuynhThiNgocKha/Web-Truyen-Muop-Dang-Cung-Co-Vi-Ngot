@@ -65,10 +65,15 @@ $all_teams = get_terms(array(
 
                     $fav_count = (int) get_term_meta($team->term_id, '_team_favorite_count', true);
                     if ($fav_count < 0) $fav_count = 0;
+                    $team_avatar = get_term_meta($team->term_id, '_team_avatar', true);
                 ?>
                     <div class="team-list-card">
                         <div class="team-card-avatar">
-                            <?php echo esc_html($initial); ?>
+                            <?php if (!empty($team_avatar)) : ?>
+                                <img src="<?php echo esc_url($team_avatar); ?>" alt="<?php echo esc_attr($team->name); ?>" class="team-card-avatar-img" />
+                            <?php else : ?>
+                                <?php echo esc_html($initial); ?>
+                            <?php endif; ?>
                         </div>
 
                         <div class="team-card-body">
