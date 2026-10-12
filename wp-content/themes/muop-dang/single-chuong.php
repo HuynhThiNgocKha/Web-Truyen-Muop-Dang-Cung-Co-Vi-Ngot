@@ -127,7 +127,7 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
             <?php endif; ?>
 
             <button type="button" class="btn btn-secondary btn-chapter-drawer-toggle" id="btnOpenChapterDrawerBottom" title="Danh sách chương">
-                <i class="fa-solid fa-bars"></i> Danh Sách Chương
+                <i class="fa-solid fa-bars"></i>
             </button>
 
             <?php if ($next_chap_url) : ?>

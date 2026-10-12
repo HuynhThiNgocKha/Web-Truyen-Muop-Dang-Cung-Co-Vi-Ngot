@@ -1414,17 +1414,18 @@ img {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-width: 44px;
+  width: 42px;
+  min-width: 42px;
   height: 38px;
-  padding: 0 14px !important;
+  padding: 0 !important;
   font-size: 15px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-sm, 8px);
   cursor: pointer;
   background: var(--bg-card);
   color: var(--text-main);
   border: 1px solid var(--border-color);
   transition: all 0.18s ease;
+  flex-shrink: 0;
 }
 
 .btn-chapter-drawer-toggle:hover {
@@ -3935,10 +3936,12 @@ img {
     font-size: 12px !important;
   }
   .btn-chapter-drawer-toggle {
-    min-width: 38px;
+    width: 36px;
+    min-width: 36px;
     height: 34px;
-    padding: 0 10px !important;
+    padding: 0 !important;
     font-size: 14px;
+    border-radius: 7px;
   }
   .reading-font-bar {
     gap: 10px;
