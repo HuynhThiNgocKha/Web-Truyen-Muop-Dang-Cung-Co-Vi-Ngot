@@ -209,7 +209,7 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
         </div>
 
         <div class="shopee-modal-btn-wrap">
-            <a href="<?php echo esc_url($shopee_url); ?>" id="btnShopeeUnlock" class="btn btn-shopee" style="width: 100%; padding: 12px; font-size: 16px;">
+            <a href="<?php echo esc_url($shopee_url); ?>" id="btnShopeeUnlock" class="btn btn-shopee">
                 <i class="fa-solid fa-bag-shopping"></i> Nhấn Vào Đây Để Mở Khóa Đọc Tiếp
             </a>
         </div>

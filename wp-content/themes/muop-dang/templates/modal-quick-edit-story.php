@@ -57,7 +57,7 @@ if (!defined('ABSPATH')) exit;
                 <div style="margin-bottom: 18px;">
                     <label class="form-label" style="font-weight: 700; margin-bottom: 8px;">1. Tải ảnh từ thiết bị:</label>
                     <button type="button" id="btnTriggerDirectUpload" class="btn btn-secondary" style="width: 100%; justify-content: center; padding: 10px; font-size: 13px;">
-                        <i class="fa-solid fa-arrow-up-from-bracket"></i> Chọn ảnh từ máy tính hoặc điện thoại
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i> Tải ảnh từ thiết bị
                     </button>
                 </div>
 

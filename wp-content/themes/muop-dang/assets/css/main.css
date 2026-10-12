@@ -120,16 +120,35 @@ img {
 }
 
 .btn-shopee {
-  background: linear-gradient(135deg, #EE4D2D, #FF6433);
-  color: #ffffff;
-  box-shadow: 0 4px 15px rgba(238, 77, 45, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
   font-weight: 700;
+  line-height: 1.35;
+  background: linear-gradient(135deg, #EE4D2D, #FF6433);
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(238, 77, 45, 0.35);
+  border-radius: var(--radius-full);
+  white-space: normal !important;
+  text-align: center;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
+}
+.btn-shopee i {
+  font-size: 17px;
+  flex-shrink: 0;
 }
 .btn-shopee:hover {
   background: linear-gradient(135deg, #D73211, #EE4D2D);
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(238, 77, 45, 0.5);
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
 .badge {
@@ -2530,60 +2549,110 @@ img {
   justify-content: center;
   padding: 20px;
   animation: fadeIn 0.3s ease;
+  box-sizing: border-box;
 }
 
 .shopee-modal-card {
   background: var(--bg-card);
   border: 2px solid var(--avocado-green);
   border-radius: var(--radius-lg);
-  max-width: 480px;
+  max-width: 440px;
   width: 100%;
-  padding: 28px;
+  padding: 26px 20px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
   text-align: center;
   animation: slideUp 0.3s ease;
   position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .shopee-modal-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 16px;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 14px;
   background: linear-gradient(135deg, #EE4D2D, #FF7A45);
   color: #fff;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 28px;
   box-shadow: 0 6px 16px rgba(238, 77, 45, 0.4);
 }
 
 .shopee-modal-title {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
   color: var(--primary-green);
   margin-bottom: 12px;
+  line-height: 1.35;
 }
 
 .shopee-modal-msg {
-  font-size: 14.5px;
+  font-size: 14px;
   color: var(--text-main);
-  line-height: 1.6;
-  margin-bottom: 22px;
+  line-height: 1.55;
+  margin-bottom: 18px;
   background: var(--pastel-green);
   border: 1px dashed var(--border-color);
-  padding: 14px;
+  padding: 12px 14px;
   border-radius: var(--radius-md);
+  box-sizing: border-box;
+  word-break: break-word;
 }
 
 .shopee-modal-btn-wrap {
   margin-bottom: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .shopee-modal-note {
   font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .shopee-gatekeeper-overlay {
+    padding: 14px 12px;
+  }
+  .shopee-modal-card {
+    padding: 20px 14px;
+    border-radius: var(--radius-md);
+  }
+  .shopee-modal-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+  .shopee-modal-title {
+    font-size: 17px;
+    margin-bottom: 10px;
+  }
+  .shopee-modal-msg {
+    font-size: 13px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .shopee-modal-msg strong {
+    font-size: 13.5px;
+  }
+  .btn-shopee {
+    font-size: 13.5px !important;
+    padding: 10px 12px !important;
+    gap: 6px !important;
+  }
+  .btn-shopee i {
+    font-size: 15px !important;
+  }
+  .shopee-modal-note {
+    font-size: 11px;
+  }
 }
 
 @keyframes fadeIn {
