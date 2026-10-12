@@ -2935,6 +2935,7 @@
           type: 'POST',
           data: {
             action: 'muop_get_preset_covers',
+            story_id: storyId,
             nonce: muopConfig.nonce
           },
           success: (res) => {

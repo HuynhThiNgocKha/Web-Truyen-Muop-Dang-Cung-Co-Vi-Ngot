@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.5');
+define('MUOP_THEME_VERSION', '2.2.6');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -1847,7 +1847,7 @@ function muop_ajax_publish_draft_handler() {
     ));
 }
 
-// 21. AJAX: Get Preset Covers (Lấy danh sách ảnh bìa có sẵn từ thư viện ảnh)
+// 21. AJAX: Get Preset Covers (Lấy danh sách ảnh bìa có sẵn: chỉ hiện ảnh sẵn của hệ thống và ảnh của dịch giả đó, không hiện ảnh của dịch giả khác)
 add_action('wp_ajax_muop_get_preset_covers', 'muop_ajax_get_preset_covers_handler');
 function muop_ajax_get_preset_covers_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
@@ -1857,34 +1857,51 @@ function muop_ajax_get_preset_covers_handler() {
         wp_send_json_error(array('message' => 'Không có quyền truy cập!'));
     }
 
-    $attachments = get_posts(array(
-        'post_type'      => 'attachment',
-        'post_mime_type' => 'image',
-        'post_status'    => 'inherit',
-        'posts_per_page' => 24,
-        'orderby'        => 'date',
-        'order'          => 'DESC'
-    ));
+    $current_user_id = get_current_user_id();
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+
+    // Xác định dịch giả của truyện cần đổi ảnh bìa
+    $translator_id = $current_user_id;
+    if ($story_id > 0) {
+        $story = get_post($story_id);
+        if ($story && $story->post_type === 'truyen') {
+            // Nếu là admin thì lấy ảnh theo tác giả/dịch giả của truyện đó; nếu là dịch giả thì chỉ lấy của chính mình
+            $translator_id = current_user_can('administrator') ? (int)$story->post_author : $current_user_id;
+        }
+    }
 
     $covers = array();
-    // Default cover
+    // 1. Ảnh mẫu mặc định có sẵn của hệ thống (luôn luôn có sẵn)
     $covers[] = array(
         'id'    => 0,
-        'title' => 'Ảnh bìa mặc định',
+        'title' => 'Ảnh bìa mặc định hệ thống',
         'url'   => MUOP_THEME_URI . '/assets/images/default-cover.svg',
         'thumb' => MUOP_THEME_URI . '/assets/images/default-cover.svg'
     );
 
-    foreach ($attachments as $att) {
-        $full_url = wp_get_attachment_url($att->ID);
-        $thumb_url = wp_get_attachment_image_url($att->ID, 'thumbnail') ?: $full_url;
-        if ($full_url) {
-            $covers[] = array(
-                'id'    => $att->ID,
-                'title' => $att->post_title ?: 'Ảnh ' . $att->ID,
-                'url'   => $full_url,
-                'thumb' => $thumb_url
-            );
+    // 2. Chỉ hiện những ảnh do chính dịch giả đó tải lên (loại trừ ảnh của dịch giả khác)
+    if ($translator_id > 0) {
+        $attachments = get_posts(array(
+            'post_type'      => 'attachment',
+            'post_mime_type' => 'image',
+            'post_status'    => 'inherit',
+            'author'         => $translator_id,
+            'posts_per_page' => 50,
+            'orderby'        => 'date',
+            'order'          => 'DESC'
+        ));
+
+        foreach ($attachments as $att) {
+            $full_url = wp_get_attachment_url($att->ID);
+            $thumb_url = wp_get_attachment_image_url($att->ID, 'thumbnail') ?: $full_url;
+            if ($full_url) {
+                $covers[] = array(
+                    'id'    => $att->ID,
+                    'title' => $att->post_title ?: 'Ảnh ' . $att->ID,
+                    'url'   => $full_url,
+                    'thumb' => $thumb_url
+                );
+            }
         }
     }
 
@@ -1924,8 +1941,8 @@ function muop_ajax_update_story_cover_handler() {
         }
         set_post_thumbnail($story_id, $attachment_id);
     } 
-    // 2. Nếu người dùng chọn ảnh có sẵn theo attachment ID
-    elseif (!empty($_POST['preset_cover_id'])) {
+    // 2. Nếu người dùng chọn ảnh có sẵn theo attachment ID (bao gồm cả ảnh mặc định hệ thống có ID = 0)
+    elseif (isset($_POST['preset_cover_id']) && $_POST['preset_cover_id'] !== '') {
         $preset_id = intval($_POST['preset_cover_id']);
         if ($preset_id > 0) {
             set_post_thumbnail($story_id, $preset_id);
