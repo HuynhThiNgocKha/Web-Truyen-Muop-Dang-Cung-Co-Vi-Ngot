@@ -178,7 +178,7 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
                         </div>
                         <div class="comment-body">
                             <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
-                            <span class="comment-time"><?php echo esc_html(human_time_diff(strtotime($cmt->comment_date), current_time('timestamp'))) . ' trước'; ?></span>
+                            <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
                             <div class="comment-text"><?php echo esc_html($cmt->comment_content); ?></div>
                         </div>
                     </li>
@@ -290,13 +290,20 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
 </div>
 
 <!-- ==========================================================================
-     NÚT NỔI CHẾ ĐỘ CHÌM (FLOATING BUTTON)
-     Tự động xuất hiện khi lướt đọc truyện xuống. Ở chế độ chìm (mờ nhẹ),
-     chỉ khi nhấn vào mới mở popup tùy chỉnh cỡ chữ, font chữ và màu sắc.
+     THANH NÚT NỔI KHI ĐỌC TRUYỆN (FLOATING TOOLBAR)
+     Bao gồm:
+     1. Nút cuộn lên đầu trang (Scroll to top)
+     2. Nút mở tùy chỉnh đọc truyện (Font, Cỡ chữ, Màu nền)
+     Có thể kéo thả di chuyển tùy ý mà không làm chạy chữ của độc giả.
      ========================================================================== -->
-<button type="button" class="floating-reading-btn btn-reading-settings-trigger" id="btnFloatingReadingSettings" title="Tùy chỉnh đọc truyện (Font, Màu, Cỡ chữ)" style="display: none;">
-    <i class="fa-solid fa-sliders"></i>
-</button>
+<div class="floating-reading-toolbar" id="floatingReadingToolbar" style="display: none;">
+    <button type="button" class="floating-reading-btn btn-floating-scroll-top" id="btnFloatingScrollTop" title="Lên đầu trang">
+        <i class="fa-solid fa-chevron-up"></i>
+    </button>
+    <button type="button" class="floating-reading-btn btn-reading-settings-trigger" id="btnFloatingReadingSettings" title="Tùy chỉnh đọc truyện (Font, Màu, Cỡ chữ)">
+        <i class="fa-solid fa-sliders"></i>
+    </button>
+</div>
 
 <!-- ==========================================================================
      POPUP / POPOVER TÙY CHỈNH ĐỌC TRUYỆN (FONT, MÀU CHỮ, CỠ CHỮ)

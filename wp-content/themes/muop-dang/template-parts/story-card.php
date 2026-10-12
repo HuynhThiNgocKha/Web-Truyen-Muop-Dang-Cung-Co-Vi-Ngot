@@ -31,7 +31,7 @@ if (!empty($chapters)) {
 $is_new_updated = (!empty($args) && !empty($args['show_latest_chapter'])) || is_page('truyen-moi');
 
 // Thời gian cập nhật gần nhất
-$time_diff = human_time_diff(get_post_modified_time('U', false, $story_id), current_time('timestamp')) . ' trước';
+$time_diff = muop_time_ago(get_post_modified_time('U', false, $story_id));
 
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
 if (!$thumb_url) {

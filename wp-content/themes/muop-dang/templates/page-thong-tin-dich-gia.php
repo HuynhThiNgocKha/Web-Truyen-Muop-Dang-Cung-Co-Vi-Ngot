@@ -277,7 +277,7 @@ if (!empty($story_ids)) {
                             <div class="comment-body">
                                 <div>
                                     <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
-                                    <span class="comment-time"><?php echo esc_html(human_time_diff(strtotime($cmt->comment_date), current_time('timestamp'))) . ' trước'; ?></span>
+                                    <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
                                     <span style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
                                         trong truyện: <a href="<?php echo esc_url(get_permalink($cmt->comment_post_ID)); ?>" style="font-weight: 600; color: var(--primary-green);"><?php echo esc_html($cmt_post ? $cmt_post->post_title : ''); ?></a>
                                     </span>

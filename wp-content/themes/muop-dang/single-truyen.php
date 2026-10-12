@@ -182,15 +182,22 @@ if (!$thumb_url) {
                     <i class="fa-solid fa-quote-left"></i> Giới Thiệu Truyện
                 </h2>
             </div>
-            <div class="story-summary-box">
-                <?php 
-                $content = get_the_content();
-                if (!empty($content)) {
-                    the_content();
-                } else {
-                    echo '<p>Câu chuyện tình yêu đầy cảm xúc được dịch và biên tập cẩn thận bởi team Mướp Đắng. Chúc các độc giả có những phút giây thư giãn ngọt ngào nhất!</p>';
-                }
-                ?>
+            <div class="story-summary-wrapper">
+                <div class="story-summary-box is-collapsed" id="storySummaryBox">
+                    <?php 
+                    $content = get_the_content();
+                    if (!empty($content)) {
+                        the_content();
+                    } else {
+                        echo '<p>Câu chuyện tình yêu đầy cảm xúc được dịch và biên tập cẩn thận bởi team Mướp Đắng. Chúc các độc giả có những phút giây thư giãn ngọt ngào nhất!</p>';
+                    }
+                    ?>
+                </div>
+                <div class="story-summary-toggle-wrap" id="storySummaryToggleWrap">
+                    <button type="button" class="btn-story-summary-toggle" id="btnToggleSummary">
+                        <span>Xem thêm</span> <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -200,17 +207,24 @@ if (!$thumb_url) {
                 <h2 class="section-title" style="font-size: 17px;">
                     <i class="fa-solid fa-list-ol"></i> Danh Sách Chương (<?php echo $chap_count; ?>)
                 </h2>
-                <span style="font-size: 12.5px; color: var(--text-muted);">Sắp xếp: Tăng dần</span>
             </div>
 
-            <?php if (!empty($chapters)) : ?>
+            <?php if (!empty($chapters)) : 
+                $chapters_desc = array_reverse($chapters);
+            ?>
                 <div class="chapter-grid">
-                    <?php foreach ($chapters as $chap) : 
-                        $chap_num = get_post_meta($chap->ID, '_chuong_number', true) ?: 1;
+                    <?php foreach ($chapters_desc as $chap) : 
+                        $chap_num   = get_post_meta($chap->ID, '_chuong_number', true) ?: 1;
+                        $chap_views = muop_get_chapter_views($chap->ID);
                     ?>
                         <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
-                            <span><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
-                            <span style="font-size: 11px; color: var(--text-muted);"><?php echo get_the_time('d/m', $chap->ID); ?></span>
+                            <span class="chapter-item-title"><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
+                            <span class="chapter-item-meta">
+                                <span class="chapter-item-views" title="Lượt xem">
+                                    <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
+                                </span>
+                                <span class="chapter-item-date"><?php echo get_the_time('d/m/Y', $chap->ID); ?></span>
+                            </span>
                         </a>
                     <?php endforeach; ?>
                 </div>
@@ -260,7 +274,7 @@ if (!$thumb_url) {
                         </div>
                         <div class="comment-body">
                             <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
-                            <span class="comment-time"><?php echo esc_html(human_time_diff(strtotime($cmt->comment_date), current_time('timestamp'))) . ' trước'; ?></span>
+                            <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
                             <div class="comment-text"><?php echo esc_html($cmt->comment_content); ?></div>
                         </div>
                     </li>

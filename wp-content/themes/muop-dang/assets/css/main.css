@@ -1150,14 +1150,54 @@ img {
 }
 
 /* Tabs & Description */
+.story-summary-wrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
 .story-summary-box {
   background: var(--pastel-green);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   padding: 18px;
-  margin-bottom: 24px;
   font-size: 15px;
   line-height: 1.85;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.story-summary-box.is-collapsed {
+  max-height: 145px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+}
+
+.story-summary-toggle-wrap {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.btn-story-summary-toggle {
+  background: var(--soft-green);
+  border: 1px solid var(--border-color);
+  color: var(--primary-green);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 20px;
+  border-radius: 999px;
+  transition: all 0.25s ease;
+}
+
+.btn-story-summary-toggle:hover {
+  background: var(--primary-green);
+  color: #ffffff;
+  border-color: var(--primary-green);
+  transform: translateY(-1px);
 }
 
 .story-summary-box p {
@@ -1190,6 +1230,7 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 9px 14px;
   background: var(--bg-body);
   border: 1px solid var(--border-light);
@@ -1198,6 +1239,40 @@ img {
   font-weight: 500;
   color: var(--text-main);
   transition: all 0.2s;
+}
+
+.chapter-item-title {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.chapter-item-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.chapter-item-views {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chapter-item-views i {
+  font-size: 11px;
+}
+
+.chapter-item-date {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .chapter-item:hover {
@@ -1785,16 +1860,27 @@ img {
 }
 
 /* ==========================================================================
-   FLOATING BUTTON (NÚT CHÌM TÙY CHỈNH ĐỌC TRUYỆN KHI CUỘN)
+   FLOATING READING TOOLBAR (THANH NÚT NỔI KHI CUỘN ĐỌC TRUYỆN)
+   Bao gồm: Nút Lên đầu trang và Nút Tùy chỉnh đọc truyện
    ========================================================================== */
-.floating-reading-btn {
+.floating-reading-toolbar {
   position: fixed;
-  top: 140px; /* Nằm ở trên theo yêu cầu */
+  top: 140px;
   right: 18px;
-  width: 46px;
-  height: 46px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 990;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.floating-reading-btn {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(46, 125, 50, 0.28);
@@ -1802,15 +1888,14 @@ img {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 17px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   cursor: grab;
-  opacity: 0.55; /* Chế độ chìm khi đọc để không che mắt */
+  opacity: 0.65;
   transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease;
-  z-index: 990;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none; /* Cho phép kéo thả tùy ý di chuyển trên mobile */
+  touch-action: none;
 }
 
 .floating-reading-btn:active {
@@ -1819,15 +1904,15 @@ img {
 
 .floating-reading-btn:hover,
 .floating-reading-btn.is-active {
-  opacity: 1; /* Sáng rõ khi hover hoặc đang mở popup */
-  transform: scale(1.1);
+  opacity: 1;
+  transform: scale(1.08);
   background: var(--bg-card);
   box-shadow: 0 6px 22px rgba(46, 125, 50, 0.28);
   border-color: var(--primary-green);
 }
 
 [data-theme="dark"] .floating-reading-btn {
-  background: rgba(30, 41, 59, 0.75);
+  background: rgba(30, 41, 59, 0.82);
   border-color: rgba(129, 199, 132, 0.28);
   color: #81C784;
 }
@@ -2348,12 +2433,16 @@ img {
     animation: sheetSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .floating-reading-btn {
+  .floating-reading-toolbar {
     top: 120px;
-    right: 14px;
-    width: 42px;
-    height: 42px;
-    font-size: 16px;
+    right: 12px;
+    gap: 8px;
+  }
+
+  .floating-reading-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 15px;
   }
 }
 

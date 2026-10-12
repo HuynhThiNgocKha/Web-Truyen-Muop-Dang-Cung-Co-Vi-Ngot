@@ -207,7 +207,7 @@ class Story {
             'author_id'    => $post->post_author,
             'author_name'  => get_the_author_meta('display_name', $post->post_author),
             'date'         => get_the_date('d/m/Y', $id),
-            'time_ago'     => human_time_diff(get_the_time('U', $id), current_time('timestamp')) . ' trước',
+            'time_ago'     => function_exists('muop_time_ago') ? muop_time_ago(get_the_time('U', $id)) : (human_time_diff(get_the_time('U', $id), current_time('timestamp')) . ' trước'),
             'genres'       => array_map(function($g) {
                 return array('id' => $g->term_id, 'name' => $g->name, 'slug' => $g->slug);
             }, $genres)

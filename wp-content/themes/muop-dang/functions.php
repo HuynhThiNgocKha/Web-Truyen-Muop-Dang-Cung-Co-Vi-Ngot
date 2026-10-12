@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.0.8');
+define('MUOP_THEME_VERSION', '2.0.9');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -354,6 +354,60 @@ function muop_enqueue_scripts() {
 add_action('wp_enqueue_scripts', 'muop_enqueue_scripts');
 
 // 7. Helper Functions
+function muop_time_ago($from, $to = '') {
+    if (empty($from)) return '';
+    if (empty($to)) {
+        $to = current_time('timestamp');
+    }
+    $diff = (int) abs($to - $from);
+    
+    if ($diff < 60) {
+        return 'Vừa xong';
+    }
+    
+    $minute = 60;
+    $hour   = 3600;
+    $day    = 86400;
+    $week   = 604800;
+    $month  = 2592000;  // 30 ngày
+    $year   = 31536000; // 365 ngày
+    
+    if ($diff < $hour) {
+        $mins = max(1, round($diff / $minute));
+        return $mins . ' phút trước';
+    } elseif ($diff < $day) {
+        $hours = max(1, round($diff / $hour));
+        return $hours . ' giờ trước';
+    } elseif ($diff < $week) {
+        $days = max(1, round($diff / $day));
+        return $days . ' ngày trước';
+    } elseif ($diff < $month) {
+        $weeks = max(1, round($diff / $week));
+        return $weeks . ' tuần trước';
+    } elseif ($diff < $year) {
+        $months = max(1, round($diff / $month));
+        return $months . ' tháng trước';
+    } else {
+        $years = max(1, round($diff / $year));
+        return $years . ' năm trước';
+    }
+}
+
+// Hook vào human_time_diff của WordPress để dịch chuẩn sang tiếng Việt
+add_filter('human_time_diff', function($since, $diff, $from, $to) {
+    if ($diff < 60) return '1 phút';
+    if ($diff < 3600) return max(1, round($diff / 60)) . ' phút';
+    if ($diff < 86400) return max(1, round($diff / 3600)) . ' giờ';
+    if ($diff < 604800) return max(1, round($diff / 86400)) . ' ngày';
+    if ($diff < 2592000) return max(1, round($diff / 604800)) . ' tuần';
+    if ($diff < 31536000) return max(1, round($diff / 2592000)) . ' tháng';
+    return max(1, round($diff / 31536000)) . ' năm';
+}, 10, 4);
+
+function muop_get_chapter_views($chapter_id) {
+    return (int) get_post_meta($chapter_id, '_chuong_views', true);
+}
+
 function muop_get_story_views($story_id) {
     return (int) get_post_meta($story_id, '_truyen_views', true);
 }

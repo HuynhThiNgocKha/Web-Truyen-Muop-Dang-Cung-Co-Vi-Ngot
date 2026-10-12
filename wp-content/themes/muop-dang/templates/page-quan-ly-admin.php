@@ -635,7 +635,7 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                         <div class="comment-body">
                             <div>
                                 <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
-                                <span class="comment-time"><?php echo esc_html(human_time_diff(strtotime($cmt->comment_date), current_time('timestamp'))) . ' trước'; ?></span>
+                                <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
                                 <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px;">
                                     trong bài: <strong><?php echo esc_html($cmt_p ? $cmt_p->post_title : ''); ?></strong>
                                 </span>

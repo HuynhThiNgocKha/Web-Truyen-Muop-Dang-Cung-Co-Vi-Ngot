@@ -401,22 +401,22 @@
       });
     },
 
-    // Floating Button (Chế độ chìm khi cuộn đọc truyện & Kéo thả tùy ý di chuyển)
+    // Floating Toolbar (Nút nổi khi cuộn đọc truyện & Kéo thả di chuyển không trôi chữ)
     bindFloatingButtonEvents() {
-      const $floatingBtn = $('#btnFloatingReadingSettings');
-      if (!$floatingBtn.length) return;
+      const $floatingToolbar = $('#floatingReadingToolbar');
+      if (!$floatingToolbar.length) return;
 
       // Khôi phục vị trí người dùng đã kéo thả trước đó (nếu có)
-      const savedPos = localStorage.getItem('muop_floating_btn_pos');
+      const savedPos = localStorage.getItem('muop_floating_toolbar_pos') || localStorage.getItem('muop_floating_btn_pos');
       if (savedPos) {
         try {
           const pos = JSON.parse(savedPos);
           if (pos && typeof pos.top === 'number' && typeof pos.left === 'number') {
             const winW = $(window).width();
             const winH = $(window).height();
-            const clampedLeft = Math.min(Math.max(10, pos.left), winW - 55);
-            const clampedTop = Math.min(Math.max(60, pos.top), winH - 60);
-            $floatingBtn.css({
+            const clampedLeft = Math.min(Math.max(10, pos.left), winW - 60);
+            const clampedTop = Math.min(Math.max(60, pos.top), winH - 120);
+            $floatingToolbar.css({
               top: clampedTop + 'px',
               left: clampedLeft + 'px',
               right: 'auto',
@@ -430,13 +430,13 @@
       $(window).on('scroll', () => {
         const scrollY = $(window).scrollTop();
         if (scrollY > 140) {
-          $floatingBtn.fadeIn(220);
+          $floatingToolbar.fadeIn(220);
         } else {
-          $floatingBtn.fadeOut(200);
+          $floatingToolbar.fadeOut(200);
         }
       });
 
-      // Tùy ý di chuyển (Drag-to-move hỗ trợ cả Chuột máy tính và Cảm ứng điện thoại)
+      // Tùy ý di chuyển (Drag-to-move hỗ trợ Chuột & Cảm ứng điện thoại - Không cuộn trang, chữ đứng yên)
       let isDragging = false;
       let hasDragged = false;
       let startX = 0, startY = 0;
@@ -448,14 +448,14 @@
         startX = clientX;
         startY = clientY;
 
-        const rect = $floatingBtn[0].getBoundingClientRect();
+        const rect = $floatingToolbar[0].getBoundingClientRect();
         initialLeft = rect.left;
         initialTop = rect.top;
 
-        $floatingBtn.css({
-          transition: 'none',
-          cursor: 'grabbing'
+        $floatingToolbar.css({
+          transition: 'none'
         });
+        $floatingToolbar.find('.floating-reading-btn').css('cursor', 'grabbing');
       };
 
       const onDragMove = (clientX, clientY) => {
@@ -463,20 +463,22 @@
         const dx = clientX - startX;
         const dy = clientY - startY;
 
-        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
           hasDragged = true;
         }
 
         const winW = $(window).width();
         const winH = $(window).height();
+        const tbW = $floatingToolbar.outerWidth() || 46;
+        const tbH = $floatingToolbar.outerHeight() || 100;
 
         let newLeft = initialLeft + dx;
         let newTop = initialTop + dy;
 
-        newLeft = Math.min(Math.max(10, newLeft), winW - 56);
-        newTop = Math.min(Math.max(60, newTop), winH - 60);
+        newLeft = Math.min(Math.max(8, newLeft), winW - tbW - 8);
+        newTop = Math.min(Math.max(50, newTop), winH - tbH - 20);
 
-        $floatingBtn.css({
+        $floatingToolbar.css({
           left: newLeft + 'px',
           top: newTop + 'px',
           right: 'auto',
@@ -488,54 +490,80 @@
         if (!isDragging) return;
         isDragging = false;
 
-        $floatingBtn.css({
-          cursor: 'grab',
-          transition: 'opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease'
+        $floatingToolbar.find('.floating-reading-btn').css('cursor', 'grab');
+        $floatingToolbar.css({
+          transition: 'opacity 0.22s ease, transform 0.22s ease'
         });
 
         if (hasDragged) {
-          const rect = $floatingBtn[0].getBoundingClientRect();
-          localStorage.setItem('muop_floating_btn_pos', JSON.stringify({
+          const rect = $floatingToolbar[0].getBoundingClientRect();
+          localStorage.setItem('muop_floating_toolbar_pos', JSON.stringify({
             left: rect.left,
             top: rect.top
           }));
         }
       };
 
-      // Mouse drag events
-      $floatingBtn.on('mousedown', (e) => {
+      const toolbarEl = $floatingToolbar[0];
+
+      // Touch events (Mobile) với non-passive listener để e.preventDefault() hoạt động triệt để
+      toolbarEl.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          onDragStart(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length === 1) {
+          // Ngăn chặn trình duyệt cuộn trang khi độc giả đang kéo nút - chữ đọc truyện đứng yên 100%
+          if (e.cancelable) {
+            e.preventDefault();
+          }
+          onDragMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+
+      window.addEventListener('touchend', () => {
+        if (isDragging) {
+          onDragEnd();
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchcancel', () => {
+        if (isDragging) {
+          onDragEnd();
+        }
+      }, { passive: true });
+
+      // Mouse events (Desktop)
+      toolbarEl.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
         onDragStart(e.clientX, e.clientY);
       });
 
-      $(document).on('mousemove', (e) => {
+      window.addEventListener('mousemove', (e) => {
         if (isDragging) {
+          e.preventDefault();
           onDragMove(e.clientX, e.clientY);
         }
       });
 
-      $(document).on('mouseup', () => {
-        onDragEnd();
-      });
-
-      // Touch drag events (Mobile)
-      $floatingBtn.on('touchstart', (e) => {
-        if (e.touches.length === 1) {
-          onDragStart(e.touches[0].clientX, e.touches[0].clientY);
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          onDragEnd();
         }
       });
 
-      $(document).on('touchmove', (e) => {
-        if (isDragging && e.touches.length === 1) {
-          onDragMove(e.touches[0].clientX, e.touches[0].clientY);
+      // Click event cho nút Lên Đầu Trang
+      $('#btnFloatingScrollTop').on('click', (e) => {
+        e.preventDefault();
+        if (!hasDragged) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
 
-      $(document).on('touchend touchcancel', () => {
-        onDragEnd();
-      });
-
-      // Click event: chỉ mở modal khi người dùng bấm chuột/chạm mà không kéo rê
-      $floatingBtn.on('click', (e) => {
+      // Click event cho nút Tùy Chỉnh Đọc Truyện (Popup Modal)
+      $('#btnFloatingReadingSettings').on('click', (e) => {
         e.preventDefault();
         if (!hasDragged) {
           this.openQuickModal();
@@ -2023,6 +2051,39 @@
     }
   };
 
+  // 16. STORY SUMMARY TOGGLE (XEM THÊM / THU GỌN GIỚI THIỆU TRUYỆN)
+  const StorySummaryManager = {
+    init() {
+      const $box = $('#storySummaryBox');
+      const $btn = $('#btnToggleSummary');
+      const $wrap = $('#storySummaryToggleWrap');
+      if (!$box.length || !$btn.length) return;
+
+      // Nếu nội dung thực tế ngắn (<= 150px) thì không cần thu gọn
+      if ($box[0].scrollHeight <= 150) {
+        $box.removeClass('is-collapsed');
+        $wrap.hide();
+        return;
+      }
+
+      $btn.on('click', function(e) {
+        e.preventDefault();
+        const isCollapsed = $box.hasClass('is-collapsed');
+        if (isCollapsed) {
+          $box.removeClass('is-collapsed');
+          $btn.html('<span>Thu gọn</span> <i class="fa-solid fa-chevron-up"></i>');
+        } else {
+          $box.addClass('is-collapsed');
+          $btn.html('<span>Xem thêm</span> <i class="fa-solid fa-chevron-down"></i>');
+          const boxTop = $box.offset().top - 80;
+          if ($(window).scrollTop() > boxTop) {
+            $('html, body').animate({ scrollTop: boxTop }, 200);
+          }
+        }
+      });
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     localStorage.removeItem('muop_accent_color');
@@ -2039,6 +2100,7 @@
     MobileNavManager.init();
     ProfileManager.init();
     StoryStatusManager.init();
+    StorySummaryManager.init();
     TeamManager.init();
   });
 
