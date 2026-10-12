@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) exit;
             <div class="footer-brand">
                 <a href="<?php echo esc_url(home_url('/')); ?>" class="brand-wrapper footer-brand-wrapper" title="<?php bloginfo('name'); ?>">
                     <div class="brand-text">
-                        <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png'); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img footer-logo-img" />
+                        <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png'); ?>" alt="<?php bloginfo('name'); ?>" class="footer-logo-img" />
                     </div>
                 </a>
                 <p class="footer-slogan">
