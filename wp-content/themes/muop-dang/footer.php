@@ -189,11 +189,11 @@ if (!defined('ABSPATH')) exit;
                         <span id="repDlgUserNotice" style="font-size: 12px; color: var(--text-muted); font-style: italic;">
                             <i class="fa-solid fa-lock"></i> Mọi phản hồi sẽ được gửi thông báo ngay tới các bên liên quan.
                         </span>
-                        <div style="display: flex; gap: 8px;">
-                            <button type="button" class="btn btn-secondary" id="btnCancelReportDialogueModal" style="padding: 7px 15px; font-size: 13px;">
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" class="btn-report-cancel-pill" id="btnCancelReportDialogueModal">
                                 Đóng
                             </button>
-                            <button type="submit" class="btn btn-primary" id="btnSubmitReportDialogueReply" style="padding: 7px 18px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                            <button type="submit" class="btn-report-submit-pill" id="btnSubmitReportDialogueReply">
                                 <i class="fa-solid fa-paper-plane"></i> <span id="repDlgBtnSubmitText">Gửi Phản Hồi</span>
                             </button>
                         </div>

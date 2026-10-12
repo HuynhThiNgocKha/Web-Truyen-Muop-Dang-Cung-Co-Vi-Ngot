@@ -398,12 +398,12 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
 
 <!-- MODAL POPUP BÁO LỖI CHƯƠNG THEO ẢNH 2 -->
 <div class="modal-backdrop" id="reportChapterModal" style="display: none;" aria-hidden="true">
-    <div class="modal-content report-chapter-modal-content" style="max-width: 480px; padding: 22px; border-radius: var(--radius-md);">
-        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
-            <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; color: #dc2626; font-size: 16px; margin: 0; font-weight: 700;">
+    <div class="modal-content report-chapter-modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">
                 <i class="fa-solid fa-triangle-exclamation"></i> Báo Lỗi Chương Truyện
             </h3>
-            <button type="button" class="btn-close-modal" id="btnCloseReportChapterModal" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted);" aria-label="Đóng">
+            <button type="button" class="btn-close-modal" id="btnCloseReportChapterModal" aria-label="Đóng">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
@@ -412,16 +412,16 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
             <input type="hidden" name="chapter_id" value="<?php echo esc_attr(get_the_ID()); ?>" />
             <input type="hidden" name="chapter_num" value="<?php echo esc_attr($chap_num); ?>" />
             
-            <div class="report-info-banner" style="background: var(--pastel-green); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 13px; line-height: 1.6;">
-                <div>Truyện: <strong style="color: var(--primary-green);"><?php echo esc_html($story ? $story->post_title : ''); ?></strong></div>
-                <div>Chương: <strong>Chương <?php echo esc_html($chap_num); ?> - <?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></strong></div>
+            <div class="report-info-banner">
+                <div>Truyện: <strong class="rep-story-name"><?php echo esc_html($story ? $story->post_title : ''); ?></strong></div>
+                <div>Chương: <strong class="rep-chap-name">Chương <?php echo esc_html($chap_num); ?> - <?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></strong></div>
             </div>
 
             <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label" style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px;">
+                <label class="form-label">
                     Loại lỗi gặp phải:
                 </label>
-                <select name="issue_type" class="form-input" style="width: 100%; font-size: 13px;" required>
+                <select name="issue_type" class="form-input" required>
                     <option value="Lỗi chính tả / ngữ pháp">Lỗi chính tả / Ngữ pháp / Dịch thuật</option>
                     <option value="Thiếu nội dung / Mất chữ / Trắng trang">Thiếu nội dung / Mất chữ / Trắng trang</option>
                     <option value="Trùng lặp nội dung">Trùng lặp nội dung với chương khác</option>
@@ -433,15 +433,15 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
             </div>
 
             <div class="form-group" style="margin-bottom: 18px;">
-                <label class="form-label" style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px;">
-                    Mô tả chi tiết lỗi: <span style="color: #dc2626;">*</span>
+                <label class="form-label">
+                    Mô tả chi tiết lỗi: <span class="required-star">*</span>
                 </label>
-                <textarea name="description" class="form-input" rows="4" style="width: 100%; font-size: 13px; resize: vertical;" placeholder="Vui lòng mô tả cụ thể câu văn bị lỗi, từ ngữ hoặc vấn đề bạn gặp phải để BQT và dịch giả kiểm tra khắc phục..." required></textarea>
+                <textarea name="description" class="form-input" rows="4" placeholder="Vui lòng mô tả cụ thể câu văn bị lỗi, từ ngữ hoặc vấn đề bạn gặp phải để BQT và dịch giả kiểm tra khắc phục..." required></textarea>
             </div>
 
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button type="button" class="btn btn-secondary" id="btnCancelReportChapter" style="padding: 7px 16px; font-size: 13px;">Hủy</button>
-                <button type="submit" class="btn btn-danger" id="btnSubmitReportChapter" style="background: #dc2626; border-color: #dc2626; color: #fff; padding: 7px 18px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+            <div class="report-modal-actions">
+                <button type="button" class="btn-report-cancel-pill" id="btnCancelReportChapter">Hủy</button>
+                <button type="submit" class="btn-report-submit-pill" id="btnSubmitReportChapter">
                     <i class="fa-solid fa-paper-plane"></i> Gửi Báo Lỗi
                 </button>
             </div>
