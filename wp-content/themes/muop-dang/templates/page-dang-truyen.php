@@ -144,12 +144,17 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                 </div>
             </div>
 
-            <!-- CENTER 3: BUTTONS THÊM & HỦY -->
-            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px;">
+            <input type="hidden" name="is_draft" id="isStoryDraftInput" value="0" />
+
+            <!-- CENTER 3: BUTTONS THÊM, LƯU NHÁP & HỦY -->
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap;">
                 <a href="<?php echo esc_url(home_url('/thong-tin-dich-gia/')); ?>" class="btn btn-secondary">
                     <i class="fa-solid fa-xmark"></i> Hủy
                 </a>
-                <button type="submit" class="btn btn-primary" style="padding: 10px 28px; font-size: 15px;">
+                <button type="button" id="btnSaveDraftNewStory" class="btn btn-outline" style="padding: 10px 22px; font-size: 14.5px;" title="Lưu thành bản nháp để hoàn thiện và đăng sau">
+                    <i class="fa-solid fa-file-pen"></i> Lưu Nháp
+                </button>
+                <button type="submit" id="btnSubmitPublishStory" class="btn btn-primary" style="padding: 10px 28px; font-size: 15px;">
                     <i class="fa-solid fa-cloud-arrow-up"></i> Đăng Truyện
                 </button>
             </div>

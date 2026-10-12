@@ -90,12 +90,17 @@ if ($selected_story_id) {
                 </div>
             </div>
 
-            <!-- Buttons Thêm & Hủy -->
-            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px;">
+            <input type="hidden" name="is_draft" id="isChapterDraftInput" value="0" />
+
+            <!-- Buttons Thêm, Lưu Nháp & Hủy -->
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap;">
                 <a href="<?php echo esc_url(home_url('/thong-tin-dich-gia/')); ?>" class="btn btn-secondary">
                     <i class="fa-solid fa-xmark"></i> Hủy
                 </a>
-                <button type="submit" class="btn btn-primary" style="padding: 10px 28px; font-size: 15px;">
+                <button type="button" id="btnSaveDraftNewChapter" class="btn btn-outline" style="padding: 10px 22px; font-size: 14.5px;" title="Lưu nháp chương này để đăng sau">
+                    <i class="fa-solid fa-file-pen"></i> Lưu Nháp
+                </button>
+                <button type="submit" id="btnSubmitPublishChapter" class="btn btn-primary" style="padding: 10px 28px; font-size: 15px;">
                     <i class="fa-solid fa-cloud-arrow-up"></i> Thêm Chương Này
                 </button>
             </div>

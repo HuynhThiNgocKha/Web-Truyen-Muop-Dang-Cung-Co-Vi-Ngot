@@ -1124,14 +1124,25 @@
         }
       });
 
-      // Submit Story
+      // Submit Story & Save Draft
+      $('#btnSaveDraftNewStory').on('click', function(e) {
+        e.preventDefault();
+        $('#isStoryDraftInput').val('1');
+        $('#formSubmitStory').trigger('submit');
+      });
+
+      $('#btnSubmitPublishStory').on('click', function() {
+        $('#isStoryDraftInput').val('0');
+      });
+
       $('#formSubmitStory').on('submit', function(e) {
         e.preventDefault();
         const $form = $(this);
         const $alert = $('#storyAlert');
-        const $btn = $form.find('button[type="submit"]');
+        const isDraft = $('#isStoryDraftInput').val() === '1';
+        const $btn = isDraft ? $('#btnSaveDraftNewStory') : $('#btnSubmitPublishStory');
 
-        $btn.prop('disabled', true).text('Đang gửi truyện...');
+        $btn.prop('disabled', true).text(isDraft ? 'Đang lưu bản nháp...' : 'Đang gửi truyện...');
         $alert.hide();
 
         const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
@@ -1153,19 +1164,19 @@
               try { res = JSON.parse(clean); } catch (e) {}
             }
             if (res && res.success) {
-              const successMsg = getAjaxMsg(res, 'Đăng truyện thành công!');
+              const successMsg = getAjaxMsg(res, isDraft ? 'Đã lưu bản nháp thành công!' : 'Đăng truyện thành công!');
               $alert.removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
               setTimeout(() => {
-                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl : '/');
+                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl + '/thong-tin-dich-gia/' : '/thong-tin-dich-gia/');
               }, 1200);
             } else {
-              $btn.prop('disabled', false).text('Đăng Truyện');
+              $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Đăng Truyện');
               const errorMsg = getAjaxMsg(res, 'Lỗi đăng truyện!');
               $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
             }
           },
           error: (xhr) => {
-            $btn.prop('disabled', false).text('Đăng Truyện');
+            $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Đăng Truyện');
             let errorMsg = 'Lỗi upload hoặc hệ thống!';
             if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
             else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
@@ -1174,14 +1185,25 @@
         });
       });
 
-      // Submit Chapter
+      // Submit Chapter & Save Draft
+      $('#btnSaveDraftNewChapter').on('click', function(e) {
+        e.preventDefault();
+        $('#isChapterDraftInput').val('1');
+        $('#formSubmitChapter').trigger('submit');
+      });
+
+      $('#btnSubmitPublishChapter').on('click', function() {
+        $('#isChapterDraftInput').val('0');
+      });
+
       $('#formSubmitChapter').on('submit', function(e) {
         e.preventDefault();
         const $form = $(this);
         const $alert = $('#chapterAlert');
-        const $btn = $form.find('button[type="submit"]');
+        const isDraft = $('#isChapterDraftInput').val() === '1';
+        const $btn = isDraft ? $('#btnSaveDraftNewChapter') : $('#btnSubmitPublishChapter');
 
-        $btn.prop('disabled', true).text('Đang thêm chương...');
+        $btn.prop('disabled', true).text(isDraft ? 'Đang lưu bản nháp...' : 'Đang thêm chương...');
         $alert.hide();
 
         const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
@@ -1200,19 +1222,19 @@
               try { res = JSON.parse(res); } catch (e) {}
             }
             if (res && res.success) {
-              const successMsg = getAjaxMsg(res, 'Thêm chương mới thành công!');
+              const successMsg = getAjaxMsg(res, isDraft ? 'Đã lưu bản nháp chương thành công!' : 'Thêm chương mới thành công!');
               $alert.removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
               setTimeout(() => {
                 window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl : '/');
               }, 1000);
             } else {
-              $btn.prop('disabled', false).text('Thêm Chương Mới');
+              $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Thêm Chương Này');
               const errorMsg = getAjaxMsg(res, 'Lỗi thêm chương!');
               $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
             }
           },
           error: (xhr) => {
-            $btn.prop('disabled', false).text('Thêm Chương Mới');
+            $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Thêm Chương Này');
             let errorMsg = 'Lỗi kết nối máy chủ!';
             if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
             else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
@@ -2408,6 +2430,391 @@
     }
   };
 
+  // 17. STORY & CHAPTER MASTER EDITOR (POPUP CHỈNH SỬA THÔNG TIN TRUYỆN & CHƯƠNG)
+  const StoryChapterEditor = {
+    init() {
+      // 1. Lọc bảng truyện theo trạng thái (Tất Cả, Đang Phát Hành, Chờ Duyệt, Mục Lưu Nháp)
+      $('.btn-tab-filter').on('click', function(e) {
+        e.preventDefault();
+        const filter = $(this).data('filter');
+        $('.btn-tab-filter').removeClass('active');
+        $(this).addClass('active');
+
+        let visibleCount = 0;
+        $('.story-table-row').each(function() {
+          const status = $(this).data('status');
+          if (filter === 'all' || status === filter) {
+            $(this).show();
+            visibleCount++;
+          } else {
+            $(this).hide();
+          }
+        });
+
+        if (visibleCount === 0) {
+          $('#noStoriesFilterMsg').show();
+        } else {
+          $('#noStoriesFilterMsg').hide();
+        }
+      });
+
+      // 2. Nút "Đăng Lên" từ danh sách bản nháp
+      $(document).on('click', '.btn-publish-draft', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+
+        if (!confirm('Bạn có chắc chắn muốn đăng bộ truyện này lên hệ thống?')) {
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng...');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_publish_draft',
+            nonce: muopConfig.nonce,
+            story_id: storyId
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              alert(getAjaxMsg(res, 'Đã gửi đăng truyện thành công!'));
+              window.location.reload();
+            } else {
+              alert(getAjaxMsg(res, 'Lỗi đăng truyện!'));
+              $btn.prop('disabled', false).html('<i class="fa-solid fa-cloud-arrow-up"></i> Đăng Lên');
+            }
+          },
+          error: (xhr) => {
+            let err = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+            alert(err);
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-cloud-arrow-up"></i> Đăng Lên');
+          }
+        });
+      });
+
+      // 3. Mở Master Modal Chỉnh Sửa Truyện & Chương
+      $(document).on('click', '.btn-edit-story', function(e) {
+        e.preventDefault();
+        const storyId = $(this).data('story-id');
+        if (!storyId) return;
+
+        const $modal = $('#modalEditStoryMaster');
+        if (!$modal.length) return;
+
+        // Reset modal state
+        $('#editStoryAlert, #editChapterAlert').hide();
+        $('#editStoryCoverInfo').hide();
+        $('#editStoryCoverFile').val('');
+        $('#formEditStoryMaster')[0].reset();
+        $('#editStoryId').val(storyId);
+        $('#modalStoryTitleText').text('Đang tải dữ liệu...');
+        $('#selectEditChapter').empty().append('<option value="">-- Đang nạp danh sách chương... --</option>');
+        $('#formEditChapterFields').hide();
+        $('#editNoChaptersMsg').hide();
+
+        // Active Tab 1
+        $('.modal-tab-nav').removeClass('active').css({
+          'color': 'var(--text-muted)',
+          'border-bottom-color': 'transparent',
+          'font-weight': '600'
+        });
+        $('.modal-tab-nav[data-target="paneEditStoryInfo"]').addClass('active').css({
+          'color': 'var(--primary-green)',
+          'border-bottom-color': 'var(--primary-green)',
+          'font-weight': '700'
+        });
+        $('.modal-tab-pane').removeClass('active').hide();
+        $('#paneEditStoryInfo').addClass('active').show();
+
+        $modal.css('display', 'flex');
+
+        // Fetch data
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_get_story_data',
+            nonce: muopConfig.nonce,
+            story_id: storyId
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const data = res.data;
+              $('#modalStoryTitleText').text(data.title);
+              $('#editStoryTitle').val(data.title);
+              $('#editStoryStatus').val(data.status || 'dang_ra');
+              $('#editStoryAuthor').val(data.author_name || '');
+              $('#editStoryTeam').val(data.team_name || '');
+              $('#editStoryDescription').val(data.description || '');
+
+              // Thumbnail preview
+              if (data.thumbnail) {
+                $('#editStoryCoverPreview').attr('src', data.thumbnail).show();
+              } else {
+                $('#editStoryCoverPreview').hide();
+              }
+
+              // Genres
+              $('#editGenresCheckboxList input[type="checkbox"]').prop('checked', false);
+              if (data.categories && data.categories.length) {
+                data.categories.forEach(catId => {
+                  $(`#editGenresCheckboxList input[value="${catId}"]`).prop('checked', true);
+                });
+              }
+
+              // Chapters
+              const $select = $('#selectEditChapter');
+              $select.empty();
+              if (data.chapters && data.chapters.length) {
+                $select.append('<option value="">-- Chọn một chương để xem & chỉnh sửa --</option>');
+                data.chapters.forEach(ch => {
+                  const statusLabel = (ch.status === 'draft') ? ' (Bản nháp)' : '';
+                  $select.append(`<option value="${ch.id}">Chương ${ch.number}: ${ch.title}${statusLabel}</option>`);
+                });
+                $('#editNoChaptersMsg').hide();
+              } else {
+                $select.append('<option value="">-- Bộ truyện chưa có chương nào --</option>');
+                const siteUrl = (typeof muopConfig !== 'undefined' && muopConfig.siteUrl) ? muopConfig.siteUrl : '';
+                $('#btnGoAddChapterFromModal').attr('href', siteUrl + '/them-chuong/?story_id=' + storyId);
+                $('#editNoChaptersMsg').show();
+              }
+            } else {
+              alert(getAjaxMsg(res, 'Không thể tải thông tin truyện!'));
+              $modal.hide();
+            }
+          },
+          error: (xhr) => {
+            let err = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+            alert(err);
+            $modal.hide();
+          }
+        });
+      });
+
+      // 4. Chuyển Tab trong Modal
+      $(document).on('click', '.modal-tab-nav', function(e) {
+        e.preventDefault();
+        const targetId = $(this).data('target');
+        $('.modal-tab-nav').removeClass('active').css({
+          'color': 'var(--text-muted)',
+          'border-bottom-color': 'transparent',
+          'font-weight': '600'
+        });
+        $(this).addClass('active').css({
+          'color': 'var(--primary-green)',
+          'border-bottom-color': 'var(--primary-green)',
+          'font-weight': '700'
+        });
+        $('.modal-tab-pane').removeClass('active').hide();
+        $('#' + targetId).addClass('active').show();
+      });
+
+      // 5. Đóng Modal
+      $('#btnCloseStoryMasterModal, .btn-close-modal-action').on('click', function(e) {
+        e.preventDefault();
+        $('#modalEditStoryMaster').hide();
+      });
+
+      $('#modalEditStoryMaster').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // 6. Upload ảnh bìa trong Modal
+      $('#btnEditUploadCover').on('click', function(e) {
+        e.preventDefault();
+        $('#editStoryCoverFile').trigger('click');
+      });
+
+      $('#editStoryCoverFile').on('change', function() {
+        const file = this.files && this.files[0];
+        if (file) {
+          $('#editStoryCoverFileName').text(file.name);
+          $('#editStoryCoverInfo').css('display', 'inline-flex');
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            $('#editStoryCoverPreview').attr('src', e.target.result).show();
+          };
+          reader.readAsDataURL(file);
+        } else {
+          $('#editStoryCoverInfo').hide();
+        }
+      });
+
+      // 7. Tìm kiếm thể loại trong Modal
+      $('#editInputSearchGenre').on('input', function() {
+        const q = $(this).val().toLowerCase().trim();
+        $('#editGenresCheckboxList .edit-genre-item').each(function() {
+          const name = ($(this).data('name') || $(this).text()).toLowerCase();
+          if (!q || name.indexOf(q) !== -1) {
+            $(this).show();
+          } else {
+            $(this).hide();
+          }
+        });
+      });
+
+      // 8. Lưu Thay Đổi Truyện & Lưu Nháp Truyện (Tab 1)
+      $('#btnSaveDraftStoryAction').on('click', function(e) {
+        e.preventDefault();
+        $('#editStoryIsDraftInput').val('1');
+        $('#formEditStoryMaster').trigger('submit');
+      });
+
+      $('#btnUpdateStoryAction').on('click', function() {
+        $('#editStoryIsDraftInput').val('0');
+      });
+
+      $('#formEditStoryMaster').on('submit', function(e) {
+        e.preventDefault();
+        const $alert = $('#editStoryAlert');
+        const isDraft = $('#editStoryIsDraftInput').val() === '1';
+        const $btn = isDraft ? $('#btnSaveDraftStoryAction') : $('#btnUpdateStoryAction');
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $alert.hide();
+
+        const formData = new FormData(this);
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: formData,
+          contentType: false,
+          processData: false,
+          success: (res) => {
+            $btn.prop('disabled', false).html(isDraft ? '<i class="fa-solid fa-file-pen"></i> Lưu Vào Bản Nháp' : '<i class="fa-solid fa-check"></i> Cập Nhật Truyện');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Cập nhật thành công!')).fadeIn();
+              setTimeout(() => {
+                window.location.reload();
+              }, 900);
+            } else {
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Lỗi cập nhật!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(isDraft ? '<i class="fa-solid fa-file-pen"></i> Lưu Vào Bản Nháp' : '<i class="fa-solid fa-check"></i> Cập Nhật Truyện');
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+          }
+        });
+      });
+
+      // 9. Chọn chương để chỉnh sửa (Tab 2)
+      $('#selectEditChapter').on('change', function() {
+        const chapId = $(this).val();
+        const $form = $('#formEditChapterFields');
+        const $alert = $('#editChapterAlert');
+        $alert.hide();
+
+        if (!chapId) {
+          $form.hide();
+          return;
+        }
+
+        $form.hide();
+        $('#editChapterId').val(chapId);
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_get_chapter_data',
+            nonce: muopConfig.nonce,
+            chapter_id: chapId
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const data = res.data;
+              $('#editChapterNumber').val(data.chapter_number);
+              $('#editChapterTitle').val(data.title);
+              $('#editChapterContent').val(data.content);
+              $form.fadeIn(200);
+            } else {
+              alert(getAjaxMsg(res, 'Không thể tải nội dung chương!'));
+            }
+          },
+          error: (xhr) => {
+            let msg = 'Lỗi kết nối khi tải nội dung chương!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            alert(msg);
+          }
+        });
+      });
+
+      // 10. Lưu Thay Đổi Chương & Lưu Nháp Chương (Tab 2)
+      $('#btnSaveDraftChapterAction').on('click', function(e) {
+        e.preventDefault();
+        $('#editChapterIsDraftInput').val('1');
+        $('#formEditChapterFields').trigger('submit');
+      });
+
+      $('#btnUpdateChapterAction').on('click', function() {
+        $('#editChapterIsDraftInput').val('0');
+      });
+
+      $('#formEditChapterFields').on('submit', function(e) {
+        e.preventDefault();
+        const $form = $(this);
+        const $alert = $('#editChapterAlert');
+        const isDraft = $('#editChapterIsDraftInput').val() === '1';
+        const $btn = isDraft ? $('#btnSaveDraftChapterAction') : $('#btnUpdateChapterAction');
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $alert.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: $form.serialize(),
+          success: (res) => {
+            $btn.prop('disabled', false).html(isDraft ? '<i class="fa-solid fa-file-pen"></i> Lưu Nháp Chương' : '<i class="fa-solid fa-check"></i> Cập Nhật Chương');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Cập nhật chương thành công!')).fadeIn();
+              const data = res.data;
+              const statusLabel = (data.post_status === 'draft') ? ' (Bản nháp)' : '';
+              $(`#selectEditChapter option[value="${data.chapter_id}"]`).text(`Chương ${data.chapter_number}: ${data.chapter_title}${statusLabel}`);
+              setTimeout(() => {
+                $alert.fadeOut(300);
+              }, 2500);
+            } else {
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Lỗi cập nhật chương!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(isDraft ? '<i class="fa-solid fa-file-pen"></i> Lưu Nháp Chương' : '<i class="fa-solid fa-check"></i> Cập Nhật Chương');
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+          }
+        });
+      });
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     localStorage.removeItem('muop_accent_color');
@@ -2418,6 +2825,7 @@
     ReadingManager.init();
     AuthForms.init();
     CreatorForms.init();
+    StoryChapterEditor.init();
     CommentManager.init();
     AdminManager.init();
     DropdownManager.init();

@@ -5370,3 +5370,42 @@ img {
   }
 }
 
+/* ==========================================================================
+   STORY & CHAPTER MASTER EDITOR & DRAFT FILTER STYLES
+   ========================================================================== */
+.btn-tab-filter {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-tab-filter:hover {
+  color: var(--primary-green);
+  border-color: var(--primary-green);
+  background: var(--pastel-green);
+}
+
+.btn-tab-filter.active {
+  background: var(--primary-green) !important;
+  color: #fff !important;
+  border-color: var(--primary-green) !important;
+  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.25);
+}
+
+.modal-tab-nav:hover {
+  color: var(--primary-green) !important;
+}
+
+.modal-tab-pane {
+  animation: admModalFadeIn 0.2s ease;
+}
+
+@media (max-width: 640px) {
+  #editGenresCheckboxList {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+
