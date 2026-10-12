@@ -21,10 +21,6 @@ $custom_avatar = $is_logged_in ? get_user_meta($user_id, 'muop_user_avatar', tru
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <?php if ($is_logged_in) : ?>
-                <a href="<?php echo esc_url(home_url('/ho-so/')); ?>">Tài khoản</a>
-                <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <?php endif; ?>
             <span style="color: var(--primary-green); font-weight: 600;">Cài Đặt Đọc Truyện</span>
         </nav>
 
@@ -72,26 +68,10 @@ $custom_avatar = $is_logged_in ? get_user_meta($user_id, 'muop_user_avatar', tru
                     <?php endif; ?>
                 </div>
             </div>
-
-            <!-- TABS NAV / ACCOUNT SUBNAV -->
-            <div class="dash-tabs-nav">
-                <a href="<?php echo esc_url(home_url('/ho-so/')); ?>" class="dash-tab-btn">
-                    <i class="fa-solid fa-user-pen"></i> Thông Tin Cá Nhân
-                </a>
-                <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>" class="dash-tab-btn">
-                    <i class="fa-solid fa-key"></i> Đổi Mật Khẩu
-                </a>
-                <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="dash-tab-btn">
-                    <i class="fa-solid fa-bookmark"></i> Tủ Truyện
-                </a>
-                <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>" class="dash-tab-btn active">
-                    <i class="fa-solid fa-sliders"></i> Cài Đặt Đọc Truyện
-                </a>
-            </div>
         <?php endif; ?>
 
         <!-- MAIN SETTINGS CONTAINER -->
-        <div id="tabReadingSettings" class="profile-form-card">
+        <div id="tabReadingSettings" class="profile-form-card" style="margin-top: 24px;">
             <div class="form-section-header">
                 <h3><i class="fa-solid fa-sliders"></i> Cài Đặt Giao Diện Đọc Truyện</h3>
                 <p>Tùy biến cỡ chữ, kiểu phông, khoảng cách đoạn và màu sắc đọc truyện ưa thích. Cài đặt được lưu tự động và áp dụng cho mọi bộ truyện bạn đọc trên Mướp Đắng.</p>

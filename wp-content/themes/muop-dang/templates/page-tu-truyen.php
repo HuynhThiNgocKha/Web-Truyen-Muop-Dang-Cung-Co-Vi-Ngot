@@ -48,28 +48,8 @@ if ($has_stories) {
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <a href="<?php echo esc_url(home_url('/ho-so/')); ?>">Tài khoản</a>
-            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
             <span style="color: var(--primary-green); font-weight: 600;">Tủ Truyện Cá Nhân</span>
         </nav>
-
-        <?php if ($is_logged_in) : ?>
-            <!-- TABS NAV / ACCOUNT SUBNAV -->
-            <div class="dash-tabs-nav" style="margin-bottom: 24px;">
-                <a href="<?php echo esc_url(home_url('/ho-so/')); ?>" class="dash-tab-btn">
-                    <i class="fa-solid fa-user-pen"></i> Thông Tin Cá Nhân
-                </a>
-                <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>" class="dash-tab-btn">
-                    <i class="fa-solid fa-key"></i> Đổi Mật Khẩu
-                </a>
-                <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="dash-tab-btn active">
-                    <i class="fa-solid fa-bookmark"></i> Tủ Truyện (<?php echo count($bookmarked_story_ids); ?>)
-                </a>
-                <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>" class="dash-tab-btn">
-                    <i class="fa-solid fa-sliders"></i> Cài Đặt Đọc Truyện
-                </a>
-            </div>
-        <?php endif; ?>
 
         <div class="section-header" style="margin-bottom: 24px;">
             <div>

@@ -1,6 +1,7 @@
 <?php
 /**
  * Template Name: Trang Thông Tin / Hồ Sơ Cá Nhân
+ * Trang chuyên biệt hiển thị và cập nhật thông tin tài khoản người dùng
  */
 if (!defined('ABSPATH')) exit;
 
@@ -19,10 +20,6 @@ $custom_avatar = get_user_meta($user_id, 'muop_user_avatar', true);
 $user_bio     = get_user_meta($user_id, 'description', true);
 
 global $wpdb;
-// Get Bookmarked stories
-$table_bm = $wpdb->prefix . 'reading_bookmarks';
-$bookmarked_ids = $wpdb->get_col($wpdb->prepare("SELECT story_id FROM $table_bm WHERE user_id = %d ORDER BY created_at DESC", $user_id)) ?: array();
-
 // Get Reading History
 $table_hist = $wpdb->prefix . 'reading_history';
 $history_rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_hist WHERE user_id = %d ORDER BY updated_at DESC LIMIT 20", $user_id)) ?: array();
@@ -92,160 +89,112 @@ $preset_avatars = array(
             </div>
         </div>
 
-        <!-- TABS NAV / ACCOUNT SUBNAV -->
-        <div class="dash-tabs-nav">
-            <button type="button" class="dash-tab-btn active" data-tab="tabProfile">
-                <i class="fa-solid fa-user-pen"></i> Thông Tin Cá Nhân
-            </button>
-            <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>" class="dash-tab-btn">
-                <i class="fa-solid fa-key"></i> Đổi Mật Khẩu
-            </a>
-            <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="dash-tab-btn">
-                <i class="fa-solid fa-bookmark"></i> Tủ Truyện (<?php echo count($bookmarked_ids); ?>)
-            </a>
-            <button type="button" class="dash-tab-btn" data-tab="tabHistory">
-                <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Đọc (<?php echo count($history_rows); ?>)
-            </button>
-            <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>" class="dash-tab-btn">
-                <i class="fa-solid fa-sliders"></i> Cài Đặt Đọc Truyện
-            </a>
+        <!-- FORM CẬP NHẬT THÔNG TIN CÁ NHÂN -->
+        <div class="profile-form-card" style="margin-top: 24px;">
+            <div id="profileAlertContainer"></div>
+
+            <form id="profileUpdateForm" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="muop_update_profile" />
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+
+                <!-- Section: Avatar -->
+                <div class="form-section-header">
+                    <h3><i class="fa-solid fa-image"></i> Ảnh Đại Diện (Avatar)</h3>
+                    <p>Chọn ảnh từ điện thoại/máy tính hoặc dán link ảnh yêu thích</p>
+                </div>
+
+                <div class="avatar-edit-layout">
+                    <!-- Preview Box -->
+                    <div class="avatar-preview-box">
+                        <div class="avatar-preview-circle" id="avatarPreviewCircle">
+                            <?php if (!empty($custom_avatar)) : ?>
+                                <img src="<?php echo esc_url($custom_avatar); ?>" alt="Preview" id="avatarPreviewImg" />
+                            <?php else : ?>
+                                <span class="avatar-preview-char" id="avatarPreviewChar"><?php echo esc_html($avatar_char); ?></span>
+                                <img src="" alt="Preview" id="avatarPreviewImg" style="display:none;" />
+                            <?php endif; ?>
+                        </div>
+                        <span class="avatar-preview-label">Xem trước</span>
+                    </div>
+
+                    <!-- Upload & Options -->
+                    <div class="avatar-options-box">
+                        <div class="avatar-actions-row">
+                            <input type="file" id="avatarFileInput" name="avatar_file" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+                            <button type="button" class="btn btn-secondary" id="btnChooseAvatarFile">
+                                <i class="fa-solid fa-upload"></i> Tải ảnh từ thiết bị
+                            </button>
+                            <span class="file-chosen-text" id="avatarFileNameDisplay">Chưa chọn tệp (Hỗ trợ JPG, PNG, WEBP)</span>
+                        </div>
+
+                        <div style="margin-top: 14px;">
+                            <label for="avatarUrlInput" class="form-label" style="font-size: 13px;">Hoặc dán đường dẫn (URL) ảnh avatar online:</label>
+                            <input type="url" id="avatarUrlInput" name="avatar_url" class="form-input" placeholder="https://example.com/anh-dai-dien.jpg" value="<?php echo esc_attr($custom_avatar); ?>" />
+                        </div>
+
+                        <!-- Preset Avatars -->
+                        <div style="margin-top: 14px;">
+                            <span class="form-label" style="font-size: 13px; display: block; margin-bottom: 8px;">Hoặc chọn nhanh avatar mẫu:</span>
+                            <div class="preset-avatar-grid">
+                                <?php foreach ($preset_avatars as $p_url => $p_label) : ?>
+                                    <button type="button" class="preset-avatar-btn <?php echo ($custom_avatar === $p_url) ? 'active' : ''; ?>" data-url="<?php echo esc_url($p_url); ?>" title="<?php echo esc_attr($p_label); ?>">
+                                        <img src="<?php echo esc_url($p_url); ?>" alt="<?php echo esc_attr($p_label); ?>" />
+                                    </button>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="form-divider" />
+
+                <!-- Section: Basic Info -->
+                <div class="form-section-header">
+                    <h3><i class="fa-solid fa-id-badge"></i> Thông Tin Cơ Bản</h3>
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label" for="profileLoginName">Tên đăng nhập (Username):</label>
+                        <input type="text" id="profileLoginName" class="form-input" value="<?php echo esc_attr($current_user->user_login); ?>" disabled style="background: var(--bg-body); opacity: 0.8; cursor: not-allowed;" />
+                        <small class="form-hint">Tên dùng để đăng nhập hệ thống (cố định).</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="profileDisplayName">Tên hiển thị (Display Name): <span style="color: #e53935;">*</span></label>
+                        <input type="text" id="profileDisplayName" name="display_name" class="form-input" value="<?php echo esc_attr($current_user->display_name); ?>" required placeholder="Nhập tên hiển thị của bạn..." />
+                        <small class="form-hint">Tên xuất hiện khi bình luận và trên thanh điều hướng.</small>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 16px;">
+                    <label class="form-label" for="profileEmail">Địa chỉ Email: <span style="color: #e53935;">*</span></label>
+                    <input type="email" id="profileEmail" name="user_email" class="form-input" value="<?php echo esc_attr($current_user->user_email); ?>" required placeholder="email@example.com" />
+                </div>
+
+                <div class="form-group" style="margin-top: 16px;">
+                    <label class="form-label" for="profileBio">Giới thiệu bản thân (Bio):</label>
+                    <textarea id="profileBio" name="bio" class="form-textarea" rows="3" placeholder="Chia sẻ đôi nét về bạn, sở thích đọc truyện Zhihu, ngôn tình..."><?php echo esc_textarea($user_bio); ?></textarea>
+                </div>
+
+                <div style="margin-top: 24px; display: flex; align-items: center; gap: 12px;">
+                    <button type="submit" class="btn btn-primary" id="btnSubmitProfile" style="padding: 10px 24px; font-size: 14px; font-weight: 700;">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu Thay Đổi
+                    </button>
+                    <span id="profileSavingSpinner" style="display: none; color: var(--text-muted); font-size: 13px;">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...
+                    </span>
+                </div>
+            </form>
         </div>
 
-        <!-- ========================================== -->
-        <!-- TAB 1: CẬP NHẬT THÔNG TIN (TÊN, AVATAR, BIO) -->
-        <!-- ========================================== -->
-        <div id="tabProfile" class="dash-tab-pane active">
-            <div class="profile-form-card">
-                <div id="profileAlertContainer"></div>
-
-                <form id="profileUpdateForm" enctype="multipart/form-data">
-                    <input type="hidden" name="action" value="muop_update_profile" />
-                    <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
-
-                    <!-- Section: Avatar -->
-                    <div class="form-section-header">
-                        <h3><i class="fa-solid fa-image"></i> Ảnh Đại Diện (Avatar)</h3>
-                        <p>Chọn ảnh từ điện thoại/máy tính hoặc dán link ảnh yêu thích</p>
-                    </div>
-
-                    <div class="avatar-edit-layout">
-                        <!-- Preview Box -->
-                        <div class="avatar-preview-box">
-                            <div class="avatar-preview-circle" id="avatarPreviewCircle">
-                                <?php if (!empty($custom_avatar)) : ?>
-                                    <img src="<?php echo esc_url($custom_avatar); ?>" alt="Preview" id="avatarPreviewImg" />
-                                <?php else : ?>
-                                    <span class="avatar-preview-char" id="avatarPreviewChar"><?php echo esc_html($avatar_char); ?></span>
-                                    <img src="" alt="Preview" id="avatarPreviewImg" style="display:none;" />
-                                <?php endif; ?>
-                            </div>
-                            <span class="avatar-preview-label">Xem trước</span>
-                        </div>
-
-                        <!-- Upload & Options -->
-                        <div class="avatar-options-box">
-                            <div class="avatar-actions-row">
-                                <input type="file" id="avatarFileInput" name="avatar_file" accept="image/png, image/jpeg, image/webp" style="display: none;" />
-                                <button type="button" class="btn btn-secondary" id="btnChooseAvatarFile">
-                                    <i class="fa-solid fa-upload"></i> Tải ảnh từ thiết bị
-                                </button>
-                                <span class="file-chosen-text" id="avatarFileNameDisplay">Chưa chọn tệp (Hỗ trợ JPG, PNG, WEBP)</span>
-                            </div>
-
-                            <div style="margin-top: 14px;">
-                                <label for="avatarUrlInput" class="form-label" style="font-size: 13px;">Hoặc dán đường dẫn (URL) ảnh avatar online:</label>
-                                <input type="url" id="avatarUrlInput" name="avatar_url" class="form-input" placeholder="https://example.com/anh-dai-dien.jpg" value="<?php echo esc_attr($custom_avatar); ?>" />
-                            </div>
-
-                            <!-- Preset Avatars -->
-                            <div style="margin-top: 14px;">
-                                <span class="form-label" style="font-size: 13px; display: block; margin-bottom: 8px;">Hoặc chọn nhanh avatar mẫu:</span>
-                                <div class="preset-avatar-grid">
-                                    <?php foreach ($preset_avatars as $p_url => $p_label) : ?>
-                                        <button type="button" class="preset-avatar-btn <?php echo ($custom_avatar === $p_url) ? 'active' : ''; ?>" data-url="<?php echo esc_url($p_url); ?>" title="<?php echo esc_attr($p_label); ?>">
-                                            <img src="<?php echo esc_url($p_url); ?>" alt="<?php echo esc_attr($p_label); ?>" />
-                                        </button>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="form-divider" />
-
-                    <!-- Section: Basic Info -->
-                    <div class="form-section-header">
-                        <h3><i class="fa-solid fa-id-badge"></i> Thông Tin Cơ Bản</h3>
-                    </div>
-
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label class="form-label" for="profileLoginName">Tên đăng nhập (Username):</label>
-                            <input type="text" id="profileLoginName" class="form-input" value="<?php echo esc_attr($current_user->user_login); ?>" disabled style="background: var(--bg-body); opacity: 0.8; cursor: not-allowed;" />
-                            <small class="form-hint">Tên dùng để đăng nhập hệ thống (cố định).</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label" for="profileDisplayName">Tên hiển thị (Display Name): <span style="color: #e53935;">*</span></label>
-                            <input type="text" id="profileDisplayName" name="display_name" class="form-input" value="<?php echo esc_attr($current_user->display_name); ?>" required placeholder="Nhập tên hiển thị của bạn..." />
-                            <small class="form-hint">Tên xuất hiện khi bình luận và trên thanh điều hướng.</small>
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-top: 16px;">
-                        <label class="form-label" for="profileEmail">Địa chỉ Email: <span style="color: #e53935;">*</span></label>
-                        <input type="email" id="profileEmail" name="user_email" class="form-input" value="<?php echo esc_attr($current_user->user_email); ?>" required placeholder="email@example.com" />
-                    </div>
-
-                    <div class="form-group" style="margin-top: 16px;">
-                        <label class="form-label" for="profileBio">Giới thiệu bản thân (Bio):</label>
-                        <textarea id="profileBio" name="bio" class="form-textarea" rows="3" placeholder="Chia sẻ đôi nét về bạn, sở thích đọc truyện Zhihu, ngôn tình..."><?php echo esc_textarea($user_bio); ?></textarea>
-                    </div>
-
-                    <div style="margin-top: 24px; display: flex; align-items: center; gap: 12px;">
-                        <button type="submit" class="btn btn-primary" id="btnSubmitProfile" style="padding: 10px 24px; font-size: 14px; font-weight: 700;">
-                            <i class="fa-solid fa-floppy-disk"></i> Lưu Thay Đổi
-                        </button>
-                        <span id="profileSavingSpinner" style="display: none; color: var(--text-muted); font-size: 13px;">
-                            <i class="fa-solid fa-circle-notch fa-spin"></i> Đang lưu...
-                        </span>
-                    </div>
-                </form>
+        <!-- LỊCH SỬ ĐỌC GẦN ĐÂY -->
+        <div class="profile-form-card" style="margin-top: 24px;">
+            <div class="form-section-header">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Đọc Gần Đây</h3>
+                <p>Theo dõi tiến độ đọc các bộ truyện bạn đã mở xem gần đây</p>
             </div>
-        </div>
 
-        <!-- ========================================== -->
-        <!-- TAB 2: ĐỔI MẬT KHẨU (ĐÃ TÁCH TRANG RIÊNG)  -->
-        <!-- ========================================== -->
-        <div id="tabPassword" class="dash-tab-pane">
-            <div class="profile-form-card" style="max-width: 620px; text-align: center; padding: 40px 24px; margin: 0 auto;">
-                <i class="fa-solid fa-key" style="font-size: 36px; color: var(--primary-green); margin-bottom: 12px; display: inline-block;"></i>
-                <h3 style="font-size: 18px; margin-bottom: 8px; color: var(--text-main);">Đổi Mật Khẩu Tài Khoản</h3>
-                <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">Tính năng đổi mật khẩu đã được chuyển sang trang chuyên biệt để bạn quản lý thuận tiện và an toàn hơn.</p>
-                <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>" class="btn btn-primary" style="padding: 10px 24px; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-arrow-right"></i> Đi Đến Trang Đổi Mật Khẩu
-                </a>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB 3: TỦ TRUYỆN (ĐÃ TÁCH TRANG RIÊNG)     -->
-        <!-- ========================================== -->
-        <div id="tabBookmarks" class="dash-tab-pane">
-            <div class="profile-form-card" style="max-width: 620px; text-align: center; padding: 40px 24px; margin: 0 auto;">
-                <i class="fa-solid fa-bookmark" style="font-size: 36px; color: var(--primary-green); margin-bottom: 12px; display: inline-block;"></i>
-                <h3 style="font-size: 18px; margin-bottom: 8px; color: var(--text-main);">Tủ Truyện Cá Nhân</h3>
-                <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">Danh sách tất cả các bộ truyện bạn đã lưu hiện được quản lý tại trang Tủ Truyện chuyên biệt.</p>
-                <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="btn btn-primary" style="padding: 10px 24px; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-arrow-right"></i> Đi Đến Trang Tủ Truyện
-                </a>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB 4: LỊCH SỬ ĐỌC GẦN ĐÂY                 -->
-        <!-- ========================================== -->
-        <div id="tabHistory" class="dash-tab-pane">
             <?php if (!empty($history_rows)) : ?>
                 <div class="table-responsive">
                     <table class="data-table">
@@ -291,20 +240,6 @@ $preset_avatars = array(
                     <p>Bạn chưa đọc chương truyện nào. Cùng khám phá truyện hay ngay thôi!</p>
                 </div>
             <?php endif; ?>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- TAB 5: CÀI ĐẶT ĐỌC TRUYỆN (ĐÃ TÁCH RIÊNG) -->
-        <!-- ========================================== -->
-        <div id="tabReadingSettings" class="dash-tab-pane">
-            <div class="profile-form-card" style="max-width: 620px; text-align: center; padding: 40px 24px; margin: 0 auto;">
-                <i class="fa-solid fa-sliders" style="font-size: 36px; color: var(--primary-green); margin-bottom: 12px; display: inline-block;"></i>
-                <h3 style="font-size: 18px; margin-bottom: 8px; color: var(--text-main);">Cài Đặt Giao Diện Đọc Truyện</h3>
-                <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">Tính năng tùy biến cỡ chữ, kiểu phông, khoảng cách đoạn và màu sắc đọc truyện đã được tách thành trang chuyên biệt.</p>
-                <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>" class="btn btn-primary" style="padding: 10px 24px; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-arrow-right"></i> Đi Đến Trang Cài Đặt Đọc Truyện
-                </a>
-            </div>
         </div>
     </div>
 </div>

@@ -26,8 +26,6 @@ $user_bio     = get_user_meta($user_id, 'description', true);
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <a href="<?php echo esc_url(home_url('/ho-so/')); ?>">Tài khoản</a>
-            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
             <span style="color: var(--primary-green); font-weight: 600;">Đổi Mật Khẩu</span>
         </nav>
 
@@ -75,24 +73,8 @@ $user_bio     = get_user_meta($user_id, 'description', true);
             </div>
         </div>
 
-        <!-- TABS NAV / ACCOUNT SUBNAV -->
-        <div class="dash-tabs-nav">
-            <a href="<?php echo esc_url(home_url('/ho-so/')); ?>" class="dash-tab-btn">
-                <i class="fa-solid fa-user-pen"></i> Thông Tin Cá Nhân
-            </a>
-            <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>" class="dash-tab-btn active">
-                <i class="fa-solid fa-key"></i> Đổi Mật Khẩu
-            </a>
-            <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="dash-tab-btn">
-                <i class="fa-solid fa-bookmark"></i> Tủ Truyện
-            </a>
-            <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>" class="dash-tab-btn">
-                <i class="fa-solid fa-sliders"></i> Cài Đặt Đọc Truyện
-            </a>
-        </div>
-
         <!-- MAIN FORM: ĐỔI MẬT KHẨU -->
-        <div class="profile-form-card" style="max-width: 640px; margin: 0 auto;">
+        <div class="profile-form-card" style="max-width: 640px; margin: 24px auto 0;">
             <div id="passwordAlertContainer"></div>
 
             <div class="form-section-header">
