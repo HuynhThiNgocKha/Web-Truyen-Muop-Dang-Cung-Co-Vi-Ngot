@@ -292,11 +292,11 @@ img {
   flex-shrink: 0;
   box-sizing: border-box;
   overflow: hidden;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.25s ease;
 }
 
 .brand-wrapper:hover .brand-logo {
-  transform: scale(1.05) rotate(-3deg);
+  transform: scale(1.08) rotate(-4deg);
   box-shadow: 0 4px 14px rgba(63, 117, 35, 0.35);
 }
 
@@ -326,11 +326,12 @@ img {
   max-width: 195px;
   object-fit: contain;
   display: block;
-  transition: transform 0.25s ease;
+  transform: none !important;
+  transition: none !important;
 }
 
 .brand-wrapper:hover .brand-title-img {
-  transform: scale(1.03);
+  transform: none !important;
 }
 
 .brand-text h1, .brand-text .site-title {
