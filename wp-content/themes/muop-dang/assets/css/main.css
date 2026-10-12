@@ -6366,11 +6366,17 @@ img {
   backdrop-filter: blur(4px) !important;
   -webkit-backdrop-filter: blur(4px) !important;
   z-index: 99999 !important;
-  display: flex !important;
+  display: none; /* Mặc định ẩn, chỉ hiển thị khi có class active/show hoặc script kích hoạt */
   align-items: center !important;
   justify-content: center !important;
   padding: 16px !important;
   box-sizing: border-box !important;
+}
+
+.notif-modal-backdrop.show,
+.notif-modal-backdrop.is-active,
+.notif-modal-backdrop.active {
+  display: flex !important;
   animation: backdropFadeIn 0.18s ease-out forwards !important;
 }
 
@@ -6416,9 +6422,12 @@ img {
   gap: 8px !important;
 }
 
+/* Nút đóng X của Popup thông báo: Triệt tiêu 100% viền đen focus outline của trình duyệt */
 .notif-modal-card .btn-close-modal,
+.notif-modal-card .btn-close-notif,
+.btn-close-notif,
 #btnCloseNotifModal {
-  background: none !important;
+  background: transparent !important;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -6433,15 +6442,31 @@ img {
   align-items: center !important;
   justify-content: center !important;
   border-radius: 50% !important;
-  transition: all 0.18s ease !important;
+  transition: all 0.15s ease !important;
   -webkit-appearance: none !important;
   appearance: none !important;
   -webkit-tap-highlight-color: transparent !important;
 }
 
+.notif-modal-card .btn-close-modal:hover,
+.notif-modal-card .btn-close-notif:hover,
+.btn-close-notif:hover,
+#btnCloseNotifModal:hover {
+  color: #dc2626 !important;
+  background: rgba(220, 38, 38, 0.1) !important;
+  outline: none !important;
+  border: none !important;
+}
+
 .notif-modal-card .btn-close-modal:focus,
 .notif-modal-card .btn-close-modal:focus-visible,
 .notif-modal-card .btn-close-modal:active,
+.notif-modal-card .btn-close-notif:focus,
+.notif-modal-card .btn-close-notif:focus-visible,
+.notif-modal-card .btn-close-notif:active,
+.btn-close-notif:focus,
+.btn-close-notif:focus-visible,
+.btn-close-notif:active,
 #btnCloseNotifModal:focus,
 #btnCloseNotifModal:focus-visible,
 #btnCloseNotifModal:active {
@@ -6449,12 +6474,6 @@ img {
   box-shadow: none !important;
   border: none !important;
   background: rgba(0, 0, 0, 0.05) !important;
-}
-
-.notif-modal-card .btn-close-modal:hover,
-#btnCloseNotifModal:hover {
-  color: #dc2626 !important;
-  background: rgba(220, 38, 38, 0.1) !important;
 }
 
 .notif-modal-card .notif-body {

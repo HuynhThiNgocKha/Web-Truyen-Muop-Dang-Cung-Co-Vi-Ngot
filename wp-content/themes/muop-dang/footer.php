@@ -42,7 +42,7 @@ if (!defined('ABSPATH')) exit;
                 <button type="button" class="notif-mark-all-btn" id="notifMarkAllReadBtn" title="Đánh dấu tất cả đã đọc">
                     <i class="fa-solid fa-check-double"></i> Đã đọc tất cả
                 </button>
-                <button type="button" class="btn-close-modal" id="btnCloseNotifModal" aria-label="Đóng" title="Đóng thông báo" style="background: none; border: none; outline: none; box-shadow: none;">
+                <button type="button" class="btn-close-notif" id="btnCloseNotifModal" aria-label="Đóng" title="Đóng thông báo" style="background: transparent !important; border: none !important; outline: none !important; box-shadow: none !important; -webkit-box-shadow: none !important; cursor: pointer; color: var(--text-muted); font-size: 16px; padding: 6px; line-height: 1;">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>

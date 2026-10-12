@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.29');
+define('MUOP_THEME_VERSION', '2.2.30');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -411,11 +411,8 @@ function muop_enqueue_scripts() {
         $effective_role = $primary_role;
     }
 
-    $ajax_url = admin_url('admin-ajax.php');
-    if (!empty($_SERVER['HTTP_HOST'])) {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $ajax_url = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/wp-admin/admin-ajax.php';
-    }
+    // Chuẩn hóa ajaxUrl luôn là relative path để không bị chặn bởi Chrome Private Network Access (PNA)
+    $ajax_url = '/wp-admin/admin-ajax.php';
 
     wp_localize_script('muop-main-script', 'muopConfig', array(
         'ajaxUrl'       => $ajax_url,
@@ -2637,9 +2634,9 @@ function muop_ajax_get_notifications_handler() {
             'type'       => $n->type,
             'title'      => esc_html($n->title),
             'message'    => esc_html($msg),
-            'link'       => $n->link,
+            'link'       => muop_clean_subresource_url($n->link),
             'report_id'  => $report_id,
-            'image'      => esc_url($n->image),
+            'image'      => muop_clean_subresource_url($n->image),
             'is_read'    => (int) $n->is_read,
             'time_ago'   => muop_time_ago($n->created_at),
             'icon'       => $icon,
@@ -2651,6 +2648,20 @@ function muop_ajax_get_notifications_handler() {
         'notifications' => $items,
         'unread_count'  => $unread_count
     ));
+}
+
+// Hàm chuẩn hóa URL tránh cảnh báo Chrome Private Network Access (PNA)
+function muop_clean_subresource_url($url) {
+    if (empty($url)) return '';
+    if (preg_match('#^https?://(192\.168\.\d+\.\d+|127\.0\.0\.1|localhost|10\.\d+\.\d+\.\d+)(:\d+)?(/.*)?$#i', $url, $m)) {
+        return !empty($m[3]) ? $m[3] : '/';
+    }
+    $home = home_url();
+    if (strpos($url, $home) === 0) {
+        $rel = substr($url, strlen($home));
+        return (empty($rel) || $rel[0] !== '/') ? '/' . $rel : $rel;
+    }
+    return $url;
 }
 
 // AJAX: Đánh dấu 1 thông báo đã đọc

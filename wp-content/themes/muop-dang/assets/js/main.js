@@ -3630,7 +3630,8 @@
         e.preventDefault();
         e.stopPropagation();
 
-        if ($('#notifModalBackdrop').is(':visible')) {
+        const $backdrop = $('#notifModalBackdrop');
+        if ($backdrop.hasClass('show') || $backdrop.is(':visible')) {
           NotificationManager.closeModal();
         } else {
           NotificationManager.openModal();
@@ -3638,8 +3639,9 @@
       });
 
       // Nút đóng modal X
-      $(document).on('click', '#btnCloseNotifModal', (e) => {
+      $(document).on('click', '#btnCloseNotifModal, .btn-close-notif', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         NotificationManager.closeModal();
       });
 
@@ -3652,7 +3654,7 @@
 
       // Đóng modal khi bấm Escape
       $(document).on('keydown', (e) => {
-        if (e.key === 'Escape' && $('#notifModalBackdrop').is(':visible')) {
+        if (e.key === 'Escape' && ($('#notifModalBackdrop').hasClass('show') || $('#notifModalBackdrop').is(':visible'))) {
           NotificationManager.closeModal();
         }
       });
@@ -3769,13 +3771,15 @@
       $('#userDropdownPanel').removeClass('show');
       $('#userMenuWrapper').removeClass('active');
 
-      $('#notifModalBackdrop').css('display', 'flex');
+      const $backdrop = $('#notifModalBackdrop');
+      $backdrop.addClass('show is-active').attr('style', 'display: flex !important;');
       $('#notifToggleBtn').attr('aria-expanded', 'true');
       this.fetchNotifications();
     },
 
     closeModal() {
-      $('#notifModalBackdrop').hide();
+      const $backdrop = $('#notifModalBackdrop');
+      $backdrop.removeClass('show is-active').attr('style', 'display: none !important;').hide();
       $('#notifToggleBtn').attr('aria-expanded', 'false');
     },
 
