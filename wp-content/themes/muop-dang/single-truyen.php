@@ -34,7 +34,7 @@ if (is_user_logged_in()) {
     $is_bookmarked = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_bm WHERE user_id = %d AND story_id = %d", $current_uid, $story_id));
 
     $post_author_id = (int) get_post_field('post_author', $story_id);
-    if ($current_user_can('administrator') || ($post_author_id === $current_uid)) {
+    if (current_user_can('administrator') || ($post_author_id === $current_uid)) {
         $can_change_status = true;
     }
 }
