@@ -1932,6 +1932,10 @@
           $('.has-genre-dropdown').removeClass('open');
           $('.genre-dropdown-menu').removeClass('show');
         }
+        if (!$(e.target).closest('#notifWrapper').length) {
+          $('#notifDropdownPanel').removeClass('show');
+          $('#notifToggleBtn').attr('aria-expanded', 'false');
+        }
       });
 
       // Escape key to close open dropdowns
@@ -1941,6 +1945,8 @@
           $('.user-dropdown-panel').removeClass('show');
           $('.has-genre-dropdown').removeClass('open');
           $('.genre-dropdown-menu').removeClass('show');
+          $('#notifDropdownPanel').removeClass('show');
+          $('#notifToggleBtn').attr('aria-expanded', 'false');
         }
       });
     }
@@ -3625,43 +3631,50 @@
   // 17. NOTIFICATIONS & BILL PREVIEW
   const NotificationManager = {
     init() {
-      // Toggle popup modal thông báo khi click chuông
+      // Toggle dropdown thông báo khi click chuông
       $(document).on('click', '#notifToggleBtn', (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        const $backdrop = $('#notifModalBackdrop');
-        if ($backdrop.hasClass('show') || $backdrop.is(':visible')) {
-          NotificationManager.closeModal();
+        const $panel = $('#notifDropdownPanel');
+        const isOpen = $panel.hasClass('show');
+
+        // Đóng dropdown user và thể loại nếu đang mở
+        $('#userDropdownPanel').removeClass('show');
+        $('#userMenuWrapper').removeClass('active');
+        $('.genre-dropdown-menu').removeClass('show');
+        $('.has-genre-dropdown').removeClass('open');
+
+        if (isOpen) {
+          NotificationManager.closeDropdown();
         } else {
-          NotificationManager.openModal();
+          NotificationManager.openDropdown();
         }
       });
 
-      // Nút đóng modal X
-      $(document).on('click', '#btnCloseNotifModal, .btn-close-notif', (e) => {
-        e.preventDefault();
+      // Ngăn chặn sự kiện click bên trong panel thông báo làm đóng panel
+      $(document).on('click', '#notifDropdownPanel', (e) => {
         e.stopPropagation();
-        NotificationManager.closeModal();
       });
 
-      // Đóng modal khi click ra nền mờ bên ngoài
-      $(document).on('click', '#notifModalBackdrop', function(e) {
-        if (e.target === this) {
-          NotificationManager.closeModal();
+      // Đóng dropdown thông báo khi click ra ngoài
+      $(document).on('click', (e) => {
+        if (!$(e.target).closest('#notifWrapper').length) {
+          NotificationManager.closeDropdown();
         }
       });
 
-      // Đóng modal khi bấm Escape
+      // Đóng dropdown khi bấm Escape
       $(document).on('keydown', (e) => {
-        if (e.key === 'Escape' && ($('#notifModalBackdrop').hasClass('show') || $('#notifModalBackdrop').is(':visible'))) {
-          NotificationManager.closeModal();
+        if (e.key === 'Escape') {
+          NotificationManager.closeDropdown();
         }
       });
 
       // Mark all read
       $(document).on('click', '#notifMarkAllReadBtn', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         $.ajax({
           url: muopConfig.ajaxUrl,
           type: 'POST',
@@ -3721,7 +3734,7 @@
         // 1. Nếu là báo lỗi chương hoặc phản hồi báo lỗi -> MỞ MODAL ĐỐI THOẠI KHÔNG RELOAD / GIỮ NGUYÊN TÀI KHOẢN
         if (repId || notifType === 'chapter_report' || notifType === 'report_reply' || (link && link.indexOf('#report-') !== -1)) {
           e.preventDefault();
-          NotificationManager.closeModal();
+          NotificationManager.closeDropdown();
           if (repId) {
             ReportDialogueManager.openModal(repId);
           }
@@ -3733,7 +3746,7 @@
           e.preventDefault();
           const billUrl = hasBill || $(e.target).closest('.notif-bill-preview-btn').data('bill-url');
           if (billUrl) {
-            NotificationManager.closeModal();
+            NotificationManager.closeDropdown();
             NotificationManager.openBillModal(billUrl);
           }
           return;
@@ -3741,7 +3754,7 @@
 
         // 3. Các thông báo thông thường khác
         if (link && !$(e.target).closest('.notif-bill-preview-btn').length) {
-          NotificationManager.closeModal();
+          NotificationManager.closeDropdown();
           window.location.href = link;
         }
       });
@@ -3766,21 +3779,30 @@
       });
     },
 
-    openModal() {
-      // Đóng dropdown user nếu đang mở
+    openDropdown() {
+      // Đóng dropdown user và thể loại nếu đang mở
       $('#userDropdownPanel').removeClass('show');
       $('#userMenuWrapper').removeClass('active');
+      $('.genre-dropdown-menu').removeClass('show');
+      $('.has-genre-dropdown').removeClass('open');
 
-      const $backdrop = $('#notifModalBackdrop');
-      $backdrop.addClass('show is-active').attr('style', 'display: flex !important;');
+      const $panel = $('#notifDropdownPanel');
+      $panel.addClass('show');
       $('#notifToggleBtn').attr('aria-expanded', 'true');
       this.fetchNotifications();
     },
 
-    closeModal() {
-      const $backdrop = $('#notifModalBackdrop');
-      $backdrop.removeClass('show is-active').attr('style', 'display: none !important;').hide();
+    closeDropdown() {
+      $('#notifDropdownPanel').removeClass('show');
       $('#notifToggleBtn').attr('aria-expanded', 'false');
+    },
+
+    openModal() {
+      this.openDropdown();
+    },
+
+    closeModal() {
+      this.closeDropdown();
     },
 
     openBillModal(billUrl) {
