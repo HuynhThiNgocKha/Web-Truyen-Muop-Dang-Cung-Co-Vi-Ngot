@@ -3873,10 +3873,28 @@
     }
   };
 
-  // 19. TRANSLATOR BANK INFO MANAGEMENT
+  // 19. TRANSLATOR BANK INFO & SALARY HISTORY MANAGEMENT
   const TranslatorBankManager = {
     init() {
-      $('#formTranslatorBankInfo').on('submit', function(e) {
+      // Mở modal lịch sử nhận tiền & bill chuyển khoản (Ảnh 2 khi nhấn button nằm trên Ảnh 3)
+      $(document).on('click', '#btnOpenSalaryHistoryModal', (e) => {
+        e.preventDefault();
+        $('#modalSalaryHistory').css('display', 'flex').hide().fadeIn(250);
+      });
+
+      $(document).on('click', '#btnCloseSalaryHistoryModal, #btnDismissSalaryHistoryModal', (e) => {
+        e.preventDefault();
+        $('#modalSalaryHistory').fadeOut(200);
+      });
+
+      $(document).on('click', '#modalSalaryHistory', function(e) {
+        if (e.target === this) {
+          $(this).fadeOut(200);
+        }
+      });
+
+      // Submit form lưu thông tin tài khoản ngân hàng (ở trang Thông Tin Hồ Sơ - Ảnh 1)
+      $(document).on('submit', '#formTranslatorBankInfo', function(e) {
         e.preventDefault();
         const $btn = $('#btnSaveBankInfo');
         const $msg = $('#bankInfoSaveMsg');

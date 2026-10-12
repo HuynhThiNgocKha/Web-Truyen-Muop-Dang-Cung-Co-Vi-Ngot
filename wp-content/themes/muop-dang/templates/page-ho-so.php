@@ -188,6 +188,64 @@ $preset_avatars = array(
             </form>
         </div>
 
+        <?php if (in_array('dich_gia', (array)$current_user->roles) || current_user_can('administrator')) : 
+            $bank_name    = get_user_meta($user_id, '_muop_bank_name', true) ?: '';
+            $bank_holder  = get_user_meta($user_id, '_muop_bank_account_holder', true) ?: '';
+            $bank_number  = get_user_meta($user_id, '_muop_bank_account_number', true) ?: '';
+        ?>
+        <!-- THÔNG TIN TÀI KHOẢN NGÂN HÀNG NHẬN NHUẬN BÚT (DÀNH CHO DỊCH GIẢ - ẢNH 1) -->
+        <div class="profile-form-card" id="bankAccountSection" style="margin-top: 24px;">
+            <div class="form-section-header">
+                <h3><i class="fa-solid fa-building-columns"></i> Tài Khoản Nhận Nhuận Bút</h3>
+                <p>Vui lòng điền chính xác tài khoản ngân hàng chính chủ để Admin đối soát và chuyển khoản tiền nhuận bút kèm gửi bill làm bằng chứng.</p>
+            </div>
+
+            <form id="formTranslatorBankInfo">
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label" for="bankAccountHolder">Tên Chủ Tài Khoản (Họ và tên): <span style="color: #dc2626;">*</span></label>
+                        <input type="text" id="bankAccountHolder" name="bank_account_holder" class="form-input" value="<?php echo esc_attr($bank_holder); ?>" placeholder="VD: NGUYEN VAN A" required style="text-transform: uppercase;" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="bankNameInput">Tên Ngân Hàng: <span style="color: #dc2626;">*</span></label>
+                        <input type="text" id="bankNameInput" name="bank_name" class="form-input" list="vietnamBanksList" value="<?php echo esc_attr($bank_name); ?>" placeholder="VD: MB Bank, Vietcombank, Techcombank..." required />
+                        <datalist id="vietnamBanksList">
+                            <option value="MB Bank (Quân Đội)">
+                            <option value="Vietcombank">
+                            <option value="Techcombank">
+                            <option value="BIDV">
+                            <option value="VietinBank">
+                            <option value="Agribank">
+                            <option value="VPBank">
+                            <option value="ACB">
+                            <option value="TPBank">
+                            <option value="Sacombank">
+                            <option value="VIB">
+                            <option value="MSB">
+                            <option value="SHB">
+                            <option value="OCB">
+                            <option value="Timo">
+                            <option value="Cake by VPBank">
+                        </datalist>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 14px;">
+                    <label class="form-label" for="bankAccountNumber">Số Tài Khoản: <span style="color: #dc2626;">*</span></label>
+                    <input type="text" id="bankAccountNumber" name="bank_account_number" class="form-input" value="<?php echo esc_attr($bank_number); ?>" placeholder="VD: 0987654321..." required />
+                </div>
+
+                <div style="margin-top: 20px; display: flex; align-items: center; gap: 12px;">
+                    <button type="submit" class="btn btn-primary" id="btnSaveBankInfo" style="padding: 10px 24px; font-size: 14px; font-weight: 700;">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu Thông Tin Ngân Hàng
+                    </button>
+                    <span id="bankInfoSaveMsg" style="font-size: 13px; display: none;"></span>
+                </div>
+            </form>
+        </div>
+        <?php endif; ?>
+
         <!-- LỊCH SỬ ĐỌC GẦN ĐÂY -->
         <div class="profile-form-card" style="margin-top: 24px;">
             <div class="form-section-header">

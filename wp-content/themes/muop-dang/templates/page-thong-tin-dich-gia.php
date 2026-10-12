@@ -177,6 +177,27 @@ if (!empty($story_ids)) {
             </div>
         </div>
 
+        <!-- THANH TIỆN ÍCH NẰM TRÊN ẢNH 3: NÚT LỊCH SỬ NHẬN TIỀN & XUẤT THÔNG TIN NGÂN HÀNG (NẾU CÓ) -->
+        <div class="translator-top-action-bar">
+            <!-- Nút Lịch Sử Nhận Tiền & Bill Chuyển Khoản (Ảnh 2 thành 1 button nằm trên Ảnh 3) -->
+            <button type="button" class="btn btn-secondary btn-salary-history-pill" id="btnOpenSalaryHistoryModal">
+                <i class="fa-solid fa-receipt"></i> Lịch Sử Nhận Tiền & Bill Chuyển Khoản (<?php echo count($my_payments); ?> đợt)
+            </button>
+
+            <!-- Xuất thông tin tài khoản ngân hàng đã nhập (Nếu đã có thì xuất lên, nếu không có thì không hiện) -->
+            <?php if (!empty($bank_holder) && !empty($bank_number)) : ?>
+                <div class="translator-bank-info-pill">
+                    <i class="fa-solid fa-building-columns" style="color: var(--primary-green); font-size: 15px;"></i>
+                    <span class="bank-pill-text">
+                        Tài khoản nhận tiền: <strong><?php echo esc_html($bank_holder); ?></strong> • <?php echo esc_html($bank_name); ?> (STK: <strong style="color: var(--primary-green);"><?php echo esc_html($bank_number); ?></strong>)
+                    </span>
+                    <a href="<?php echo esc_url(home_url('/ho-so/#bankAccountSection')); ?>" class="btn-edit-bank-pill" title="Chỉnh sửa thông tin tài khoản trong trang Thông tin">
+                        <i class="fa-solid fa-pen-to-square"></i> Sửa
+                    </a>
+                </div>
+            <?php endif; ?>
+        </div>
+
         <!-- KPI VIEW STATS GRID (HÔM NAY, TUẦN, THÁNG, NĂM) -->
         <div class="kpi-grid">
             <div class="kpi-card">
@@ -212,67 +233,21 @@ if (!empty($story_ids)) {
             </div>
         </div>
 
-        <!-- THÔNG TIN TÀI KHOẢN NGÂN HÀNG & LỊCH SỬ THANH TOÁN KÈM BILL -->
-        <div class="translator-salary-box" id="salaryHistory" style="display: grid; grid-template-columns: 360px 1fr; gap: 20px; margin-top: 24px; margin-bottom: 24px;">
-            <!-- Cột 1: Thông tin tài khoản ngân hàng nhận nhuận bút -->
-            <div class="dash-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm);">
-                <div class="dash-section-header" style="margin-bottom: 12px;">
-                    <h3 class="dash-section-title" style="font-size: 15px; margin: 0; color: var(--primary-green);">
-                        <i class="fa-solid fa-building-columns"></i> Tài Khoản Nhận Nhuận Bút
-                    </h3>
-                </div>
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
-                    Vui lòng điền chính xác tài khoản ngân hàng chính chủ để Admin đối soát và chuyển khoản tiền nhuận bút kèm gửi bill làm bằng chứng.
-                </p>
-                <form id="formTranslatorBankInfo">
-                    <div class="form-group" style="margin-bottom: 12px;">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Tên Chủ Tài Khoản (Họ và tên) <span style="color: #dc2626;">*</span></label>
-                        <input type="text" name="bank_account_holder" class="form-input" value="<?php echo esc_attr($bank_holder); ?>" placeholder="VD: NGUYEN VAN A" required style="text-transform: uppercase;" />
-                    </div>
-                    <div class="form-group" style="margin-bottom: 12px;">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Tên Ngân Hàng <span style="color: #dc2626;">*</span></label>
-                        <input type="text" name="bank_name" class="form-input" list="vietnamBanksList" value="<?php echo esc_attr($bank_name); ?>" placeholder="VD: MB Bank, Vietcombank, Techcombank..." required />
-                        <datalist id="vietnamBanksList">
-                            <option value="MB Bank (Quân Đội)">
-                            <option value="Vietcombank">
-                            <option value="Techcombank">
-                            <option value="BIDV">
-                            <option value="VietinBank">
-                            <option value="Agribank">
-                            <option value="VPBank">
-                            <option value="ACB">
-                            <option value="TPBank">
-                            <option value="Sacombank">
-                            <option value="VIB">
-                            <option value="MSB">
-                            <option value="SHB">
-                            <option value="OCB">
-                            <option value="Timo">
-                            <option value="Cake by VPBank">
-                        </datalist>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 16px;">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Số Tài Khoản <span style="color: #dc2626;">*</span></label>
-                        <input type="text" name="bank_account_number" class="form-input" value="<?php echo esc_attr($bank_number); ?>" placeholder="VD: 0987654321..." required />
-                    </div>
-                    <button type="submit" class="btn btn-primary" id="btnSaveBankInfo" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; font-size: 13px;">
-                        <i class="fa-solid fa-floppy-disk"></i> Lưu Thông Tin Ngân Hàng
-                    </button>
-                    <div id="bankInfoSaveMsg" style="margin-top: 10px; font-size: 12px; display: none;"></div>
-                </form>
-            </div>
-
-            <!-- Cột 2: Lịch sử nhận nhuận bút & Bill chuyển khoản -->
-            <div class="dash-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm);">
-                <div class="dash-section-header" style="margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
-                    <h3 class="dash-section-title" style="font-size: 15px; margin: 0; color: var(--primary-green);">
+        <!-- MODAL POPUP LỊCH SỬ NHẬN TIỀN & BILL CHUYỂN KHOẢN (ẢNH 2 - MỞ KHI BẤM NÚT NẰM TRÊN ẢNH 3) -->
+        <div class="modal-backdrop" id="modalSalaryHistory" style="display: none;" aria-hidden="true">
+            <div class="modal-content" style="max-width: 760px; width: 100%; padding: 22px; border-radius: var(--radius-lg);">
+                <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                    <h3 style="font-size: 16.5px; font-weight: 700; color: var(--primary-green); margin: 0; display: flex; align-items: center; gap: 8px;">
                         <i class="fa-solid fa-receipt"></i> Lịch Sử Nhận Tiền & Bill Chuyển Khoản
+                        <span class="count-badge" style="font-size: 12.5px; font-weight: 600;">(<?php echo count($my_payments); ?> đợt)</span>
                     </h3>
-                    <span class="count-badge">(<?php echo count($my_payments); ?> đợt)</span>
+                    <button type="button" class="btn-close-modal" id="btnCloseSalaryHistoryModal" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted);" aria-label="Đóng">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
 
                 <?php if (!empty($my_payments)) : ?>
-                    <div class="table-responsive">
+                    <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
                         <table class="data-table" style="font-size: 13px;">
                             <thead>
                                 <tr>
@@ -309,11 +284,20 @@ if (!empty($story_ids)) {
                         </table>
                     </div>
                 <?php else : ?>
-                    <div style="text-align: center; padding: 40px 20px; background: var(--pastel-green); border-radius: var(--radius-sm); color: var(--text-muted);">
-                        <i class="fa-solid fa-money-check-dollar" style="font-size: 32px; color: var(--avocado-green); margin-bottom: 8px;"></i>
-                        <p style="margin: 0; font-size: 13px;">Chưa có lượt thanh toán nào. Admin sẽ chuyển tiền và gửi bill đính kèm vào cuối mỗi chu kỳ đối soát!</p>
+                    <!-- ĐÚNG GIAO DIỆN Ở ẢNH 2 KHI CHƯA CÓ LƯỢT THANH TOÁN NÀO -->
+                    <div style="text-align: center; padding: 40px 20px; background: var(--pastel-green); border-radius: var(--radius-sm); color: var(--text-muted); margin: 10px 0;">
+                        <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 32px; background: #689f38; color: #fff; border-radius: 4px; font-size: 18px; font-weight: 800; margin-bottom: 12px;">
+                            $=
+                        </div>
+                        <p style="margin: 0; font-size: 13.5px; color: #374151;">Chưa có lượt thanh toán nào. Admin sẽ chuyển tiền và gửi bill đính kèm vào cuối mỗi chu kỳ đối soát!</p>
                     </div>
                 <?php endif; ?>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 18px;">
+                    <button type="button" class="btn btn-secondary" id="btnDismissSalaryHistoryModal" style="padding: 7px 18px; font-size: 13px;">
+                        Đóng
+                    </button>
+                </div>
             </div>
         </div>
 

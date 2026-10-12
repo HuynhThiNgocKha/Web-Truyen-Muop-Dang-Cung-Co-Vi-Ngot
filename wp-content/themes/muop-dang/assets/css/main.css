@@ -6486,3 +6486,92 @@ img {
   animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Thanh tiện ích trên kpi-grid (Ảnh 3) trong Kênh Dịch Giả */
+.translator-top-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.btn-salary-history-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--primary-green) !important;
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-salary-history-pill:hover {
+  background: var(--pastel-green);
+  border-color: var(--primary-green);
+  transform: translateY(-1px);
+}
+
+.translator-bank-info-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pastel-green);
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--text-main);
+  box-shadow: var(--shadow-sm);
+}
+
+.bank-pill-text {
+  line-height: 1.4;
+}
+
+.btn-edit-bank-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-green);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  margin-left: 6px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-edit-bank-pill:hover {
+  background: var(--primary-green);
+  color: #fff;
+  border-color: var(--primary-green);
+}
+
+@media (max-width: 768px) {
+  .translator-top-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .btn-salary-history-pill {
+    justify-content: center;
+    width: 100%;
+  }
+  .translator-bank-info-pill {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: space-between;
+  }
+}
+
+
