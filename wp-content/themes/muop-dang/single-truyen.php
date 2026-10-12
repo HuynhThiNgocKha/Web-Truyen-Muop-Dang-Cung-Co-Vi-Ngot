@@ -235,9 +235,12 @@ if (!$thumb_url) {
                             $chap_time_ago = get_the_time('d/m/Y', $chap->ID);
                         }
                     ?>
-                        <div class="chapter-item-row">
+                        <div class="chapter-item-row" id="chapterRow-<?php echo $chap->ID; ?>">
                             <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
-                                <span class="chapter-item-title"><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
+                                <span class="chapter-item-title">
+                                    <i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i>
+                                    <span class="chap-title-text"><?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
+                                </span>
                                 <span class="chapter-item-meta">
                                     <?php if ($can_manage_story) : ?>
                                         <span class="chapter-item-views" title="Lượt xem chương (Admin & Dịch giả)">
@@ -248,9 +251,19 @@ if (!$thumb_url) {
                                 </span>
                             </a>
                             <?php if ($can_manage_story) : ?>
-                                <button type="button" class="btn-edit-chapter-direct" data-story-id="<?php echo $story_id; ?>" data-chapter-id="<?php echo $chap->ID; ?>" title="Chỉnh sửa nội dung chương này (Admin & Dịch giả)">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
+                                <div class="chapter-actions-dropdown">
+                                    <button type="button" class="btn-chapter-dropdown-trigger" data-story-id="<?php echo $story_id; ?>" data-chapter-id="<?php echo $chap->ID; ?>" data-chapter-num="<?php echo esc_attr($chap_num); ?>" data-chapter-title="<?php echo esc_attr(muop_get_clean_chapter_title($chap->post_title)); ?>" title="Tùy chọn chương (Admin & Dịch giả)">
+                                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                                    </button>
+                                    <div class="chapter-dropdown-menu">
+                                        <button type="button" class="chapter-dropdown-item btn-trigger-edit-chapter" data-story-id="<?php echo $story_id; ?>" data-chapter-id="<?php echo $chap->ID; ?>" data-chapter-num="<?php echo esc_attr($chap_num); ?>" data-chapter-title="<?php echo esc_attr(muop_get_clean_chapter_title($chap->post_title)); ?>">
+                                            <i class="fa-solid fa-pen-to-square"></i> Chỉnh sửa chương
+                                        </button>
+                                        <button type="button" class="chapter-dropdown-item item-danger btn-trigger-delete-chapter" data-story-id="<?php echo $story_id; ?>" data-chapter-id="<?php echo $chap->ID; ?>" data-chapter-num="<?php echo esc_attr($chap_num); ?>" data-chapter-title="<?php echo esc_attr(muop_get_clean_chapter_title($chap->post_title)); ?>">
+                                            <i class="fa-solid fa-trash-can"></i> Xóa chương
+                                        </button>
+                                    </div>
+                                </div>
                             <?php endif; ?>
                         </div>
                     <?php endforeach; ?>

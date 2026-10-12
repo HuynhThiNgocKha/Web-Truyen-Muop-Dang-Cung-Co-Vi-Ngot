@@ -2809,6 +2809,16 @@
               const data = res.data;
               const statusLabel = (data.post_status === 'draft') ? ' (Bản nháp)' : '';
               $(`#selectEditChapter option[value="${data.chapter_id}"]`).text(`Chương ${data.chapter_number}: ${data.chapter_title}${statusLabel}`);
+
+              // Cập nhật ngay tên chương trên danh sách ngoài giao diện
+              const $row = $(`#chapterRow-${data.chapter_id}`);
+              if ($row.length) {
+                $row.find('.chap-title-text').text(data.chapter_title);
+                $row.find('.btn-chapter-dropdown-trigger').data('chapter-title', data.chapter_title).data('chapter-num', data.chapter_number);
+                $row.find('.btn-trigger-edit-chapter').data('chapter-title', data.chapter_title).data('chapter-num', data.chapter_number);
+                $row.find('.btn-trigger-delete-chapter').data('chapter-title', data.chapter_title).data('chapter-num', data.chapter_number);
+              }
+
               setTimeout(() => {
                 $alert.fadeOut(300);
               }, 2500);
@@ -2825,34 +2835,75 @@
         });
       });
 
-      // 11. Cây bút ở từng chương (Popup 2: Chỉnh Sửa Nội Dung Chương Truyện)
-      $(document).on('click', '.btn-edit-chapter-direct', function(e) {
+      // 11.a. Menu 3 chấm dọc ở từng chương: Mở/Đóng Dropdown menu
+      $(document).on('click', '.btn-chapter-dropdown-trigger', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        const $dropdown = $(this).closest('.chapter-actions-dropdown');
+        const isOpen = $dropdown.hasClass('is-open');
+
+        // Đóng các dropdown khác đang mở
+        $('.chapter-actions-dropdown').not($dropdown).removeClass('is-open').find('.chapter-dropdown-menu').removeClass('is-show');
+
+        if (isOpen) {
+          $dropdown.removeClass('is-open');
+          $dropdown.find('.chapter-dropdown-menu').removeClass('is-show');
+        } else {
+          $dropdown.addClass('is-open');
+          $dropdown.find('.chapter-dropdown-menu').addClass('is-show');
+        }
+      });
+
+      // Đóng dropdown khi click ra ngoài
+      $(document).on('click', function(e) {
+        if (!$(e.target).closest('.chapter-actions-dropdown').length) {
+          $('.chapter-actions-dropdown').removeClass('is-open');
+          $('.chapter-dropdown-menu').removeClass('is-show');
+        }
+      });
+
+      // 11.b. Khi nhấn "Chỉnh sửa chương" từ menu 3 chấm: Mở popup và tự động nạp thẳng nội dung chương, không cần chọn lại chương
+      $(document).on('click', '.btn-trigger-edit-chapter', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Đóng dropdown menu
+        $('.chapter-actions-dropdown').removeClass('is-open');
+        $('.chapter-dropdown-menu').removeClass('is-show');
+
         const storyId = $(this).data('story-id');
         const chapterId = $(this).data('chapter-id');
-        if (!storyId || !chapterId) return;
+        const chapterNum = $(this).data('chapter-num');
+        const chapterTitle = $(this).data('chapter-title') || '';
+
+        if (!chapterId) return;
 
         const $modal = $('#modalEditChapterContent');
         if (!$modal.length) return;
 
+        // Reset cảnh báo và ẩn hẳn phần chọn chương (vì đã biết rõ chương cần sửa)
         $('#editChapterAlert').hide();
-        $('#editChapterId').val('');
-        $('#selectEditChapter').empty().append('<option value="">-- Đang nạp danh sách chương... --</option>');
-        $('#formEditChapterFields').hide();
+        $('#wrapperSelectEditChapter').hide();
         $('#editNoChaptersMsg').hide();
-        $('#modalChapterStoryTitleText').text('Đang tải dữ liệu...');
+        $('#formEditChapterFields').hide();
+
+        // Đặt tiêu đề modal: Chương [số]: [tiêu đề]
+        const displayTitle = chapterTitle ? `Chương ${chapterNum}: ${chapterTitle}` : `Chương ${chapterNum}`;
+        $('#modalChapterStoryTitleText').text(displayTitle);
 
         $modal.css('display', 'flex');
 
-        // Nạp danh sách chương của bộ truyện
+        // Hiển thị trạng thái đang nạp nội dung
+        $('#editChapterAlert').html('<i class="fa-solid fa-spinner fa-spin"></i> Đang nạp nội dung chương...').removeClass('alert-error alert-success').addClass('alert-info').show();
+
+        // Nạp trực tiếp dữ liệu của chương này
         $.ajax({
           url: muopConfig.ajaxUrl,
           type: 'POST',
           data: {
-            action: 'muop_get_story_data',
-            nonce: muopConfig.nonce,
-            story_id: storyId
+            action: 'muop_get_chapter_data',
+            chapter_id: chapterId,
+            nonce: muopConfig.nonce
           },
           success: (res) => {
             if (typeof res === 'string') {
@@ -2860,34 +2911,134 @@
             }
             if (res && res.success && res.data) {
               const data = res.data;
-              $('#modalChapterStoryTitleText').text(data.title);
+              $('#editChapterAlert').hide();
+              $('#editChapterId').val(data.id);
+              $('#editChapterNumber').val(data.chapter_number);
+              $('#editChapterTitle').val(data.title);
+              $('#editChapterContent').val(data.content);
+              $('#editChapterIsDraftInput').val(data.status === 'draft' ? '1' : '0');
 
-              const $select = $('#selectEditChapter');
-              $select.empty();
-              if (data.chapters && data.chapters.length) {
-                $select.append('<option value="">-- Chọn một chương để xem & chỉnh sửa --</option>');
-                data.chapters.forEach(ch => {
-                  const statusLabel = (ch.status === 'draft') ? ' (Bản nháp)' : '';
-                  $select.append(`<option value="${ch.id}">Chương ${ch.number}: ${ch.title}${statusLabel}</option>`);
-                });
-                $('#editNoChaptersMsg').hide();
-
-                // Tự động chọn đúng chương vừa click và nạp nội dung ngay
-                $select.val(chapterId).trigger('change');
+              if (data.status === 'draft') {
+                $('#btnSaveDraftChapterAction').html('<i class="fa-solid fa-file-pen"></i> Tiếp Tục Lưu Nháp');
+                $('#btnUpdateChapterAction').html('<i class="fa-solid fa-cloud-arrow-up"></i> Xuất Bản (Đăng Ngay)');
               } else {
-                $select.append('<option value="">-- Bộ truyện chưa có chương nào --</option>');
-                $('#editNoChaptersMsg').show();
+                $('#btnSaveDraftChapterAction').html('<i class="fa-solid fa-file-pen"></i> Chuyển Về Bản Nháp');
+                $('#btnUpdateChapterAction').html('<i class="fa-solid fa-check"></i> Cập Nhật Chương');
               }
+
+              $('#formEditChapterFields').fadeIn(200);
             } else {
-              alert(getAjaxMsg(res, 'Không thể tải danh sách chương!'));
-              $modal.hide();
+              const msg = (res && res.data && res.data.message) || 'Không thể tải nội dung chương!';
+              $('#editChapterAlert').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).removeClass('alert-info').addClass('alert-error').show();
             }
           },
           error: (xhr) => {
-            let err = 'Lỗi kết nối khi tải danh sách chương!';
-            if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
-            alert(err);
-            $modal.hide();
+            let msg = 'Lỗi kết nối khi tải nội dung chương!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $('#editChapterAlert').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).removeClass('alert-info').addClass('alert-error').show();
+          }
+        });
+      });
+
+      // 11.c. Khi nhấn "Xóa chương" từ menu 3 chấm: Mở popup xác nhận xóa chương
+      $(document).on('click', '.btn-trigger-delete-chapter', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Đóng dropdown menu
+        $('.chapter-actions-dropdown').removeClass('is-open');
+        $('.chapter-dropdown-menu').removeClass('is-show');
+
+        const storyId = $(this).data('story-id');
+        const chapterId = $(this).data('chapter-id');
+        const chapterNum = $(this).data('chapter-num');
+        const chapterTitle = $(this).data('chapter-title') || '';
+
+        if (!chapterId) return;
+
+        const $modal = $('#modalDeleteChapterConfirm');
+        if (!$modal.length) return;
+
+        $modal.data('chapter-id', chapterId).data('story-id', storyId);
+        const nameText = chapterTitle ? `Chương ${chapterNum}: "${chapterTitle}"` : `Chương ${chapterNum}`;
+        $('#deleteChapterLabelName').text(nameText);
+        $('#deleteChapterAlert').hide();
+        $('#btnConfirmDeleteChapter').prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa Chương');
+
+        $modal.css('display', 'flex');
+      });
+
+      // Đóng modal xóa chương
+      $(document).on('click', '.btn-cancel-delete-chapter', function(e) {
+        e.preventDefault();
+        $('#modalDeleteChapterConfirm').hide();
+      });
+
+      $('#modalDeleteChapterConfirm').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Xác nhận thực hiện xóa chương qua AJAX
+      $('#btnConfirmDeleteChapter').on('click', function(e) {
+        e.preventDefault();
+        const $modal = $('#modalDeleteChapterConfirm');
+        const chapterId = $modal.data('chapter-id');
+        const storyId = $modal.data('story-id');
+        const $btn = $(this);
+
+        if (!chapterId) return;
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang xóa...');
+        $('#deleteChapterAlert').hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_delete_chapter',
+            chapter_id: chapterId,
+            nonce: muopConfig.nonce
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $modal.hide();
+
+              // Xóa hàng chương khỏi giao diện danh sách chương với hiệu ứng trượt mượt mà
+              const $row = $(`#chapterRow-${chapterId}`);
+              $row.slideUp(250, function() {
+                $(this).remove();
+
+                const remaining = (res.data && typeof res.data.remaining_chapters !== 'undefined')
+                  ? res.data.remaining_chapters
+                  : $('.chapter-item-row').length;
+
+                $('.chapter-list-header .section-title').html(`<i class="fa-solid fa-list-ol"></i> Danh Sách Chương (${remaining})`);
+
+                if (remaining === 0) {
+                  $('.chapter-grid').replaceWith(`
+                    <div style="text-align: center; padding: 30px; background: var(--pastel-green); border-radius: var(--radius-md); color: var(--text-muted);">
+                      <i class="fa-regular fa-folder-open" style="font-size: 32px; color: var(--avocado-green); margin-bottom: 8px;"></i>
+                      <p>Truyện đang được cập nhật chương mới. Vui lòng quay lại sau nha!</p>
+                    </div>
+                  `);
+                }
+              });
+            } else {
+              $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa Chương');
+              const msg = (res && res.data && res.data.message) || 'Lỗi xóa chương. Vui lòng thử lại!';
+              $('#deleteChapterAlert').text(msg).show();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa Chương');
+            let msg = 'Lỗi kết nối máy chủ khi xóa chương!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $('#deleteChapterAlert').text(msg).show();
           }
         });
       });

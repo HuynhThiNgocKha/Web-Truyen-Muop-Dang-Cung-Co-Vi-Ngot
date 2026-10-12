@@ -147,7 +147,7 @@ if (is_wp_error($all_genres)) $all_genres = array();
         <div style="padding: 20px; overflow-y: auto; flex: 1;">
             <div id="editChapterAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
 
-            <div style="background: var(--pastel-green); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 16px;">
+            <div id="wrapperSelectEditChapter" style="background: var(--pastel-green); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 16px;">
                 <label class="form-label" for="selectEditChapter" style="margin-bottom: 6px; font-weight: 700;">
                     <i class="fa-solid fa-list-ol"></i> Chọn Chương Cần Chỉnh Sửa:
                 </label>
@@ -204,3 +204,37 @@ if (is_wp_error($all_genres)) $all_genres = array();
         </div>
     </div>
 </div>
+
+<!-- ==========================================================================
+     POPUP XÁC NHẬN XÓA CHƯƠNG TRUYỆN
+     ========================================================================== -->
+<div id="modalDeleteChapterConfirm" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 440px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 2px solid #fecaca; overflow: hidden; animation: slideUp 0.25s ease;">
+        <div style="padding: 24px; text-align: center;">
+            <div style="width: 58px; height: 58px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px;">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 style="font-size: 18px; font-weight: 800; color: #991b1b; margin-bottom: 8px;">
+                Xác Nhận Xóa Chương?
+            </h3>
+            <p style="font-size: 14px; color: var(--text-main); margin-bottom: 6px; line-height: 1.5;">
+                Bạn có chắc chắn muốn xóa <strong id="deleteChapterLabelName" style="color: #dc2626;">Chương này</strong> không?
+            </p>
+            <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.4;">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i> Hành động này sẽ xóa vĩnh viễn nội dung chương và không thể hoàn tác!
+            </p>
+
+            <div id="deleteChapterAlert" class="alert-box alert-error" style="display: none; margin-bottom: 14px; text-align: left; font-size: 13px;"></div>
+
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button type="button" class="btn btn-secondary btn-cancel-delete-chapter" style="padding: 9px 20px; font-size: 13.5px; border-radius: var(--radius-full);">
+                    Hủy Bỏ
+                </button>
+                <button type="button" id="btnConfirmDeleteChapter" class="btn btn-danger" style="background: #dc2626; border-color: #dc2626; color: #fff; padding: 9px 22px; font-size: 13.5px; border-radius: var(--radius-full); font-weight: 700; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);">
+                    <i class="fa-solid fa-trash-can"></i> Xóa Chương
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+

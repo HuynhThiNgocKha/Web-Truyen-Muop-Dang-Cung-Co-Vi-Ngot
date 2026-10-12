@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.6');
+define('MUOP_THEME_VERSION', '2.2.7');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -1804,6 +1804,53 @@ function muop_ajax_update_chapter_handler() {
         'chapter_title'  => $clean_title,
         'post_status'    => $post_status,
         'updated'        => $story_id ? muop_get_story_last_updated($story_id) : null
+    ));
+}
+
+// 19.b. AJAX: Delete Chapter (Xóa chương truyện - chỉ Admin hoặc chính Dịch giả của truyện)
+add_action('wp_ajax_muop_delete_chapter', 'muop_ajax_delete_chapter_handler');
+function muop_ajax_delete_chapter_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập!'));
+    }
+
+    $chapter_id = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
+    $chapter = get_post($chapter_id);
+    if (!$chapter || $chapter->post_type !== 'chuong') {
+        wp_send_json_error(array('message' => 'Chương không tồn tại hoặc đã bị xóa!'));
+    }
+
+    $story_id = get_post_meta($chapter->ID, '_chuong_truyen_id', true);
+    $story = get_post($story_id);
+    $current_user_id = get_current_user_id();
+
+    // Kiểm tra quyền: Phải là Admin hoặc chính Dịch giả của chương/truyện
+    if (!current_user_can('administrator') && !current_user_can('dich_gia') && 
+        ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền xóa chương này!'));
+    }
+
+    // Xóa vĩnh viễn chương
+    $res = wp_delete_post($chapter_id, true);
+    if (!$res) {
+        wp_send_json_error(array('message' => 'Không thể xóa chương. Vui lòng thử lại!'));
+    }
+
+    // Cập nhật modified time của truyện
+    if ($story_id) {
+        wp_update_post(array('ID' => $story_id));
+    }
+
+    $remaining_chapters = $story_id ? count(muop_get_story_chapters($story_id)) : 0;
+
+    wp_send_json_success(array(
+        'message'            => 'Đã xóa chương thành công!',
+        'chapter_id'         => $chapter_id,
+        'story_id'           => $story_id,
+        'remaining_chapters' => $remaining_chapters
     ));
 }
 
