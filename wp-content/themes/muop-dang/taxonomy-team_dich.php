@@ -379,7 +379,147 @@ if (is_user_logged_in() && $team_id > 0) {
 </div>
 
 <?php if ($can_edit_team) : ?>
-<!-- MODAL CHỈNH SỬA THÔNG TIN TEAM DỊCH -->
+<!-- 1. MODAL RIÊNG: THAY ĐỔI ẢNH ĐẠI DIỆN TEAM -->
+<div id="modalEditSingleTeamAvatar" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 480px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+        <div class="modal-header-top-box">
+            <div class="modal-title-stacked">
+                <span class="modal-action-label">
+                    <i class="fa-solid fa-camera"></i> Chỉnh Sửa
+                </span>
+                <h3 class="modal-story-title-sub">Thay Đổi Ảnh Đại Diện Team</h3>
+            </div>
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <div id="editSingleAvatarAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+            <form id="formEditSingleTeamAvatar" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="muop_update_team_info" />
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+                <input type="file" name="team_avatar_file" id="inputSingleAvatarFile" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+
+                <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+                    <div class="avatar-preview-circle" style="width: 76px; height: 76px; border-radius: 50%; border: 3px solid #ffffff; overflow: hidden; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 12px rgba(63, 117, 35, 0.3);">
+                        <?php if (!empty($team_avatar_url)) : ?>
+                            <img id="singleAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                            <span id="singleAvatarPreviewChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
+                        <?php else : ?>
+                            <span id="singleAvatarPreviewChar"><?php echo esc_html($avatar_initial); ?></span>
+                            <img id="singleAvatarPreviewImg" src="" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+                        <?php endif; ?>
+                    </div>
+
+                    <div style="flex: 1; min-width: 0;">
+                        <button type="button" id="btnTriggerSingleAvatarUpload" class="btn btn-secondary" style="padding: 8px 14px; font-size: 13px; margin-bottom: 6px;">
+                            <i class="fa-solid fa-upload"></i> Tải ảnh từ thiết bị
+                        </button>
+                        <div id="singleAvatarFileName" style="font-size: 12px; color: var(--text-muted); word-break: break-all;">Chưa chọn tệp (Hỗ trợ JPG, PNG, WEBP)</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 18px;">
+                    <label for="inputSingleAvatarUrl" class="form-label" style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px;">Hoặc dán đường dẫn (URL) ảnh avatar online:</label>
+                    <input type="url" id="inputSingleAvatarUrl" name="team_avatar_url" class="form-input" style="height: 38px; font-size: 13px;" placeholder="https://example.com/avatar-team.jpg" value="<?php echo esc_attr($team_avatar_url); ?>" />
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+                    <button type="submit" id="btnSubmitSingleAvatar" class="btn btn-primary" style="padding: 8px 22px;">
+                        <i class="fa-solid fa-check"></i> Cập Nhật Ảnh
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 2. MODAL RIÊNG: ĐỔI TÊN TEAM DỊCH -->
+<div id="modalEditSingleTeamName" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 480px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column;">
+        <div class="modal-header-top-box">
+            <div class="modal-title-stacked">
+                <span class="modal-action-label">
+                    <i class="fa-solid fa-pen-to-square"></i> Chỉnh Sửa
+                </span>
+                <h3 class="modal-story-title-sub">Đổi Tên Team Dịch</h3>
+            </div>
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div style="padding: 20px;">
+            <div id="editSingleNameAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+            <form id="formEditSingleTeamName">
+                <input type="hidden" name="action" value="muop_update_team_info" />
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" for="inputSingleTeamName" style="font-weight: 700; margin-bottom: 6px; display: block;">Tên Team Dịch Mới (*)</label>
+                    <input type="text" id="inputSingleTeamName" name="team_name" class="form-input" style="height: 42px; font-size: 14px;" required value="<?php echo esc_attr($team_name); ?>" placeholder="Nhập tên team dịch mới..." />
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 0 0;">
+                        Lưu ý: Hệ thống sẽ tự động cập nhật tên team ở tất cả các tác phẩm của team.
+                    </p>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+                    <button type="submit" id="btnSubmitSingleName" class="btn btn-primary" style="padding: 8px 22px;">
+                        <i class="fa-solid fa-check"></i> Cập Nhật Tên Team
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 3. MODAL RIÊNG: ĐỔI LỜI GIỚI THIỆU (BIO) -->
+<div id="modalEditSingleTeamBio" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 500px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column;">
+        <div class="modal-header-top-box">
+            <div class="modal-title-stacked">
+                <span class="modal-action-label">
+                    <i class="fa-solid fa-align-left"></i> Chỉnh Sửa
+                </span>
+                <h3 class="modal-story-title-sub">Đổi Lời Giới Thiệu Team</h3>
+            </div>
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div style="padding: 20px;">
+            <div id="editSingleBioAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+            <form id="formEditSingleTeamBio">
+                <input type="hidden" name="action" value="muop_update_team_info" />
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" for="inputSingleTeamBio" style="font-weight: 700; margin-bottom: 6px; display: block;">Lời Giới Thiệu / Bio Team</label>
+                    <textarea id="inputSingleTeamBio" name="team_bio" class="form-input" rows="4" style="font-size: 13.5px; line-height: 1.5; resize: vertical;" placeholder="Nhập lời chào mừng hoặc giới thiệu về team dịch..."><?php echo esc_textarea($team_bio); ?></textarea>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+                    <button type="submit" id="btnSubmitSingleBio" class="btn btn-primary" style="padding: 8px 22px;">
+                        <i class="fa-solid fa-check"></i> Cập Nhật Lời Giới Thiệu
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 4. MODAL CHUNG: QUẢN LÝ TẤT CẢ THÔNG TIN TEAM DỊCH -->
 <div id="modalEditTeamInfo" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
     <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 560px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
         
