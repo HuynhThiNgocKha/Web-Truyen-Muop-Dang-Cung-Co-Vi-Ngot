@@ -96,7 +96,7 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 <button type="button" class="font-size-btn btn-reading-settings-trigger" id="btnOpenReadingSettingsTop" title="Tùy chỉnh font chữ & màu sắc">
                     <i class="fa-solid fa-palette"></i>
                 </button>
-                <button type="button" class="font-size-btn btn-report-chapter-trigger" id="btnOpenReportChapterModal" title="Báo lỗi chương này">
+                <button type="button" class="font-size-btn btn-report-chapter-trigger" id="btnOpenReportChapterModal" data-logged-in="<?php echo is_user_logged_in() ? '1' : '0'; ?>" title="Báo lỗi chương này">
                     <i class="fa-solid fa-flag"></i> Báo lỗi
                 </button>
             </div>

@@ -6574,4 +6574,213 @@ img {
   }
 }
 
+/* ==========================================================
+   20. MODAL ĐỐI THOẠI & PHẢN HỒI BÁO LỖI CHƯƠNG (DIALOGUE THREAD)
+   ========================================================== */
+.report-dialogue-modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rep-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.rep-status-badge.badge-pending {
+  background: rgba(234, 88, 12, 0.12);
+  color: #ea580c;
+  border: 1px solid rgba(234, 88, 12, 0.3);
+}
+
+.rep-status-badge.badge-processing {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.3);
+}
+
+.rep-status-badge.badge-resolved {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+}
+
+.rep-status-badge.badge-rejected {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748b;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.rep-role-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 12px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.rep-role-tag.role-admin {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+.rep-role-tag.role-dich-gia {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+.rep-role-tag.role-doc-gia {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+.rep-issue-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(234, 88, 12, 0.09);
+  color: #c2410c;
+  border: 1px solid rgba(234, 88, 12, 0.25);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+/* Chat thread */
+.rep-thread-container {
+  margin-top: 4px;
+}
+
+#repDlgMessagesList {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+#repDlgMessagesList::-webkit-scrollbar {
+  width: 6px;
+}
+
+#repDlgMessagesList::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.rep-empty-thread {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  background: var(--bg-body);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+}
+
+.rep-msg-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+
+.rep-msg-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+}
+
+.rep-msg-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pastel-green);
+  color: var(--primary-green);
+  font-size: 14px;
+}
+
+.rep-msg-bubble {
+  background: var(--bg-body);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+  padding: 10px 14px;
+  max-width: 85%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rep-msg-item.is-me {
+  flex-direction: row-reverse;
+}
+
+.rep-msg-item.is-me .rep-msg-bubble {
+  background: rgba(46, 125, 50, 0.08);
+  border-color: rgba(46, 125, 50, 0.2);
+  border-radius: 12px;
+  border-top-right-radius: 4px;
+}
+
+.rep-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.rep-msg-item.is-me .rep-msg-meta {
+  flex-direction: row-reverse;
+}
+
+.rep-msg-author {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 12.5px;
+}
+
+.rep-msg-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.rep-msg-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  .report-dialogue-modal-content {
+    width: 96%;
+    max-height: 94vh;
+  }
+  .rep-msg-bubble {
+    max-width: 90%;
+    padding: 8px 12px;
+  }
+  .rep-msg-avatar {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+
 

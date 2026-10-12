@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.23');
+define('MUOP_THEME_VERSION', '2.2.24');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -2611,12 +2611,18 @@ function muop_ajax_get_notifications_handler() {
                 break;
         }
 
+        $report_id = 0;
+        if (!empty($n->link) && preg_match('/#report-(\d+)/', $n->link, $matches)) {
+            $report_id = intval($matches[1]);
+        }
+
         $items[] = array(
             'id'         => (int) $n->id,
             'type'       => $n->type,
             'title'      => esc_html($n->title),
             'message'    => esc_html($n->message),
-            'link'       => esc_url($n->link),
+            'link'       => $n->link,
+            'report_id'  => $report_id,
             'image'      => esc_url($n->image),
             'is_read'    => (int) $n->is_read,
             'time_ago'   => muop_time_ago($n->created_at),
@@ -2655,13 +2661,16 @@ function muop_ajax_mark_all_notifs_read_handler() {
     wp_send_json_success(array('unread_count' => 0));
 }
 
-// AJAX: Gửi báo lỗi chương truyện
+// AJAX: Gửi báo lỗi chương truyện (Yêu cầu đăng nhập)
 add_action('wp_ajax_muop_submit_chapter_report', 'muop_ajax_submit_chapter_report_handler');
-add_action('wp_ajax_nopriv_muop_submit_chapter_report', 'muop_ajax_submit_chapter_report_handler');
 function muop_ajax_submit_chapter_report_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Bạn cần đăng nhập tài khoản để báo lỗi chương truyện!'));
+    }
+
     global $wpdb;
     $story_id    = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
     $chapter_id  = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
@@ -2680,8 +2689,8 @@ function muop_ajax_submit_chapter_report_handler() {
     }
 
     $user_id = get_current_user_id();
-    $user_obj = $user_id ? get_userdata($user_id) : null;
-    $sender_name = $user_obj ? $user_obj->display_name : 'Một độc giả ẩn danh';
+    $user_obj = get_userdata($user_id);
+    $sender_name = $user_obj ? $user_obj->display_name : 'Một độc giả';
 
     $table_reports = $wpdb->prefix . 'muop_chapter_reports';
     $inserted = $wpdb->insert($table_reports, array(
@@ -2700,33 +2709,318 @@ function muop_ajax_submit_chapter_report_handler() {
     if (!$inserted) {
         wp_send_json_error(array('message' => 'Không thể gửi báo lỗi lúc này. Vui lòng thử lại sau!'));
     }
+    $inserted_id = $wpdb->insert_id;
 
-    // 1. Thông báo cho Admin
-    $admins = get_users(array('role' => 'administrator'));
-    foreach ($admins as $adm) {
-        muop_add_notification(array(
-            'user_id'   => $adm->ID,
-            'sender_id' => $user_id,
-            'type'      => 'chapter_report',
-            'title'     => 'Báo lỗi chương: ' . $story->post_title,
-            'message'   => $sender_name . ' báo lỗi Chương ' . $chapter_num . ' (' . $issue_type . '): "' . wp_trim_words($description, 12) . '"',
-            'link'      => home_url('/quan-ly-admin/#admTabReports')
-        ));
+    // Gộp danh sách người nhận DUY NHẤT để Admin / Dịch giả chỉ nhận đúng 1 thông báo
+    $recipient_ids = array();
+    $admins = get_users(array('role' => 'administrator', 'fields' => 'ID'));
+    if (!empty($admins)) {
+        foreach ($admins as $adm_id) {
+            $recipient_ids[] = (int) $adm_id;
+        }
     }
+    if ($story->post_author) {
+        $recipient_ids[] = (int) $story->post_author;
+    }
+    $recipient_ids = array_unique(array_filter($recipient_ids));
+    $recipient_ids = array_diff($recipient_ids, array($user_id));
 
-    // 2. Thông báo cho Dịch giả của truyện
-    if ($story->post_author && (int) $story->post_author !== (int) $user_id) {
+    foreach ($recipient_ids as $target_uid) {
         muop_add_notification(array(
-            'user_id'   => (int) $story->post_author,
+            'user_id'   => $target_uid,
             'sender_id' => $user_id,
             'type'      => 'chapter_report',
             'title'     => 'Báo lỗi Chương ' . $chapter_num . ' - ' . $story->post_title,
-            'message'   => 'Độc giả vừa báo lỗi (' . $issue_type . '): "' . wp_trim_words($description, 12) . '"',
-            'link'      => get_permalink($chapter_id)
+            'message'   => $sender_name . ' báo lỗi (' . $issue_type . '): "' . wp_trim_words($description, 14) . '"',
+            'link'      => '#report-' . $inserted_id
         ));
     }
 
-    wp_send_json_success(array('message' => 'Cảm ơn bạn đã báo lỗi! Ban quản trị và dịch giả sẽ kiểm tra và khắc phục sớm nhất.'));
+    wp_send_json_success(array(
+        'message'   => 'Cảm ơn bạn đã báo lỗi! Ban quản trị và dịch giả đã nhận được thông tin và sẽ phản hồi sớm nhất.',
+        'report_id' => $inserted_id
+    ));
+}
+
+// AJAX: Lấy chi tiết báo lỗi chương (kèm lịch sử hội thoại đối thoại)
+add_action('wp_ajax_muop_get_report_details', 'muop_ajax_get_report_details_handler');
+function muop_ajax_get_report_details_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để xem chi tiết báo lỗi.'));
+    }
+
+    global $wpdb;
+    $report_id = isset($_POST['report_id']) ? intval($_POST['report_id']) : 0;
+    if (!$report_id) {
+        wp_send_json_error(array('message' => 'Thiếu ID báo lỗi.'));
+    }
+
+    $table_reports = $wpdb->prefix . 'muop_chapter_reports';
+    $report = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_reports WHERE id = %d", $report_id));
+    if (!$report) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thông tin báo lỗi này.'));
+    }
+
+    $current_uid = get_current_user_id();
+    $is_admin = current_user_can('administrator');
+    $story = get_post($report->story_id);
+    $is_author = ($story && (int) $story->post_author === $current_uid);
+    $is_reporter = ((int) $report->user_id === $current_uid);
+
+    // Quyền truy cập: Chỉ Admin, Dịch giả của truyện, hoặc chính Người gửi báo lỗi mới được xem
+    if (!$is_admin && !$is_author && !$is_reporter) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền truy cập vào nội dung báo lỗi này!'));
+    }
+
+    $chapter = get_post($report->chapter_id);
+    $sender = $report->user_id ? get_userdata($report->user_id) : null;
+    $sender_name = $sender ? $sender->display_name : 'Độc giả';
+    $sender_avatar = $report->user_id ? get_avatar_url($report->user_id, array('size' => 64)) : '';
+    
+    // Vai trò người gửi ban đầu
+    $sender_role = 'doc_gia';
+    $sender_role_label = 'Độc giả';
+    if ($sender) {
+        if (in_array('administrator', (array) $sender->roles, true)) {
+            $sender_role = 'admin';
+            $sender_role_label = 'Ban Quản Trị';
+        } elseif (in_array('dich_gia', (array) $sender->roles, true)) {
+            $sender_role = 'dich_gia';
+            $sender_role_label = 'Dịch Giả';
+        }
+    }
+
+    // Đọc lịch sử phản hồi trao đổi
+    $replies = array();
+    if (!empty($report->admin_reply)) {
+        $decoded = json_decode($report->admin_reply, true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $rep_item) {
+                $item_uid = isset($rep_item['sender_id']) ? intval($rep_item['sender_id']) : 0;
+                $item_role = isset($rep_item['role']) ? $rep_item['role'] : 'admin';
+                $item_label = isset($rep_item['role_label']) ? $rep_item['role_label'] : ($item_role === 'admin' ? 'Ban Quản Trị' : ($item_role === 'dich_gia' ? 'Dịch Giả' : 'Độc giả'));
+                $item_created = isset($rep_item['created_at']) ? $rep_item['created_at'] : '';
+                $item_avatar = $item_uid ? get_avatar_url($item_uid, array('size' => 48)) : '';
+
+                $replies[] = array(
+                    'sender_id'   => $item_uid,
+                    'sender_name' => esc_html(isset($rep_item['sender_name']) ? $rep_item['sender_name'] : 'Thành viên'),
+                    'avatar'      => $item_avatar,
+                    'role'        => $item_role,
+                    'role_label'  => $item_label,
+                    'message'     => nl2br(esc_html(isset($rep_item['message']) ? $rep_item['message'] : '')),
+                    'time_ago'    => $item_created ? muop_time_ago($item_created) : '',
+                    'created_at'  => $item_created ? date_i18n('d/m/Y H:i', strtotime($item_created)) : '',
+                    'is_me'       => ($item_uid === $current_uid)
+                );
+            }
+        } else {
+            $replies[] = array(
+                'sender_id'   => 0,
+                'sender_name' => 'Ban Quản Trị',
+                'avatar'      => '',
+                'role'        => 'admin',
+                'role_label'  => 'Ban Quản Trị',
+                'message'     => nl2br(esc_html($report->admin_reply)),
+                'time_ago'    => muop_time_ago($report->updated_at),
+                'created_at'  => date_i18n('d/m/Y H:i', strtotime($report->updated_at)),
+                'is_me'       => false
+            );
+        }
+    }
+
+    $response_data = array(
+        'report_id'          => (int) $report->id,
+        'story_id'           => (int) $report->story_id,
+        'story_title'        => $story ? esc_html($story->post_title) : 'Truyện không tồn tại',
+        'story_url'          => $story ? esc_url(get_permalink($story->ID)) : '#',
+        'chapter_id'         => (int) $report->chapter_id,
+        'chapter_num'        => (int) $report->chapter_num,
+        'chapter_title'      => $chapter ? esc_html(muop_get_clean_chapter_title($chapter->post_title)) : '',
+        'chapter_url'        => $chapter ? esc_url(get_permalink($chapter->ID)) : '#',
+        'issue_type'         => esc_html($report->issue_type),
+        'description'        => nl2br(esc_html($report->description)),
+        'status'             => esc_html($report->status),
+        'created_at_time'    => muop_time_ago($report->created_at),
+        'created_at_full'    => date_i18n('d/m/Y H:i', strtotime($report->created_at)),
+        'sender_id'          => (int) $report->user_id,
+        'sender_name'        => esc_html($sender_name),
+        'sender_avatar'      => $sender_avatar,
+        'sender_role'        => $sender_role,
+        'sender_role_label'  => $sender_role_label,
+        'replies'            => $replies,
+        'can_change_status'  => ($is_admin || $is_author),
+        'is_reporter'        => $is_reporter,
+        'current_user_role'  => $is_admin ? 'admin' : ($is_author ? 'dich_gia' : 'doc_gia')
+    );
+
+    wp_send_json_success($response_data);
+}
+
+// AJAX: Gửi phản hồi trong chuỗi hội thoại đối thoại báo lỗi chương
+add_action('wp_ajax_muop_submit_report_reply', 'muop_ajax_submit_report_reply_handler');
+function muop_ajax_submit_report_reply_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để gửi phản hồi.'));
+    }
+
+    global $wpdb;
+    $report_id     = isset($_POST['report_id']) ? intval($_POST['report_id']) : 0;
+    $reply_message = isset($_POST['reply_message']) ? sanitize_textarea_field($_POST['reply_message']) : '';
+    $status        = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+
+    if (!$report_id || empty($reply_message)) {
+        wp_send_json_error(array('message' => 'Vui lòng nhập nội dung phản hồi!'));
+    }
+
+    $table_reports = $wpdb->prefix . 'muop_chapter_reports';
+    $report = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_reports WHERE id = %d", $report_id));
+    if (!$report) {
+        wp_send_json_error(array('message' => 'Không tìm thấy báo cáo lỗi này!'));
+    }
+
+    $current_uid = get_current_user_id();
+    $current_user = wp_get_current_user();
+    $is_admin = current_user_can('administrator');
+    $story = get_post($report->story_id);
+    $is_author = ($story && (int) $story->post_author === $current_uid);
+    $is_reporter = ((int) $report->user_id === $current_uid);
+
+    if (!$is_admin && !$is_author && !$is_reporter) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền tham gia phản hồi báo lỗi này!'));
+    }
+
+    // Xác định vai trò của người gửi phản hồi
+    if ($is_admin) {
+        $sender_role = 'admin';
+        $sender_role_label = 'Ban Quản Trị';
+    } elseif ($is_author) {
+        $sender_role = 'dich_gia';
+        $sender_role_label = 'Dịch Giả';
+    } else {
+        $sender_role = 'doc_gia';
+        $sender_role_label = 'Người Báo Lỗi';
+    }
+
+    // Đọc danh sách replies hiện tại
+    $replies = array();
+    if (!empty($report->admin_reply)) {
+        $decoded = json_decode($report->admin_reply, true);
+        if (is_array($decoded)) {
+            $replies = $decoded;
+        } else {
+            $replies[] = array(
+                'sender_id'   => 0,
+                'sender_name' => 'Ban Quản Trị',
+                'role'        => 'admin',
+                'role_label'  => 'Ban Quản Trị',
+                'message'     => $report->admin_reply,
+                'created_at'  => $report->updated_at
+            );
+        }
+    }
+
+    $new_entry = array(
+        'sender_id'   => $current_uid,
+        'sender_name' => $current_user->display_name,
+        'role'        => $sender_role,
+        'role_label'  => $sender_role_label,
+        'message'     => $reply_message,
+        'created_at'  => current_time('mysql')
+    );
+    $replies[] = $new_entry;
+
+    // Cập nhật trạng thái
+    $new_status = $report->status;
+    if (($is_admin || $is_author) && !empty($status)) {
+        $new_status = $status;
+    } elseif ($is_admin || $is_author) {
+        if ($new_status === 'pending') {
+            $new_status = 'processing';
+        }
+    }
+
+    $wpdb->update(
+        $table_reports,
+        array(
+            'admin_reply' => wp_json_encode($replies, JSON_UNESCAPED_UNICODE),
+            'status'      => $new_status,
+            'updated_at'  => current_time('mysql')
+        ),
+        array('id' => $report_id)
+    );
+
+    $story_title = $story ? $story->post_title : 'Truyện';
+
+    // BẮN THÔNG BÁO CHO CÁC BÊN (Mỗi người duy nhất 1 thông báo)
+    $recipient_ids = array();
+
+    if ($is_admin || $is_author) {
+        // Admin hoặc Dịch giả trả lời -> Báo cho Độc giả
+        if ($report->user_id > 0) {
+            $recipient_ids[] = (int) $report->user_id;
+        }
+        // Nếu Admin trả lời mà dịch giả là người khác -> Báo cho dịch giả
+        if ($is_admin && $story && $story->post_author) {
+            $recipient_ids[] = (int) $story->post_author;
+        }
+        // Nếu Dịch giả trả lời -> Báo cho Admin
+        if ($is_author && !$is_admin) {
+            $admins = get_users(array('role' => 'administrator', 'fields' => 'ID'));
+            foreach ($admins as $aid) {
+                $recipient_ids[] = (int) $aid;
+            }
+        }
+    } else {
+        // Độc giả gửi tiếp phản hồi -> Báo cho Admin và Dịch giả
+        $admins = get_users(array('role' => 'administrator', 'fields' => 'ID'));
+        foreach ($admins as $aid) {
+            $recipient_ids[] = (int) $aid;
+        }
+        if ($story && $story->post_author) {
+            $recipient_ids[] = (int) $story->post_author;
+        }
+    }
+
+    // Loại bỏ trùng lặp và loại trừ người gửi
+    $recipient_ids = array_unique(array_filter($recipient_ids));
+    $recipient_ids = array_diff($recipient_ids, array($current_uid));
+
+    $notif_title = ($is_reporter ? 'Độc giả phản hồi tiếp báo lỗi: ' : 'Phản hồi báo lỗi chương: ') . $story_title;
+    $notif_msg = $current_user->display_name . ' (' . $sender_role_label . '): "' . wp_trim_words($reply_message, 14) . '"';
+
+    foreach ($recipient_ids as $target_uid) {
+        muop_add_notification(array(
+            'user_id'   => $target_uid,
+            'sender_id' => $current_uid,
+            'type'      => 'report_reply',
+            'title'     => $notif_title,
+            'message'   => $notif_msg,
+            'link'      => '#report-' . $report_id
+        ));
+    }
+
+    wp_send_json_success(array(
+        'message' => 'Đã gửi phản hồi thành công!',
+        'status'  => $new_status,
+        'entry'   => array(
+            'sender_id'   => $current_uid,
+            'sender_name' => esc_html($current_user->display_name),
+            'avatar'      => get_avatar_url($current_uid, array('size' => 48)),
+            'role'        => $sender_role,
+            'role_label'  => $sender_role_label,
+            'message'     => nl2br(esc_html($reply_message)),
+            'time_ago'    => 'Vừa xong',
+            'created_at'  => date_i18n('d/m/Y H:i'),
+            'is_me'       => true
+        )
+    ));
 }
 
 // AJAX: Dịch giả lưu thông tin ngân hàng nhận nhuận bút

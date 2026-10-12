@@ -3686,10 +3686,17 @@
       // Click individual notif item
       $(document).on('click', '.notif-item', function(e) {
         const notifId = $(this).data('id');
-        const link = $(this).data('link');
+        const link = $(this).data('link') || '';
+        const notifType = $(this).data('type') || '';
         const hasBill = $(this).data('bill');
+        const repIdAttr = $(this).data('report-id');
+        let repId = repIdAttr ? parseInt(repIdAttr, 10) : 0;
+        if (!repId && link) {
+          const match = link.match(/#report-(\d+)/);
+          if (match) repId = parseInt(match[1], 10);
+        }
 
-        // Mark as read
+        // Mark as read ngầm
         if ($(this).hasClass('unread')) {
           $(this).removeClass('unread');
           $.ajax({
@@ -3715,7 +3722,18 @@
           });
         }
 
-        // If clicked on "Xem Bill" or notification has bill image
+        // 1. Nếu là báo lỗi chương hoặc phản hồi báo lỗi -> MỞ MODAL ĐỐI THOẠI KHÔNG RELOAD / GIỮ NGUYÊN TÀI KHOẢN
+        if (repId || notifType === 'chapter_report' || notifType === 'report_reply' || (link && link.indexOf('#report-') !== -1)) {
+          e.preventDefault();
+          $('#notifDropdownPanel').removeClass('show');
+          $('#notifToggleBtn').attr('aria-expanded', 'false');
+          if (repId) {
+            ReportDialogueManager.openModal(repId);
+          }
+          return;
+        }
+
+        // 2. If clicked on "Xem Bill" or notification has bill image
         if ($(e.target).closest('.notif-bill-preview-btn').length || (hasBill && !link)) {
           e.preventDefault();
           const billUrl = hasBill || $(e.target).closest('.notif-bill-preview-btn').data('bill-url');
@@ -3725,6 +3743,7 @@
           return;
         }
 
+        // 3. Các thông báo thông thường khác
         if (link && !$(e.target).closest('.notif-bill-preview-btn').length) {
           window.location.href = link;
         }
@@ -3793,7 +3812,7 @@
               const unreadClass = n.is_read ? '' : 'unread';
               const billBtn = n.image ? `<button type="button" class="notif-bill-preview-btn" data-bill-url="${n.image}"><i class="fa-solid fa-receipt"></i> Xem Bill Chuyển Khoản</button>` : '';
               html += `
-                <div class="notif-item ${unreadClass}" data-id="${n.id}" data-link="${n.link || ''}" data-bill="${n.image || ''}">
+                <div class="notif-item ${unreadClass}" data-id="${n.id}" data-type="${n.type || ''}" data-report-id="${n.report_id || ''}" data-link="${n.link || ''}" data-bill="${n.image || ''}">
                   <div class="notif-icon-box" style="background: ${n.icon_color}18; color: ${n.icon_color};">
                     <i class="${n.icon}"></i>
                   </div>
@@ -3818,12 +3837,20 @@
     }
   };
 
-  // 18. CHAPTER REPORT MODAL (HÌNH 2)
+  // 18. CHAPTER REPORT MODAL (HÌNH 2) - YÊU CẦU ĐĂNG NHẬP
   const ChapterReportManager = {
     init() {
       // Mở modal báo lỗi chương
-      $(document).on('click', '#btnOpenReportChapterModal', (e) => {
+      $(document).on('click', '#btnOpenReportChapterModal', function(e) {
         e.preventDefault();
+        const isLogged = $(this).data('logged-in') == 1 || $(this).data('logged-in') === '1' || (window.muopConfig && window.muopConfig.isLoggedIn);
+        if (!isLogged) {
+          alert('Bạn cần đăng ký hoặc đăng nhập tài khoản để báo lỗi chương truyện nhé!');
+          if ($('#modalAuth').length) {
+            $('#modalAuth').show();
+          }
+          return;
+        }
         $('#reportChapterModal').css('display', 'flex');
       });
 
@@ -3855,7 +3882,7 @@
               try { res = JSON.parse(res); } catch (e) {}
             }
             if (res && res.success) {
-              alert(res.data.message || 'Cảm ơn bạn đã báo lỗi! Ban quản trị sẽ kiểm tra khắc phục.');
+              alert(res.data.message || 'Cảm ơn bạn đã báo lỗi! Ban quản trị và dịch giả đã nhận được thông tin.');
               $('#formSubmitChapterReport')[0].reset();
               $('#reportChapterModal').hide();
             } else {
@@ -3869,6 +3896,222 @@
             alert(msg);
           }
         });
+      });
+    }
+  };
+
+  // 18B. REPORT DIALOGUE MANAGER (XEM CHI TIẾT & TRAO ĐỔI PHẢN HỒI 2 CHIỀU ĐỘC GIẢ - DỊCH GIẢ - ADMIN)
+  const ReportDialogueManager = {
+    init() {
+      // Đóng modal
+      $('#btnCloseReportDialogueModal, #btnCancelReportDialogueModal').on('click', () => {
+        $('#reportDialogueModal').hide();
+      });
+
+      $('#reportDialogueModal').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Submit phản hồi trong modal
+      $('#formSubmitReportDialogueReply').on('submit', function(e) {
+        e.preventDefault();
+        const replyText = $.trim($('#repDlgReplyTextarea').val());
+        if (!replyText) {
+          alert('Vui lòng nhập nội dung phản hồi!');
+          return;
+        }
+
+        const $btn = $('#btnSubmitReportDialogueReply');
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: $(this).serialize() + '&action=muop_submit_report_reply&nonce=' + muopConfig.nonce,
+          success: (res) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $('#repDlgReplyTextarea').val('');
+              if (res.data.status) {
+                ReportDialogueManager.updateStatusBadge(res.data.status);
+              }
+              if (res.data.entry) {
+                // Xóa thông báo empty nếu có
+                $('#repDlgMessagesList .rep-empty-thread').remove();
+                // Append message mới
+                const entryHtml = ReportDialogueManager.renderMessageItem(res.data.entry);
+                $('#repDlgMessagesList').append(entryHtml);
+                // Cập nhật số lượng
+                const currentCount = parseInt($('#repDlgReplyCount').text(), 10) || 0;
+                $('#repDlgReplyCount').text(currentCount + 1);
+                // Cuộn xuống tin nhắn mới nhất
+                const $list = $('#repDlgMessagesList');
+                $list.scrollTop($list[0].scrollHeight);
+              }
+            } else {
+              alert(getAjaxMsg(res, 'Lỗi gửi phản hồi!'));
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            alert(msg);
+          }
+        });
+      });
+
+      // Mở tự động nếu URL có hash #report-(\d+)
+      if (window.location.hash && window.location.hash.indexOf('#report-') === 0) {
+        const hashReportId = window.location.hash.replace('#report-', '');
+        if (hashReportId && !isNaN(hashReportId)) {
+          setTimeout(() => {
+            ReportDialogueManager.openModal(parseInt(hashReportId, 10));
+          }, 350);
+        }
+      }
+    },
+
+    updateStatusBadge(status) {
+      const $badge = $('#repDlgStatusBadge');
+      $badge.removeClass('badge-pending badge-processing badge-resolved badge-rejected');
+      if (status === 'resolved') {
+        $badge.addClass('badge-resolved').text('Đã sửa xong');
+      } else if (status === 'processing') {
+        $badge.addClass('badge-processing').text('Đang xử lý');
+      } else if (status === 'rejected') {
+        $badge.addClass('badge-rejected').text('Đã đóng');
+      } else {
+        $badge.addClass('badge-pending').text('Chờ xử lý');
+      }
+    },
+
+    renderMessageItem(item) {
+      const isMeClass = item.is_me ? 'is-me' : '';
+      let roleTagClass = 'role-doc-gia';
+      if (item.role === 'admin') roleTagClass = 'role-admin';
+      else if (item.role === 'dich_gia') roleTagClass = 'role-dich-gia';
+
+      const avatarHtml = item.avatar 
+        ? `<img src="${item.avatar}" alt="${item.sender_name}" class="rep-msg-avatar" />`
+        : `<div class="rep-msg-avatar rep-msg-avatar-placeholder"><i class="fa-solid fa-user"></i></div>`;
+
+      return `
+        <div class="rep-msg-item ${isMeClass}">
+          ${avatarHtml}
+          <div class="rep-msg-bubble">
+            <div class="rep-msg-meta">
+              <span class="rep-msg-author">${item.sender_name}</span>
+              <span class="rep-role-tag ${roleTagClass}">${item.role_label}</span>
+              <span class="rep-msg-time" title="${item.created_at}">${item.time_ago || item.created_at}</span>
+            </div>
+            <div class="rep-msg-body">${item.message}</div>
+          </div>
+        </div>
+      `;
+    },
+
+    openModal(reportId) {
+      if (!reportId) return;
+      const $modal = $('#reportDialogueModal');
+      $modal.css('display', 'flex');
+
+      $('#repDlgLoading').show();
+      $('#repDlgMainContent').hide();
+      $('#repDlgHiddenReportId').val(reportId);
+
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_get_report_details',
+          report_id: reportId,
+          nonce: muopConfig.nonce
+        },
+        success: (res) => {
+          if (typeof res === 'string') {
+            try { res = JSON.parse(res); } catch (e) {}
+          }
+          if (res && res.success) {
+            const d = res.data;
+            $('#repDlgLoading').hide();
+            $('#repDlgMainContent').show();
+
+            // Trạng thái
+            ReportDialogueManager.updateStatusBadge(d.status);
+
+            // Thông tin truyện & chương
+            $('#repDlgStoryLink').text(d.story_title).attr('href', d.story_url);
+            $('#repDlgChapterNum').text(`Chương ${d.chapter_num}`);
+            $('#repDlgChapterTitle').text(d.chapter_title ? `- ${d.chapter_title}` : '');
+            $('#repDlgCreatedAt').html(`<i class="fa-regular fa-clock"></i> ${d.created_at_time} (${d.created_at_full})`);
+
+            // Người gửi ban đầu
+            $('#repDlgSenderName').text(d.sender_name);
+            if (d.sender_avatar) {
+              $('#repDlgSenderAvatar').attr('src', d.sender_avatar).show();
+            } else {
+              $('#repDlgSenderAvatar').attr('src', 'https://secure.gravatar.com/avatar/?d=mp').show();
+            }
+
+            const $roleTag = $('#repDlgSenderRole');
+            $roleTag.removeClass('role-admin role-dich-gia role-doc-gia');
+            if (d.sender_role === 'admin') $roleTag.addClass('role-admin');
+            else if (d.sender_role === 'dich_gia') $roleTag.addClass('role-dich-gia');
+            else $roleTag.addClass('role-doc-gia');
+            $roleTag.text(d.sender_role_label);
+
+            $('#repDlgIssueType').html(`<i class="fa-solid fa-triangle-exclamation"></i> ${d.issue_type}`);
+            $('#repDlgDescription').html(d.description);
+
+            // Render Thread tin nhắn
+            const $messagesList = $('#repDlgMessagesList');
+            $messagesList.empty();
+            const replies = d.replies || [];
+            $('#repDlgReplyCount').text(replies.length);
+
+            if (replies.length === 0) {
+              $messagesList.html('<div class="rep-empty-thread"><i class="fa-regular fa-comments"></i> Chưa có phản hồi nào. Ban quản trị hoặc dịch giả sẽ sớm phản hồi cho bạn.</div>');
+            } else {
+              replies.forEach(rep => {
+                $messagesList.append(ReportDialogueManager.renderMessageItem(rep));
+              });
+              // Cuộn xuống cuối
+              setTimeout(() => {
+                $messagesList.scrollTop($messagesList[0].scrollHeight);
+              }, 100);
+            }
+
+            // Quyền & Giao diện phản hồi
+            if (d.can_change_status) {
+              $('#repDlgStatusControl').css('display', 'flex');
+              $('#repDlgStatusSelect').val(d.status);
+              $('#repDlgBtnSubmitText').text('Gửi Phản Hồi');
+              $('#repDlgReplyTextarea').attr('placeholder', 'Nhập nội dung phản hồi gửi lại cho độc giả...');
+              $('#repDlgUserNotice').html('<i class="fa-solid fa-shield-halved" style="color:var(--primary-green);"></i> Bạn đang trả lời với tư cách <strong>' + (d.current_user_role === 'admin' ? 'Ban Quản Trị' : 'Dịch Giả') + '</strong>.');
+            } else {
+              $('#repDlgStatusControl').hide();
+              $('#repDlgBtnSubmitText').text('Gửi Phản Hồi Tiếp');
+              $('#repDlgReplyTextarea').attr('placeholder', 'Nhập phản hồi tiếp của bạn gửi tới Admin & Dịch giả...');
+              $('#repDlgUserNotice').html('<i class="fa-solid fa-user-check" style="color:var(--primary-green);"></i> Bạn có thể gửi tiếp ý kiến/phản hồi để tiếp tục trao đổi.');
+            }
+
+            $('#repDlgReplyTextarea').val('');
+          } else {
+            $('#repDlgLoading').html('<div style="color:#dc2626;padding:20px;"><i class="fa-solid fa-circle-exclamation"></i> ' + getAjaxMsg(res, 'Không thể tải chi tiết báo lỗi!') + '</div>');
+          }
+        },
+        error: (xhr) => {
+          let err = 'Lỗi kết nối khi tải chi tiết báo lỗi!';
+          if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+          $('#repDlgLoading').html('<div style="color:#dc2626;padding:20px;"><i class="fa-solid fa-circle-exclamation"></i> ' + err + '</div>');
+        }
       });
     }
   };
@@ -4003,22 +4246,13 @@
         });
       });
 
-      // B. Mở Modal Phản Hồi Báo Lỗi
+      // B. Mở Modal Phản Hồi Báo Lỗi (Dùng ReportDialogueManager toàn cục)
       $(document).on('click', '.btn-open-reply-report', function(e) {
         e.preventDefault();
         const repId = $(this).data('report-id');
-        const story = $(this).data('story');
-        const chapNum = $(this).data('chapter-num');
-        const reply = $(this).data('reply') || '';
-        const status = $(this).data('status') || 'pending';
-
-        $('#replyReportId').val(repId);
-        $('#replyStoryName').text(`${story} (Chương ${chapNum})`);
-        $('#replyTextarea').val(reply);
-        $('#replyStatusSelect').val(status);
-        $('#replyStatusMsg').hide();
-
-        $('#admModalReplyReport').css('display', 'flex');
+        if (repId) {
+          ReportDialogueManager.openModal(repId);
+        }
       });
 
       $('#btnCloseReplyModal, #btnCancelReplyModal').on('click', () => {
@@ -4124,6 +4358,7 @@
     TeamManager.init();
     NotificationManager.init();
     ChapterReportManager.init();
+    ReportDialogueManager.init();
     TranslatorBankManager.init();
     AdminExtraManager.init();
   });
