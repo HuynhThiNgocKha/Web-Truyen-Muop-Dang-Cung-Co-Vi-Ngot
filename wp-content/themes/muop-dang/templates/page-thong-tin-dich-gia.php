@@ -16,6 +16,8 @@ $current_user = wp_get_current_user();
 $user_id      = $current_user->ID;
 $registered   = date('d/m/Y', strtotime($current_user->user_registered));
 $avatar_char  = strtoupper(substr($current_user->display_name, 0, 1));
+$custom_avatar = get_user_meta($user_id, 'muop_user_avatar', true);
+$user_bio      = get_user_meta($user_id, 'description', true);
 
 // Stories of this translator
 $my_stories = get_posts(array(
@@ -81,30 +83,41 @@ if (!empty($story_ids)) {
             <span style="color: var(--primary-green); font-weight: 600;">Kênh Dịch Giả</span>
         </nav>
 
-        <!-- PROFILE HEADER -->
-        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--pastel-green); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; box-shadow: var(--shadow-sm);">
-                    <?php echo esc_html($avatar_char); ?>
-                </div>
-
-                <div>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-                        <h1 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin: 0;"><?php echo esc_html($current_user->display_name); ?></h1>
-                        <span class="badge badge-green">
-                            <i class="fa-solid fa-feather-pointed"></i> Dịch Giả Chính Thức
-                        </span>
-                    </div>
-                    <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 4px;">
-                        <i class="fa-solid fa-envelope" style="margin-right: 4px;"></i> <?php echo esc_html($current_user->user_email); ?>
-                    </p>
-                    <p style="font-size: 12.5px; color: var(--text-muted);">
-                        <i class="fa-solid fa-calendar-check" style="margin-right: 4px;"></i> Ngày tham gia: <strong><?php echo esc_html($registered); ?></strong>
-                    </p>
+        <!-- PROFILE HEADER CARD (ĐỒNG NHẤT VỚI TRANG HỒ SƠ ẢNH 2) -->
+        <div class="profile-header-card">
+            <div class="profile-avatar-wrapper">
+                <div class="profile-avatar-display">
+                    <?php if (!empty($custom_avatar)) : ?>
+                        <img src="<?php echo esc_url($custom_avatar); ?>" alt="<?php echo esc_attr($current_user->display_name); ?>" class="profile-avatar-img" />
+                    <?php else : ?>
+                        <span class="profile-avatar-text"><?php echo esc_html($avatar_char); ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
 
-            <div style="display: flex; gap: 10px;">
+            <div class="profile-header-info">
+                <div class="profile-name-row">
+                    <h1 class="profile-display-name"><?php echo esc_html($current_user->display_name); ?></h1>
+                    <span class="badge badge-green">
+                        <?php 
+                            if (current_user_can('administrator')) echo '<i class="fa-solid fa-shield-halved"></i> Quản Trị Viên';
+                            elseif (in_array('dich_gia', (array)$current_user->roles)) echo '<i class="fa-solid fa-feather-pointed"></i> Dịch Giả Chính Thức';
+                            else echo '<i class="fa-solid fa-feather-pointed"></i> Dịch Giả Chính Thức';
+                        ?>
+                    </span>
+                </div>
+                <p class="profile-meta-item">
+                    <i class="fa-solid fa-envelope"></i> <?php echo esc_html($current_user->user_email); ?>
+                </p>
+                <p class="profile-meta-item">
+                    <i class="fa-solid fa-calendar-check"></i> Ngày tham gia: <strong><?php echo esc_html($registered); ?></strong>
+                </p>
+                <?php if (!empty($user_bio)) : ?>
+                    <p class="profile-bio-text">"<?php echo esc_html($user_bio); ?>"</p>
+                <?php endif; ?>
+            </div>
+
+            <div class="profile-header-actions">
                 <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>" class="btn btn-primary">
                     <i class="fa-solid fa-plus-circle"></i> Đăng Truyện Mới
                 </a>
