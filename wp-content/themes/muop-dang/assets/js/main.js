@@ -3787,14 +3787,31 @@
 
     fetchNotifications() {
       const $container = $('#notifListContainer');
-      $container.html('<div class="notif-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải thông báo...</div>');
+      $container.html('<div class="notif-loading"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px;margin-bottom:8px;color:var(--primary-green);"></i><div>Đang tải thông báo...</div></div>');
+
+      let endpoint = '/wp-admin/admin-ajax.php';
+      if (window.muopConfig && window.muopConfig.ajaxUrl) {
+        endpoint = window.muopConfig.ajaxUrl;
+        // Nếu ajaxUrl khác hostname hiện tại (ví dụ truy cập IP LAN mà siteurl là domain), fallback về relative path
+        try {
+          const parsed = new URL(endpoint, window.location.origin);
+          if (parsed.host !== window.location.host) {
+            endpoint = '/wp-admin/admin-ajax.php';
+          }
+        } catch (e) {
+          endpoint = '/wp-admin/admin-ajax.php';
+        }
+      }
+
+      const nonce = (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '';
 
       $.ajax({
-        url: muopConfig.ajaxUrl,
+        url: endpoint,
         type: 'POST',
+        timeout: 10000,
         data: {
           action: 'muop_get_notifications',
-          nonce: muopConfig.nonce
+          nonce: nonce
         },
         success: (res) => {
           if (typeof res === 'string') {
@@ -3813,7 +3830,7 @@
             }
 
             if (notifs.length === 0) {
-              $container.html('<div class="notif-empty"><i class="fa-regular fa-bell-slash" style="font-size:26px;display:block;margin-bottom:8px;color:var(--text-muted);"></i>Bạn chưa có thông báo nào.</div>');
+              $container.html('<div class="notif-empty"><i class="fa-regular fa-bell-slash" style="font-size:28px;display:block;margin-bottom:10px;color:var(--text-muted);opacity:0.6;"></i>Bạn chưa có thông báo nào.</div>');
               return;
             }
 

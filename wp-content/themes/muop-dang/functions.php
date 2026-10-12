@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.28');
+define('MUOP_THEME_VERSION', '2.2.29');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -411,8 +411,14 @@ function muop_enqueue_scripts() {
         $effective_role = $primary_role;
     }
 
+    $ajax_url = admin_url('admin-ajax.php');
+    if (!empty($_SERVER['HTTP_HOST'])) {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $ajax_url = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/wp-admin/admin-ajax.php';
+    }
+
     wp_localize_script('muop-main-script', 'muopConfig', array(
-        'ajaxUrl'       => admin_url('admin-ajax.php'),
+        'ajaxUrl'       => $ajax_url,
         'nonce'         => wp_create_nonce('muop_ajax_nonce'),
         'siteUrl'       => home_url(),
         'isLoggedIn'    => is_user_logged_in(),

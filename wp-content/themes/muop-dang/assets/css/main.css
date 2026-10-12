@@ -6383,6 +6383,7 @@ img {
   margin: auto !important;
   width: 100% !important;
   max-width: 460px !important;
+  min-height: 280px !important;
   max-height: 84vh !important;
   background: var(--bg-card, #ffffff) !important;
   border-radius: 20px !important;
@@ -6415,31 +6416,66 @@ img {
   gap: 8px !important;
 }
 
-.notif-modal-card .btn-close-modal {
+.notif-modal-card .btn-close-modal,
+#btnCloseNotifModal {
   background: none !important;
   border: none !important;
-  font-size: 19px !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-size: 16px !important;
   cursor: pointer !important;
-  color: var(--text-muted) !important;
-  padding: 4px 6px !important;
+  color: var(--text-muted, #64748b) !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
   line-height: 1 !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 6px !important;
-  transition: all 0.15s ease !important;
+  border-radius: 50% !important;
+  transition: all 0.18s ease !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
-.notif-modal-card .btn-close-modal:hover {
+.notif-modal-card .btn-close-modal:focus,
+.notif-modal-card .btn-close-modal:focus-visible,
+.notif-modal-card .btn-close-modal:active,
+#btnCloseNotifModal:focus,
+#btnCloseNotifModal:focus-visible,
+#btnCloseNotifModal:active {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.notif-modal-card .btn-close-modal:hover,
+#btnCloseNotifModal:hover {
   color: #dc2626 !important;
-  background: rgba(220, 38, 38, 0.08) !important;
+  background: rgba(220, 38, 38, 0.1) !important;
 }
 
 .notif-modal-card .notif-body {
   flex: 1 1 auto !important;
   overflow-y: auto !important;
+  min-height: 220px !important;
   max-height: calc(84vh - 65px) !important;
   -webkit-overflow-scrolling: touch !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.notif-modal-card .notif-loading,
+.notif-modal-card .notif-empty {
+  margin: auto !important;
+  padding: 35px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
 }
 
 .notif-header {
