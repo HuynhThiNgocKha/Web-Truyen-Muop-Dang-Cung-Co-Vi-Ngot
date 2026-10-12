@@ -52,6 +52,35 @@ if (!defined('ABSPATH')) exit;
     </div>
 </div>
 
+<!-- POPUP SHOPEE GATEKEEPER MODAL TOÀN TRANG -->
+<?php $global_shopee_url = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'); ?>
+<div id="shopeeGatekeeperModal" class="shopee-gatekeeper-overlay" style="display: none;" aria-hidden="true">
+    <div class="shopee-modal-card">
+        <button type="button" class="btn-close-shopee-modal" id="btnCloseShopeeModal" title="Đóng" aria-label="Đóng">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="shopee-modal-icon">
+            <i class="fa-solid fa-gift"></i>
+        </div>
+        <h3 class="shopee-modal-title">Ủng Hộ Mướp Đắng Nhé! 🌱</h3>
+        
+        <div class="shopee-modal-msg">
+            <p style="margin-bottom: 8px;"><strong>Để giúp Mướp có thể duy trì web lâu dài mọi người click vào link này nha.</strong></p>
+            <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Bạn cần nhấn mở link Shopee dưới đây để hệ thống tự động mở khóa chương truyện này cho bạn đọc tiếp nhé!</p>
+        </div>
+
+        <div class="shopee-modal-btn-wrap">
+            <a href="<?php echo esc_url($global_shopee_url); ?>" id="btnShopeeUnlock" class="btn btn-shopee" target="_blank" rel="noopener noreferrer">
+                <i class="fa-solid fa-bag-shopping"></i> Nhấn Vào Đây Để Mở Khóa Đọc Tiếp
+            </a>
+        </div>
+
+        <p class="shopee-modal-note">
+            <i class="fa-solid fa-circle-check" style="color: var(--primary-green);"></i> Chỉ cần 1 lượt click ủng hộ, chương truyện sẽ được mở khóa ngay lập tức!
+        </p>
+    </div>
+</div>
+
 <?php wp_footer(); ?>
 </body>
 </html>

@@ -2539,10 +2539,33 @@ img {
 }
 
 /* Chapter content locked state (until Shopee click) */
+.chapter-locked-init,
 .chapter-locked {
-  filter: blur(7px);
-  pointer-events: none;
-  user-select: none;
+  filter: blur(8px) !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: pointer;
+  transition: filter 0.3s ease;
+}
+
+.btn-close-shopee-modal {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s, transform 0.2s;
+  z-index: 2;
+}
+.btn-close-shopee-modal:hover {
+  color: #dc2626;
+  transform: rotate(90deg);
 }
 
 /* ==========================================================================

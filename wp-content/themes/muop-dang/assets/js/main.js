@@ -83,72 +83,171 @@
 
   // 3. SHOPEE GATEKEEPER & AFFILIATE CLICK TRACKING
   const AffiliateManager = {
+    pendingUnlock: null,
+
     init() {
-      this.bindFirstClickTrigger();
+      this.bindChapterListInterceptors();
+      this.bindUnlockButton();
       this.checkChapterLock();
     },
 
-    // Hidden link trigger: First click anywhere on action buttons
-    bindFirstClickTrigger() {
-      const hasTriggered = sessionStorage.getItem('muop_first_click_triggered');
-      if (!hasTriggered) {
-        $(document).one('click', '.btn, .chapter-item, .nav-links a', (e) => {
-          sessionStorage.setItem('muop_first_click_triggered', 'true');
-          // Alternate between TikTok and Shopee for background trigger
-          const affiliateUrl = muopConfig.shopeeUrl || 'https://s.shopee.vn/4qG9lQO2rp';
-          this.trackClick('shopee', affiliateUrl, 0, 0);
-          // Non-blocking trigger in background window
-          window.open(affiliateUrl, '_blank');
-        });
-      }
+    // Chặn click vào bất kỳ chương nào không phải chương 1 nếu chưa mở khóa link Shopee
+    bindChapterListInterceptors() {
+      // 1. Bắt sự kiện khi click vào link chương trên trang truyện hoặc thanh điều hướng
+      $(document).on('click', '.chapter-item, .btn-read-latest, .chapter-drawer-link, .btn-next-chapter', function(e) {
+        const $el = $(this);
+        const href = $el.attr('href');
+        if (!href || href === '#' || href.startsWith('javascript:')) return;
+
+        // Xác định xem có phải Chương 1 không
+        const isChap1Attr = $el.data('is-chap1');
+        const isChap1 = (isChap1Attr === 1 || isChap1Attr === '1');
+        const storyId = parseInt($el.data('story-id'), 10) || 0;
+        const chapterId = parseInt($el.data('chapter-id'), 10) || 0;
+        const chapNum = parseInt($el.data('chapter-num'), 10) || 0;
+
+        // Kiểm tra chữ trong tiêu đề nếu chưa có meta
+        const text = $el.text().toLowerCase().trim();
+        const isFirstChapter = isChap1 || (chapNum === 1) || 
+          (chapNum === 0 && text.includes('chương 1') && !text.match(/chương 1\d/));
+
+        // NẾU LÀ CHƯƠNG 1 -> ĐỌC MIỄN PHÍ TRỰC TIẾP, KHÔNG CHẶN
+        if (isFirstChapter) {
+          return;
+        }
+
+        // BẤT KỲ CHƯƠNG NÀO KHÔNG PHẢI CHƯƠNG 1 (CHƯƠNG 2, 3, 4, 5...):
+        // Kiểm tra xem chương này đã được mở khóa trong phiên chưa
+        const isUnlocked = (chapterId && sessionStorage.getItem(`muop_unlocked_chap_${chapterId}`)) ||
+                           (storyId && chapNum && sessionStorage.getItem(`muop_unlocked_s${storyId}_c${chapNum}`));
+
+        if (isUnlocked) {
+          // Đã mở khóa trước đó trong phiên này -> Cho phép mở đọc
+          return;
+        }
+
+        // CHƯA MỞ KHÓA -> CHẶN LẠI VÀ HIỆN POPUP SHOPEE BẮT BUỘC
+        e.preventDefault();
+        e.stopPropagation();
+
+        AffiliateManager.pendingUnlock = {
+          targetUrl: href,
+          storyId: storyId,
+          chapterId: chapterId,
+          chapNum: chapNum
+        };
+
+        $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(250);
+      });
+
+      // 2. Nếu đang ở trang đọc chương mà bị khóa, click vào nội dung mờ sẽ mở lại modal Shopee
+      $(document).on('click', '.chapter-locked, .chapter-locked-init', function(e) {
+        e.preventDefault();
+        $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(250);
+      });
+
+      // 3. Nút đóng modal Shopee (Nếu độc giả không bấm link Shopee thì không được vào đọc)
+      $(document).on('click', '#btnCloseShopeeModal', function(e) {
+        e.preventDefault();
+        $('#shopeeGatekeeperModal').fadeOut(200);
+        AffiliateManager.pendingUnlock = null;
+      });
+
+      // 4. Click ra nền mờ đóng modal (vẫn không đọc được nếu không click link)
+      $(document).on('click', '#shopeeGatekeeperModal', function(e) {
+        if (e.target === this) {
+          $(this).fadeOut(200);
+          AffiliateManager.pendingUnlock = null;
+        }
+      });
     },
 
-    // Check if current chapter is locked by Shopee requirement
+    // Xử lý khi độc giả bấm vào nút mở link Shopee để mở khóa
+    bindUnlockButton() {
+      $(document).on('click', '#btnShopeeUnlock', (e) => {
+        e.preventDefault();
+        const shopeeUrl = $('#btnShopeeUnlock').attr('href') || muopConfig.shopeeUrl || 'https://s.shopee.vn/4qG9lQO2rp';
+
+        // 1. Mở link Shopee trong tab mới
+        window.open(shopeeUrl, '_blank');
+
+        const pending = AffiliateManager.pendingUnlock;
+        let storyId = 0;
+        let chapterId = 0;
+        let chapNum = 1;
+
+        if (pending) {
+          storyId = pending.storyId;
+          chapterId = pending.chapterId;
+          chapNum = pending.chapNum;
+        } else {
+          const $rw = $('.chapter-reading-wrapper');
+          if ($rw.length) {
+            storyId = parseInt($rw.data('story-id'), 10) || 0;
+            chapterId = parseInt($rw.data('chapter-id'), 10) || 0;
+            chapNum = parseInt($rw.data('chapter-num'), 10) || 1;
+          }
+        }
+
+        // 2. Track click qua AJAX
+        this.trackClick('shopee', shopeeUrl, storyId, chapNum);
+
+        // 3. Đánh dấu đã mở khóa trong sessionStorage
+        if (chapterId) {
+          sessionStorage.setItem(`muop_unlocked_chap_${chapterId}`, 'true');
+        }
+        if (storyId && chapNum) {
+          sessionStorage.setItem(`muop_unlocked_s${storyId}_c${chapNum}`, 'true');
+        }
+
+        // 4. Nếu có targetUrl (độc giả vừa bấm từ danh sách chương):
+        // Đóng modal và chuyển hướng ngay tới chương đó để đọc!
+        if (pending && pending.targetUrl) {
+          $('#shopeeGatekeeperModal').fadeOut(200);
+          const target = pending.targetUrl;
+          AffiliateManager.pendingUnlock = null;
+          window.location.href = target;
+          return;
+        }
+
+        // 5. Nếu đang ở chính trang đọc chương này (single-chuong.php):
+        // Mở khóa nội dung chương ngay lập tức
+        $('#shopeeGatekeeperModal').fadeOut(250);
+        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
+      });
+    },
+
+    // Kiểm tra trạng thái khóa khi vừa tải trang đọc chương (single-chuong.php)
     checkChapterLock() {
       const $readingWrapper = $('.chapter-reading-wrapper');
       if (!$readingWrapper.length) return;
 
-      const storyId = $readingWrapper.data('story-id');
+      const storyId = parseInt($readingWrapper.data('story-id'), 10) || 0;
+      const chapterId = parseInt($readingWrapper.data('chapter-id'), 10) || 0;
       const chapNum = parseInt($readingWrapper.data('chapter-num'), 10) || 1;
-      const totalChapters = parseInt($readingWrapper.data('total-chapters'), 10) || 0;
       const checkpointAttr = $readingWrapper.data('is-checkpoint');
 
-      // Quy tắc: Bất kỳ chương nào không phải chương 1 đều xuất hiện popup link Shopee để mở khóa
-      let isShopeeCheckpoint = false;
-      if (typeof checkpointAttr !== 'undefined') {
-        isShopeeCheckpoint = (checkpointAttr === 1 || checkpointAttr === '1');
+      // Nếu là Chương 1 -> Đọc trực tiếp, đảm bảo không bị khóa
+      if (chapNum === 1 && (checkpointAttr === 0 || checkpointAttr === '0')) {
+        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
+        $('#shopeeGatekeeperModal').hide();
+        return;
+      }
+
+      // Bất kỳ chương nào không phải Chương 1:
+      // Kiểm tra xem đã mở khóa trong phiên chưa
+      const isUnlocked = (chapterId && sessionStorage.getItem(`muop_unlocked_chap_${chapterId}`)) ||
+                         (storyId && chapNum && sessionStorage.getItem(`muop_unlocked_s${storyId}_c${chapNum}`));
+
+      if (!isUnlocked) {
+        // Chưa mở khóa -> Khóa nội dung và hiển thị Popup Shopee
+        $('.chapter-content-box').addClass('chapter-locked');
+        $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(300);
       } else {
-        isShopeeCheckpoint = (chapNum > 1);
+        // Đã mở khóa -> Mở toàn bộ nội dung đọc
+        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
+        $('#shopeeGatekeeperModal').hide();
       }
-
-      if (isShopeeCheckpoint) {
-        const storageKey = `muop_unlocked_s${storyId}_c${chapNum}`;
-        const isUnlocked = sessionStorage.getItem(storageKey);
-
-        if (!isUnlocked) {
-          // Lock chapter & display modal
-          $('.chapter-content-box').addClass('chapter-locked');
-          $('#shopeeGatekeeperModal').fadeIn(300);
-        }
-      }
-
-      // Handle click Shopee button in modal
-      $(document).on('click', '#btnShopeeUnlock', (e) => {
-        e.preventDefault();
-        const shopeeUrl = muopConfig.shopeeUrl || 'https://s.shopee.vn/4qG9lQO2rp';
-        const storageKey = `muop_unlocked_s${storyId}_c${chapNum}`;
-
-        // 1. Track click in DB
-        this.trackClick('shopee', shopeeUrl, storyId, chapNum);
-
-        // 2. Open link in new tab
-        window.open(shopeeUrl, '_blank');
-
-        // 3. Mark unlocked & hide modal
-        sessionStorage.setItem(storageKey, 'true');
-        $('#shopeeGatekeeperModal').fadeOut(250);
-        $('.chapter-content-box').removeClass('chapter-locked');
-      });
     },
 
     // Track click via AJAX
@@ -160,8 +259,8 @@
           action: 'muop_track_click',
           link_type: type,
           url: url,
-          story_id: storyId,
-          chapter_num: chapterNum
+          story_id: storyId || 0,
+          chapter_num: chapterNum || 0
         }
       });
     }

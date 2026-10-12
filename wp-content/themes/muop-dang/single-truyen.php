@@ -168,11 +168,22 @@ if (!$thumb_url) {
 
                 <!-- Action Buttons: Đọc từ đầu, Đọc mới nhất, Lưu tủ truyện -->
                 <div class="story-actions-bar">
-                    <?php if ($chap_count > 0) : ?>
+                    <?php if ($chap_count > 0) : 
+                        $first_chap_id = $chapters[0]->ID;
+                        $last_chap = end($chapters);
+                        $last_chap_id = $last_chap ? $last_chap->ID : 0;
+                        $last_chap_num = $last_chap ? (get_post_meta($last_chap->ID, '_chuong_number', true) ?: $chap_count) : 1;
+                        $is_last_chap1 = ($last_chap_id === $first_chap_id || (int)$last_chap_num === 1);
+                    ?>
                         <a href="<?php echo esc_url($first_chap_url); ?>" class="btn btn-primary">
                             <i class="fa-solid fa-book-reader"></i> Đọc Từ Đầu
                         </a>
-                        <a href="<?php echo esc_url($last_chap_url); ?>" class="btn btn-secondary">
+                        <a href="<?php echo esc_url($last_chap_url); ?>" 
+                           class="btn btn-secondary btn-read-latest"
+                           data-story-id="<?php echo esc_attr($story_id); ?>"
+                           data-chapter-id="<?php echo esc_attr($last_chap_id); ?>"
+                           data-chapter-num="<?php echo esc_attr($last_chap_num); ?>"
+                           data-is-chap1="<?php echo $is_last_chap1 ? '1' : '0'; ?>">
                             <i class="fa-solid fa-forward-step"></i> Đọc Mới Nhất
                         </a>
                     <?php endif; ?>
@@ -231,6 +242,7 @@ if (!$thumb_url) {
 
             <?php if (!empty($chapters)) : 
                 $chapters_desc = array_reverse($chapters);
+                $first_chap_id = $chapters[0]->ID;
             ?>
                 <div class="chapter-grid">
                     <?php foreach ($chapters_desc as $chap) : 
@@ -241,9 +253,15 @@ if (!$thumb_url) {
                         if (empty($chap_time_ago)) {
                             $chap_time_ago = get_the_time('d/m/Y', $chap->ID);
                         }
+                        $is_chap_1 = ((int)$chap->ID === (int)$first_chap_id || (int)$chap_num === 1);
                     ?>
                         <div class="chapter-item-row" id="chapterRow-<?php echo $chap->ID; ?>">
-                            <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
+                            <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" 
+                               class="chapter-item"
+                               data-story-id="<?php echo esc_attr($story_id); ?>"
+                               data-chapter-id="<?php echo esc_attr($chap->ID); ?>"
+                               data-chapter-num="<?php echo esc_attr($chap_num); ?>"
+                               data-is-chap1="<?php echo $is_chap_1 ? '1' : '0'; ?>">
                                 <span class="chapter-item-title">
                                     <i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i>
                                     <span class="chap-title-text"><?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>

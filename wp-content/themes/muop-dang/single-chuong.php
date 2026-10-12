@@ -103,7 +103,7 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
         </div>
 
         <!-- CENTER 3: NỘI DUNG TRUYỆN CỦA CHƯƠNG (CHỐNG COPY) -->
-        <article class="chapter-content-box">
+        <article class="chapter-content-box <?php echo $is_checkpoint ? 'chapter-locked-init' : ''; ?>">
             <header class="chapter-header-compact">
                 <h1 class="chapter-heading-title"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></h1>
                 <div class="chapter-meta-date" title="<?php echo esc_attr(get_the_date('d/m/Y H:i')); ?>">
@@ -137,7 +137,7 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
             </button>
 
             <?php if ($next_chap_url) : ?>
-                <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter">
+                <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter" data-story-id="<?php echo esc_attr($story_id); ?>" data-chapter-num="<?php echo esc_attr($chap_order + 1); ?>" data-is-chap1="0">
                     Chương Sau <i class="fa-solid fa-arrow-right"></i>
                 </a>
             <?php else : ?>
@@ -200,35 +200,6 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
 </div>
 
 <!-- ==========================================================================
-     POPUP SHOPEE GATEKEEPER MODAL
-     Xuất hiện từ chương 2 và cứ cách 3 chương hiện 1 lần (Chương 2, 5, 8, 11...)
-     Bắt buộc độc giả nhấn vào link Shopee mới có thể mở khóa đọc tiếp.
-     ========================================================================== -->
-<div id="shopeeGatekeeperModal" class="shopee-gatekeeper-overlay" style="display: none;">
-    <div class="shopee-modal-card">
-        <div class="shopee-modal-icon">
-            <i class="fa-solid fa-gift"></i>
-        </div>
-        <h3 class="shopee-modal-title">Ủng Hộ Mướp Đắng Nhé! 🌱</h3>
-        
-        <div class="shopee-modal-msg">
-            <p style="margin-bottom: 8px;"><strong>Để giúp Mướp có thể duy trì web lâu dài mọi người click vào link này nha.</strong></p>
-            <p style="font-size: 13px; color: var(--text-muted);">Bạn cần nhấn mở link Shopee dưới đây để hệ thống tự động mở khóa chương truyện này cho bạn đọc tiếp nhé!</p>
-        </div>
-
-        <div class="shopee-modal-btn-wrap">
-            <a href="<?php echo esc_url($shopee_url); ?>" id="btnShopeeUnlock" class="btn btn-shopee">
-                <i class="fa-solid fa-bag-shopping"></i> Nhấn Vào Đây Để Mở Khóa Đọc Tiếp
-            </a>
-        </div>
-
-        <p class="shopee-modal-note">
-            <i class="fa-solid fa-circle-check" style="color: var(--primary-green);"></i> Chỉ cần 1 lượt click ủng hộ, chương truyện sẽ được mở khóa ngay lập tức!
-        </p>
-    </div>
-</div>
-
-<!-- ==========================================================================
      POPUP DANH SÁCH CHƯƠNG (DRAWER / MODAL)
      Mở ra khi nhấn vào nút 3 gạch (fa-bars) ở thanh điều hướng đọc truyện
      ========================================================================== -->
@@ -265,9 +236,15 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
             <?php foreach ($all_chapters as $idx => $c) : 
                 $is_current = ($c->ID == $chapter_id);
                 $chap_clean_title = muop_get_clean_chapter_title($c->post_title);
+                $is_drawer_chap1 = ($idx === 0);
             ?>
                 <li class="chapter-drawer-item <?php echo $is_current ? 'is-current-chapter' : ''; ?>" data-title="<?php echo esc_attr(mb_strtolower($chap_clean_title)); ?>">
-                    <a href="<?php echo esc_url(get_permalink($c->ID)); ?>" class="chapter-drawer-link">
+                    <a href="<?php echo esc_url(get_permalink($c->ID)); ?>" 
+                       class="chapter-drawer-link"
+                       data-story-id="<?php echo esc_attr($story_id); ?>"
+                       data-chapter-id="<?php echo esc_attr($c->ID); ?>"
+                       data-chapter-num="<?php echo esc_attr($idx + 1); ?>"
+                       data-is-chap1="<?php echo $is_drawer_chap1 ? '1' : '0'; ?>">
                         <span class="chapter-drawer-name">
                             <?php if ($is_current) : ?>
                                 <i class="fa-solid fa-book-open current-icon"></i>
