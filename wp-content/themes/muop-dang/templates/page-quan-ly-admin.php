@@ -600,19 +600,101 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
 
         <!-- TAB 5: QUẢN LÝ THỂ LOẠI -->
         <div id="admTabGenres" class="dash-tab-pane">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-                <h3 style="font-size: 17px; font-weight: 700; color: var(--primary-green);">
-                    Danh Sách Thể Loại Truyện (<?php echo count($all_genres); ?>)
-                </h3>
+            <div class="admin-tab-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                <div>
+                    <h3 class="admin-tab-title" style="margin-bottom: 4px;">
+                        <i class="fa-solid fa-tags"></i> Quản Lý Thể Loại Truyện (<span id="admGenreTotalCount"><?php echo count($all_genres); ?></span>)
+                    </h3>
+                    <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+                        Thêm mới, tìm kiếm, chỉnh sửa tên và xóa thể loại trong hệ thống
+                    </p>
+                </div>
+                <div class="admin-tab-actions" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" id="admBtnToggleAddGenre" class="btn btn-primary" style="font-size: 13px; padding: 7px 16px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-plus"></i> Thêm Thể Loại Mới
+                    </button>
+                </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
-                <?php foreach ($all_genres as $g) : ?>
-                    <div style="background: var(--pastel-green); padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
-                        <span style="font-weight: 700; color: var(--text-main);"><?php echo esc_html($g->name); ?></span>
-                        <span class="badge badge-green"><?php echo $g->count; ?> truyện</span>
+            <!-- Hộp Thêm Thể Loại Mới Cho Admin (toggle mở/đóng) -->
+            <div id="admBoxAddGenre" style="display: none; margin-bottom: 20px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--primary-green); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                <div style="font-weight: 700; font-size: 13.5px; color: var(--primary-green); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-folder-plus"></i> Thêm Thể Loại Mới Vào Hệ Thống
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <input type="text" id="admInputNewGenre" class="form-input" placeholder="Nhập tên thể loại mới (vd: Trinh thám, Kinh dị, Xuyên không...)" style="flex: 1; min-width: 240px; height: 38px; font-size: 13.5px;" />
+                    <button type="button" id="admBtnConfirmAddGenre" class="btn btn-primary" style="height: 38px; padding: 0 18px; font-size: 13px; white-space: nowrap;">
+                        <i class="fa-solid fa-check"></i> Lưu Thể Loại
+                    </button>
+                    <button type="button" id="admBtnCancelAddGenre" class="btn btn-secondary" style="height: 38px; padding: 0 14px; font-size: 13px;">
+                        Hủy
+                    </button>
+                </div>
+                <div id="admAddGenreStatus" style="font-size: 12.5px; margin-top: 8px; display: none;"></div>
+            </div>
+
+            <!-- Thanh Tìm Kiếm Thể Loại -->
+            <div style="margin-bottom: 18px; position: relative; max-width: 400px;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
+                <input type="text" id="admSearchGenre" class="form-input" placeholder="Tìm kiếm thể loại..." style="padding-left: 36px; height: 38px; font-size: 13.5px; border-radius: var(--radius-sm);" />
+            </div>
+
+            <!-- Danh Sách Thẻ Thể Loại -->
+            <div id="admGenresGrid" class="adm-genres-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+                <?php if (!empty($all_genres) && !is_wp_error($all_genres)) : ?>
+                    <?php foreach ($all_genres as $g) : ?>
+                        <div class="adm-genre-card" data-id="<?php echo esc_attr($g->term_id); ?>" data-name="<?php echo esc_attr(mb_strtolower($g->name, 'UTF-8')); ?>" style="background: var(--bg-card); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-shadow: var(--shadow-sm); transition: transform 0.15s ease, box-shadow 0.15s ease;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                <span class="adm-genre-title" style="font-weight: 700; color: var(--text-main); font-size: 14px; word-break: break-word;"><?php echo esc_html($g->name); ?></span>
+                                <span class="badge badge-green" style="font-size: 11px; white-space: nowrap;"><?php echo (int)$g->count; ?> truyện</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--border-light);">
+                                <button type="button" class="btn btn-outline btn-xs adm-btn-edit-genre" data-id="<?php echo esc_attr($g->term_id); ?>" data-name="<?php echo esc_attr($g->name); ?>" title="Sửa tên thể loại" style="padding: 4px 10px; font-size: 12px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-pen-to-square"></i> Sửa
+                                </button>
+                                <button type="button" class="btn btn-outline btn-xs adm-btn-delete-genre" data-id="<?php echo esc_attr($g->term_id); ?>" data-name="<?php echo esc_attr($g->name); ?>" title="Xóa thể loại này" style="padding: 4px 10px; font-size: 12px; border-radius: 4px; color: #ef4444; border-color: #fca5a5; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class="fa-solid fa-trash-can"></i> Xóa
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <!-- Thông báo khi không tìm thấy kết quả -->
+            <div id="admNoGenreFound" style="display: none; padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; background: var(--bg-card); border-radius: var(--radius-md); border: 1px dashed var(--border-color); margin-top: 10px;">
+                <i class="fa-solid fa-circle-question" style="font-size: 20px; margin-bottom: 6px; display: block;"></i>
+                Không tìm thấy thể loại nào phù hợp với từ khóa!
+            </div>
+
+            <!-- Modal Sửa Tên Thể Loại -->
+            <div id="admModalEditGenre" class="adm-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center; padding: 16px;">
+                <div style="background: var(--bg-card); width: 100%; max-width: 420px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden;">
+                    <div style="padding: 14px 18px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; background: var(--pastel-green);">
+                        <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--primary-green); display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-pen-to-square"></i> Sửa Tên Thể Loại
+                        </h4>
+                        <button type="button" id="admBtnCloseEditModal" style="background: none; border: none; font-size: 16px; color: var(--text-muted); cursor: pointer;" title="Đóng">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
-                <?php endforeach; ?>
+                    <div style="padding: 18px;">
+                        <input type="hidden" id="admEditGenreId" value="" />
+                        <div class="form-group" style="margin-bottom: 14px;">
+                            <label class="form-label" for="admEditGenreName" style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">Tên thể loại:</label>
+                            <input type="text" id="admEditGenreName" class="form-input" style="width: 100%; height: 38px; font-size: 13.5px;" />
+                        </div>
+                        <div id="admEditGenreStatus" style="font-size: 12.5px; margin-bottom: 12px; display: none;"></div>
+                        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                            <button type="button" id="admBtnCancelEditModal" class="btn btn-secondary" style="padding: 7px 14px; font-size: 13px;">
+                                Hủy bỏ
+                            </button>
+                            <button type="button" id="admBtnSaveEditGenre" class="btn btn-primary" style="padding: 7px 18px; font-size: 13px;">
+                                <i class="fa-solid fa-check"></i> Lưu Thay Đổi
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

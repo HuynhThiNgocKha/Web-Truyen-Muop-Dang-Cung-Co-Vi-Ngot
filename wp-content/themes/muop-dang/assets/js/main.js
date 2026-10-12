@@ -973,7 +973,54 @@
   // 7. STORY & CHAPTER SUBMISSION (TRANSLATORS / ADMIN)
   const CreatorForms = {
     init() {
-      // Toggle Box Add New Genre
+      // 1. Tải ảnh bìa từ thiết bị
+      $('#btnUploadCover').on('click', function(e) {
+        e.preventDefault();
+        $('#storyCover').trigger('click');
+      });
+
+      $('#storyCover').on('change', function() {
+        const file = this.files && this.files[0];
+        if (file) {
+          $('#coverFileName').text(file.name);
+          $('#coverUploadInfo').css('display', 'inline-flex');
+          $('#btnUploadCover').html('<i class="fa-solid fa-arrow-rotate-right"></i> Đổi ảnh khác');
+        } else {
+          $('#coverFileName').text('');
+          $('#coverUploadInfo').hide();
+          $('#btnUploadCover').html('<i class="fa-solid fa-arrow-up-from-bracket"></i> Tải ảnh từ thiết bị');
+        }
+      });
+
+      $('#btnRemoveCover').on('click', function(e) {
+        e.preventDefault();
+        $('#storyCover').val('');
+        $('#coverFileName').text('');
+        $('#coverUploadInfo').hide();
+        $('#btnUploadCover').html('<i class="fa-solid fa-arrow-up-from-bracket"></i> Tải ảnh từ thiết bị');
+      });
+
+      // 2. Tìm kiếm thể loại trong trang đăng truyện
+      $('#inputSearchGenre').on('input', function() {
+        const query = $(this).val().toLowerCase().trim();
+        let matchedCount = 0;
+        $('#genresCheckboxList .genre-checkbox-item').each(function() {
+          const name = ($(this).data('name') || $(this).text()).toLowerCase();
+          if (!query || name.indexOf(query) !== -1) {
+            $(this).show();
+            matchedCount++;
+          } else {
+            $(this).hide();
+          }
+        });
+        if (matchedCount === 0) {
+          $('#noGenreFoundMsg').show();
+        } else {
+          $('#noGenreFoundMsg').hide();
+        }
+      });
+
+      // 3. Toggle Box Add New Genre
       $('#btnToggleAddNewGenre').on('click', function(e) {
         e.preventDefault();
         const $box = $('#boxAddNewGenre');
@@ -982,6 +1029,13 @@
             $('#inputNewGenreName').focus();
           }
         });
+      });
+
+      $('#btnCancelAddGenre').on('click', function(e) {
+        e.preventDefault();
+        $('#boxAddNewGenre').slideUp(180);
+        $('#inputNewGenreName').val('');
+        $('#addGenreStatus').hide();
       });
 
       // Confirm Add New Genre (Lưu vào taxonomy the_loai ngay lập tức)
@@ -1026,18 +1080,25 @@
               let $existing = $(`#genresCheckboxList input[value="${termId}"]`);
               if ($existing.length) {
                 $existing.prop('checked', true);
+                $existing.closest('.genre-checkbox-item').show();
                 $status.css('color', '#3F7523').text(`Thể loại "${termName}" đã có sẵn và đã được chọn!`).fadeIn();
               } else {
+                const escapedName = $('<div>').text(termName).html();
                 const newHtml = `
-                  <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--primary-green); font-weight: 600;">
+                  <label class="genre-checkbox-item" data-name="${escapedName.toLowerCase()}" style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--primary-green); font-weight: 600;">
                     <input type="checkbox" name="categories[]" value="${termId}" checked />
-                    <span>${termName} (Mới)</span>
+                    <span class="genre-checkbox-name">${escapedName} (Mới)</span>
                   </label>
                 `;
                 $('#genresCheckboxList').prepend(newHtml);
+                $('#noGenreFoundMsg').hide();
                 $status.css('color', '#3F7523').text(`Đã thêm thể loại "${termName}" thành công!`).fadeIn();
               }
               $input.val('');
+              setTimeout(() => {
+                $('#boxAddNewGenre').slideUp(180);
+                $status.hide();
+              }, 1200);
             } else {
               $status.css('color', '#ef4444').text(getAjaxMsg(res, 'Lỗi thêm thể loại!')).fadeIn();
             }
@@ -1351,6 +1412,269 @@
             if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
             else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
             $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
+          }
+        });
+      });
+
+      // === QUẢN LÝ THỂ LOẠI (ADMIN GENRE MANAGEMENT) ===
+      // 1. Tìm kiếm thể loại realtime
+      $('#admSearchGenre').on('input', function() {
+        const q = $(this).val().toLowerCase().trim();
+        let matched = 0;
+        $('#admGenresGrid .adm-genre-card').each(function() {
+          const name = ($(this).data('name') || $(this).find('.adm-genre-title').text()).toLowerCase();
+          if (!q || name.indexOf(q) !== -1) {
+            $(this).show();
+            matched++;
+          } else {
+            $(this).hide();
+          }
+        });
+        if (matched === 0) {
+          $('#admNoGenreFound').show();
+        } else {
+          $('#admNoGenreFound').hide();
+        }
+      });
+
+      // 2. Toggle Box Thêm Thể Loại
+      $('#admBtnToggleAddGenre').on('click', function(e) {
+        e.preventDefault();
+        const $box = $('#admBoxAddGenre');
+        $box.slideToggle(180, function() {
+          if ($box.is(':visible')) {
+            $('#admInputNewGenre').focus();
+          }
+        });
+      });
+
+      $('#admBtnCancelAddGenre').on('click', function(e) {
+        e.preventDefault();
+        $('#admBoxAddGenre').slideUp(180);
+        $('#admInputNewGenre').val('');
+        $('#admAddGenreStatus').hide();
+      });
+
+      // 3. Admin Thêm Thể Loại Mới
+      const handleAdminAddGenre = () => {
+        const $input = $('#admInputNewGenre');
+        const name = $.trim($input.val());
+        const $btn = $('#admBtnConfirmAddGenre');
+        const $status = $('#admAddGenreStatus');
+
+        if (!name) {
+          $status.css('color', '#ef4444').text('Vui lòng nhập tên thể loại!').fadeIn();
+          $input.focus();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $status.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_create_genre',
+            nonce: muopConfig.nonce,
+            name: name
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thể Loại');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const data = res.data;
+              const $existing = $(`#admGenresGrid .adm-genre-card[data-id="${data.term_id}"]`);
+              if ($existing.length) {
+                $status.css('color', '#3F7523').text('Thể loại này đã có sẵn trong danh sách!').fadeIn();
+                $existing.show();
+              } else {
+                const safeName = $('<div>').text(data.name).html();
+                const cardHtml = `
+                  <div class="adm-genre-card" data-id="${data.term_id}" data-name="${safeName.toLowerCase()}" style="background: var(--bg-card); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-shadow: var(--shadow-sm); animation: admModalFadeIn 0.3s ease;">
+                      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                          <span class="adm-genre-title" style="font-weight: 700; color: var(--text-main); font-size: 14px; word-break: break-word;">${safeName}</span>
+                          <span class="badge badge-green" style="font-size: 11px; white-space: nowrap;">0 truyện</span>
+                      </div>
+                      <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--border-light);">
+                          <button type="button" class="btn btn-outline btn-xs adm-btn-edit-genre" data-id="${data.term_id}" data-name="${safeName}" title="Sửa tên thể loại" style="padding: 4px 10px; font-size: 12px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                              <i class="fa-solid fa-pen-to-square"></i> Sửa
+                          </button>
+                          <button type="button" class="btn btn-outline btn-xs adm-btn-delete-genre" data-id="${data.term_id}" data-name="${safeName}" title="Xóa thể loại này" style="padding: 4px 10px; font-size: 12px; border-radius: 4px; color: #ef4444; border-color: #fca5a5; display: inline-flex; align-items: center; gap: 4px;">
+                              <i class="fa-solid fa-trash-can"></i> Xóa
+                          </button>
+                      </div>
+                  </div>
+                `;
+                $('#admGenresGrid').prepend(cardHtml);
+                $('#admNoGenreFound').hide();
+                const curCount = parseInt($('#admGenreTotalCount').text(), 10) || 0;
+                $('#admGenreTotalCount').text(curCount + 1);
+                $status.css('color', '#3F7523').text('Đã thêm thể loại mới thành công!').fadeIn();
+                $input.val('');
+                setTimeout(() => {
+                  $('#admBoxAddGenre').slideUp(180);
+                  $status.hide();
+                }, 1000);
+              }
+            } else {
+              $status.css('color', '#ef4444').text(getAjaxMsg(res, 'Lỗi thêm thể loại!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thể Loại');
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $status.css('color', '#ef4444').text(errorMsg).fadeIn();
+          }
+        });
+      };
+
+      $('#admBtnConfirmAddGenre').on('click', function(e) {
+        e.preventDefault();
+        handleAdminAddGenre();
+      });
+
+      $('#admInputNewGenre').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAdminAddGenre();
+        }
+      });
+
+      // 4. Mở Modal Chỉnh Sửa Thể Loại
+      $(document).on('click', '.adm-btn-edit-genre', function(e) {
+        e.preventDefault();
+        const termId = $(this).data('id');
+        const termName = $(this).attr('data-name') || $(this).data('name') || '';
+        $('#admEditGenreId').val(termId);
+        $('#admEditGenreName').val(termName);
+        $('#admEditGenreStatus').hide();
+        $('#admModalEditGenre').css('display', 'flex');
+        setTimeout(() => $('#admEditGenreName').focus().select(), 50);
+      });
+
+      $('#admBtnCloseEditModal, #admBtnCancelEditModal').on('click', function(e) {
+        e.preventDefault();
+        $('#admModalEditGenre').hide();
+      });
+
+      $('#admModalEditGenre').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // 5. Lưu Chỉnh Sửa Thể Loại
+      const handleAdminSaveEditGenre = () => {
+        const termId = $('#admEditGenreId').val();
+        const newName = $.trim($('#admEditGenreName').val());
+        const $status = $('#admEditGenreStatus');
+        const $btn = $('#admBtnSaveEditGenre');
+
+        if (!newName) {
+          $status.css('color', '#ef4444').text('Vui lòng nhập tên thể loại!').fadeIn();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $status.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_update_genre',
+            nonce: muopConfig.nonce,
+            term_id: termId,
+            name: newName
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thay Đổi');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const data = res.data;
+              const $card = $(`#admGenresGrid .adm-genre-card[data-id="${termId}"]`);
+              $card.attr('data-name', data.name.toLowerCase());
+              $card.data('name', data.name.toLowerCase());
+              $card.find('.adm-genre-title').text(data.name);
+              $card.find('.adm-btn-edit-genre').attr('data-name', data.name).data('name', data.name);
+              $card.find('.adm-btn-delete-genre').attr('data-name', data.name).data('name', data.name);
+              $status.css('color', '#3F7523').text('Đã cập nhật thể loại thành công!').fadeIn();
+              setTimeout(() => {
+                $('#admModalEditGenre').hide();
+              }, 800);
+            } else {
+              $status.css('color', '#ef4444').text(getAjaxMsg(res, 'Lỗi cập nhật thể loại!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thay Đổi');
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $status.css('color', '#ef4444').text(errorMsg).fadeIn();
+          }
+        });
+      };
+
+      $('#admBtnSaveEditGenre').on('click', function(e) {
+        e.preventDefault();
+        handleAdminSaveEditGenre();
+      });
+
+      $('#admEditGenreName').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAdminSaveEditGenre();
+        }
+      });
+
+      // 6. Xóa Thể Loại
+      $(document).on('click', '.adm-btn-delete-genre', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const termId = $btn.data('id');
+        const termName = $btn.attr('data-name') || $btn.data('name') || 'này';
+
+        if (!confirm(`Bạn có chắc chắn muốn xóa thể loại "${termName}" khỏi hệ thống không? Các truyện thuộc thể loại này sẽ không còn thể loại này nữa.`)) {
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_delete_genre',
+            nonce: muopConfig.nonce,
+            term_id: termId
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const $card = $btn.closest('.adm-genre-card');
+              $card.fadeOut(250, function() {
+                $(this).remove();
+                const curCount = parseInt($('#admGenreTotalCount').text(), 10) || 1;
+                $('#admGenreTotalCount').text(Math.max(0, curCount - 1));
+              });
+            } else {
+              alert(getAjaxMsg(res, 'Lỗi khi xóa thể loại!'));
+              $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+            }
+          },
+          error: (xhr) => {
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            alert(errorMsg);
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
           }
         });
       });

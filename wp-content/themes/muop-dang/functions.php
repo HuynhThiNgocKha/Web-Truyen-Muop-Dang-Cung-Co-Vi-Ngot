@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.1.7');
+define('MUOP_THEME_VERSION', '2.1.8');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -1372,5 +1372,66 @@ function muop_ajax_create_genre_handler() {
         'slug'    => $term->slug,
         'is_new'  => true,
         'message' => 'Đã thêm thể loại mới thành công!'
+    ));
+}
+
+// 14. AJAX: Update Genre (Sửa Thể Loại - Dành Cho Admin)
+add_action('wp_ajax_muop_update_genre', 'muop_ajax_update_genre_handler');
+function muop_ajax_update_genre_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Chỉ Quản Trị Viên mới có quyền chỉnh sửa thể loại!'));
+    }
+
+    $term_id = isset($_POST['term_id']) ? intval($_POST['term_id']) : 0;
+    $new_name = isset($_POST['name']) ? sanitize_text_field(trim($_POST['name'])) : '';
+
+    if ($term_id <= 0 || empty($new_name)) {
+        wp_send_json_error(array('message' => 'Vui lòng cung cấp tên thể loại hợp lệ!'));
+    }
+
+    $res = wp_update_term($term_id, 'the_loai', array(
+        'name' => $new_name,
+        'slug' => sanitize_title($new_name)
+    ));
+
+    if (is_wp_error($res)) {
+        wp_send_json_error(array('message' => $res->get_error_message()));
+    }
+
+    $term = get_term($term_id, 'the_loai');
+    wp_send_json_success(array(
+        'term_id' => $term_id,
+        'name'    => $term->name,
+        'slug'    => $term->slug,
+        'message' => 'Đã cập nhật thể loại thành công!'
+    ));
+}
+
+// 15. AJAX: Delete Genre (Xóa Thể Loại - Dành Cho Admin)
+add_action('wp_ajax_muop_delete_genre', 'muop_ajax_delete_genre_handler');
+function muop_ajax_delete_genre_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Chỉ Quản Trị Viên mới có quyền xóa thể loại!'));
+    }
+
+    $term_id = isset($_POST['term_id']) ? intval($_POST['term_id']) : 0;
+    if ($term_id <= 0) {
+        wp_send_json_error(array('message' => 'Thể loại không hợp lệ!'));
+    }
+
+    $res = wp_delete_term($term_id, 'the_loai');
+    if (is_wp_error($res) || !$res) {
+        wp_send_json_error(array('message' => 'Không thể xóa thể loại này!'));
+    }
+
+    wp_send_json_success(array(
+        'term_id' => $term_id,
+        'message' => 'Đã xóa thể loại thành công!'
     ));
 }
