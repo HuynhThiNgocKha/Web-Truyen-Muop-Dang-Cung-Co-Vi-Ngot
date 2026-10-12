@@ -96,7 +96,7 @@ $all_teams = get_terms(array(
                             </div>
 
                             <a href="<?php echo esc_url($team_link); ?>" class="btn btn-secondary team-card-btn">
-                                <span>Xem Trang Team & Truyện</span>
+                                <span>Xem Trang</span>
                                 <i class="fa-solid fa-arrow-right" style="font-size: 11px;"></i>
                             </a>
                         </div>
