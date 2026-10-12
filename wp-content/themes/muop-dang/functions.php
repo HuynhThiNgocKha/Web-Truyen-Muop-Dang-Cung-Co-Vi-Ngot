@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.1.9');
+define('MUOP_THEME_VERSION', '2.2.0');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -1464,7 +1464,7 @@ function muop_ajax_get_story_data_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && $story->post_author != $current_user_id) {
+    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
         wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa bộ truyện này!'));
     }
 
@@ -1535,7 +1535,7 @@ function muop_ajax_get_chapter_data_handler() {
     $story_id = get_post_meta($chapter->ID, '_chuong_truyen_id', true);
     $story = get_post($story_id);
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
+    if (!current_user_can('administrator') && !current_user_can('dich_gia') && ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
         wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa chương này!'));
     }
 
@@ -1566,7 +1566,7 @@ function muop_ajax_update_story_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && $story->post_author != $current_user_id) {
+    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
         wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa truyện này!'));
     }
 
@@ -1669,7 +1669,7 @@ function muop_ajax_update_chapter_handler() {
     $story_id = get_post_meta($chapter->ID, '_chuong_truyen_id', true);
     $story = get_post($story_id);
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
+    if (!current_user_can('administrator') && !current_user_can('dich_gia') && ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
         wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa chương này!'));
     }
 
@@ -1750,3 +1750,159 @@ function muop_ajax_publish_draft_handler() {
         'post_status' => $new_status
     ));
 }
+
+// 21. AJAX: Get Preset Covers (Lấy danh sách ảnh bìa có sẵn từ thư viện ảnh)
+add_action('wp_ajax_muop_get_preset_covers', 'muop_ajax_get_preset_covers_handler');
+function muop_ajax_get_preset_covers_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!is_user_logged_in() || (!current_user_can('administrator') && !current_user_can('dich_gia'))) {
+        wp_send_json_error(array('message' => 'Không có quyền truy cập!'));
+    }
+
+    $attachments = get_posts(array(
+        'post_type'      => 'attachment',
+        'post_mime_type' => 'image',
+        'post_status'    => 'inherit',
+        'posts_per_page' => 24,
+        'orderby'        => 'date',
+        'order'          => 'DESC'
+    ));
+
+    $covers = array();
+    // Default cover
+    $covers[] = array(
+        'id'    => 0,
+        'title' => 'Ảnh bìa mặc định',
+        'url'   => MUOP_THEME_URI . '/assets/images/default-cover.svg',
+        'thumb' => MUOP_THEME_URI . '/assets/images/default-cover.svg'
+    );
+
+    foreach ($attachments as $att) {
+        $full_url = wp_get_attachment_url($att->ID);
+        $thumb_url = wp_get_attachment_image_url($att->ID, 'thumbnail') ?: $full_url;
+        if ($full_url) {
+            $covers[] = array(
+                'id'    => $att->ID,
+                'title' => $att->post_title ?: 'Ảnh ' . $att->ID,
+                'url'   => $full_url,
+                'thumb' => $thumb_url
+            );
+        }
+    }
+
+    wp_send_json_success(array('covers' => $covers));
+}
+
+// 22. AJAX: Update Story Cover (Đổi ảnh bìa nhanh: tải từ thiết bị hoặc chọn ảnh có sẵn)
+add_action('wp_ajax_muop_update_story_cover', 'muop_ajax_update_story_cover_handler');
+function muop_ajax_update_story_cover_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập!'));
+    }
+
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $story = get_post($story_id);
+    if (!$story || $story->post_type !== 'truyen') {
+        wp_send_json_error(array('message' => 'Truyện không tồn tại!'));
+    }
+
+    $current_user_id = get_current_user_id();
+    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thay đổi ảnh bìa truyện này!'));
+    }
+
+    // 1. Nếu người dùng tải ảnh từ thiết bị
+    if (!empty($_FILES['cover_file']['name'])) {
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        $attachment_id = media_handle_upload('cover_file', $story_id);
+        if (is_wp_error($attachment_id)) {
+            wp_send_json_error(array('message' => 'Tải ảnh thất bại: ' . $attachment_id->get_error_message()));
+        }
+        set_post_thumbnail($story_id, $attachment_id);
+    } 
+    // 2. Nếu người dùng chọn ảnh có sẵn theo attachment ID
+    elseif (!empty($_POST['preset_cover_id'])) {
+        $preset_id = intval($_POST['preset_cover_id']);
+        if ($preset_id > 0) {
+            set_post_thumbnail($story_id, $preset_id);
+        } else {
+            delete_post_thumbnail($story_id);
+        }
+    }
+    // 3. Nếu người dùng chọn theo URL
+    elseif (!empty($_POST['preset_cover_url'])) {
+        $cover_url = esc_url_raw($_POST['preset_cover_url']);
+        $att_id = attachment_url_to_postid($cover_url);
+        if ($att_id > 0) {
+            set_post_thumbnail($story_id, $att_id);
+        }
+    } else {
+        wp_send_json_error(array('message' => 'Vui lòng chọn ảnh có sẵn hoặc tải ảnh mới từ thiết bị!'));
+    }
+
+    // Cập nhật modified time
+    wp_update_post(array('ID' => $story_id));
+
+    $new_cover_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
+    if (!$new_cover_url) {
+        $new_cover_url = get_the_post_thumbnail_url($story_id, 'full');
+    }
+    if (!$new_cover_url) {
+        $new_cover_url = MUOP_THEME_URI . '/assets/images/default-cover.svg';
+    }
+
+    wp_send_json_success(array(
+        'message'   => 'Đã thay đổi ảnh bìa truyện thành công!',
+        'cover_url' => $new_cover_url
+    ));
+}
+
+// 23. AJAX: Update Story Title (Chỉnh sửa tên truyện nhanh)
+add_action('wp_ajax_muop_update_story_title', 'muop_ajax_update_story_title_handler');
+function muop_ajax_update_story_title_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập!'));
+    }
+
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $story = get_post($story_id);
+    if (!$story || $story->post_type !== 'truyen') {
+        wp_send_json_error(array('message' => 'Truyện không tồn tại!'));
+    }
+
+    $current_user_id = get_current_user_id();
+    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa tên truyện này!'));
+    }
+
+    $new_title = isset($_POST['title']) ? sanitize_text_field(trim($_POST['title'])) : '';
+    if (empty($new_title)) {
+        wp_send_json_error(array('message' => 'Tên truyện không được để trống!'));
+    }
+
+    $res = wp_update_post(array(
+        'ID'         => $story_id,
+        'post_title' => $new_title
+    ));
+
+    if (is_wp_error($res)) {
+        wp_send_json_error(array('message' => 'Không thể đổi tên truyện: ' . $res->get_error_message()));
+    }
+
+    wp_send_json_success(array(
+        'message' => 'Đã đổi tên truyện thành công!',
+        'title'   => $new_title
+    ));
+}
+

@@ -2582,6 +2582,11 @@
                   $select.append(`<option value="${ch.id}">Chương ${ch.number}: ${ch.title}${statusLabel}</option>`);
                 });
                 $('#editNoChaptersMsg').hide();
+
+                if (window._targetChapterIdToSelect) {
+                  $select.val(window._targetChapterIdToSelect).trigger('change');
+                  window._targetChapterIdToSelect = null;
+                }
               } else {
                 $select.append('<option value="">-- Bộ truyện chưa có chương nào --</option>');
                 const siteUrl = (typeof muopConfig !== 'undefined' && muopConfig.siteUrl) ? muopConfig.siteUrl : '';
@@ -2811,6 +2816,255 @@
             $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
           }
         });
+      });
+
+      // 11. Cây bút ở từng chương (Hình 3): Mở Master Modal -> Tab 2 -> nạp chương đó
+      $(document).on('click', '.btn-edit-chapter-direct', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const storyId = $(this).data('story-id');
+        const chapterId = $(this).data('chapter-id');
+        if (!storyId || !chapterId) return;
+
+        window._targetChapterIdToSelect = chapterId;
+
+        // Kích hoạt nút .btn-edit-story để mở Master Modal
+        const $editBtn = $(`.btn-edit-story[data-story-id="${storyId}"]`);
+        if ($editBtn.length) {
+          $editBtn.trigger('click');
+        } else {
+          $('<button>')
+            .addClass('btn-edit-story')
+            .attr('data-story-id', storyId)
+            .hide()
+            .appendTo('body')
+            .trigger('click')
+            .remove();
+        }
+
+        // Tự động chuyển ngay sang Tab 2 (Chỉnh sửa nội dung chương)
+        setTimeout(() => {
+          $('.modal-tab-nav[data-target="paneEditChapterContent"]').trigger('click');
+        }, 80);
+      });
+
+      // 12. Cây bút mờ trên ảnh bìa truyện (Hình 1): Đổi ảnh bìa nhanh
+      $('#btnChangeCoverOverlay').on('click', function(e) {
+        e.preventDefault();
+        const storyId = $(this).data('story-id');
+        if (!storyId) return;
+
+        const $modal = $('#modalChangeCoverDirect');
+        if (!$modal.length) return;
+
+        $('#changeCoverAlert').hide();
+        $('#directCoverSelectedStatus').hide();
+        $('#inputDirectCoverFile').val('');
+        $('#inputSelectedPresetCoverId').val('');
+        $('#inputSelectedPresetCoverUrl').val('');
+        $('#quickCoverStoryId').val(storyId);
+
+        // Preview ảnh hiện tại
+        const currentSrc = $('#mainStoryCoverImg').attr('src') || '';
+        $('#directCoverPreviewImg').attr('src', currentSrc);
+
+        $modal.css('display', 'flex');
+
+        // Nạp danh sách preset covers qua AJAX
+        const $presetGrid = $('#directPresetCoversList');
+        $presetGrid.html('<div style="grid-column: 1 / -1; text-align: center; font-size: 12px; color: var(--text-muted); padding: 15px;"><i class="fa-solid fa-spinner fa-spin"></i> Đang nạp danh sách ảnh...</div>');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_get_preset_covers',
+            nonce: muopConfig.nonce
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data && res.data.covers) {
+              $presetGrid.empty();
+              res.data.covers.forEach(c => {
+                const card = $(`
+                  <div class="preset-cover-card" data-id="${c.id}" data-url="${c.url}" title="${c.title}">
+                    <img src="${c.thumb}" alt="${c.title}" />
+                  </div>
+                `);
+                $presetGrid.append(card);
+              });
+            } else {
+              $presetGrid.html('<div style="grid-column: 1 / -1; text-align: center; font-size: 12px; color: var(--text-muted); padding: 10px;">Không có ảnh mẫu nào. Hãy tải ảnh từ thiết bị của bạn!</div>');
+            }
+          },
+          error: () => {
+            $presetGrid.html('<div style="grid-column: 1 / -1; text-align: center; font-size: 12px; color: var(--text-muted); padding: 10px;">Không thể tải danh sách ảnh mẫu. Hãy tải ảnh từ thiết bị!</div>');
+          }
+        });
+      });
+
+      // Click chọn ảnh preset trong modal đổi ảnh
+      $(document).on('click', '.preset-cover-card', function() {
+        $('.preset-cover-card').removeClass('is-selected');
+        $(this).addClass('is-selected');
+
+        const presetId = $(this).data('id');
+        const presetUrl = $(this).data('url');
+
+        $('#inputSelectedPresetCoverId').val(presetId);
+        $('#inputSelectedPresetCoverUrl').val(presetUrl);
+        $('#inputDirectCoverFile').val('');
+
+        $('#directCoverPreviewImg').attr('src', presetUrl);
+        $('#directCoverFileName').text($(this).attr('title') || 'Ảnh mẫu');
+        $('#directCoverSelectedStatus').css('display', 'inline-flex');
+      });
+
+      // Tải ảnh từ thiết bị trong modal đổi ảnh
+      $('#btnTriggerDirectUpload').on('click', function(e) {
+        e.preventDefault();
+        $('#inputDirectCoverFile').trigger('click');
+      });
+
+      $('#inputDirectCoverFile').on('change', function() {
+        const file = this.files && this.files[0];
+        if (file) {
+          $('.preset-cover-card').removeClass('is-selected');
+          $('#inputSelectedPresetCoverId').val('');
+          $('#inputSelectedPresetCoverUrl').val('');
+
+          $('#directCoverFileName').text(file.name);
+          $('#directCoverSelectedStatus').css('display', 'inline-flex');
+
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            $('#directCoverPreviewImg').attr('src', e.target.result);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          $('#directCoverSelectedStatus').hide();
+        }
+      });
+
+      // Submit Form Đổi Ảnh Bìa Nhanh
+      $('#formChangeCoverDirect').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSubmitDirectCover');
+        const $alert = $('#changeCoverAlert');
+        $alert.hide();
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang cập nhật...');
+
+        const formData = new FormData(this);
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: formData,
+          contentType: false,
+          processData: false,
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Cập Nhật Ảnh Bìa');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const newUrl = res.data && res.data.cover_url;
+              if (newUrl) {
+                $('#mainStoryCoverImg').attr('src', newUrl);
+                $('#editStoryCoverPreview').attr('src', newUrl).show();
+              }
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Thay đổi ảnh bìa thành công!')).fadeIn();
+              setTimeout(() => {
+                $('#modalChangeCoverDirect').hide();
+              }, 1000);
+            } else {
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Lỗi cập nhật ảnh bìa!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Cập Nhật Ảnh Bìa');
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+          }
+        });
+      });
+
+      // 13. Cây bút cạnh tên truyện (Hình 1): Đổi tên truyện nhanh
+      $('#btnEditTitleInline').on('click', function(e) {
+        e.preventDefault();
+        const storyId = $(this).data('story-id');
+        if (!storyId) return;
+
+        const currentTitle = $('#storyTitleText').text().trim();
+        $('#editTitleAlert').hide();
+        $('#quickTitleStoryId').val(storyId);
+        $('#inputQuickStoryTitle').val(currentTitle);
+
+        $('#modalEditTitleDirect').css('display', 'flex');
+        $('#inputQuickStoryTitle').trigger('focus');
+      });
+
+      // Submit Form Đổi Tên Truyện Nhanh
+      $('#formEditTitleDirect').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSubmitQuickTitle');
+        const $alert = $('#editTitleAlert');
+        const newTitle = $('#inputQuickStoryTitle').val().trim();
+        $alert.hide();
+
+        if (!newTitle) {
+          $alert.removeClass('alert-success').addClass('alert-error').text('Vui lòng nhập tên truyện!').fadeIn();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: $(this).serialize(),
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Cập Nhật Tên Truyện');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $('#storyTitleText').text(newTitle);
+              $('#breadcrumbStoryTitle').text(newTitle);
+              $('#modalStoryTitleText').text(newTitle);
+              $('#editStoryTitle').val(newTitle);
+
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Đổi tên truyện thành công!')).fadeIn();
+              setTimeout(() => {
+                $('#modalEditTitleDirect').hide();
+              }, 900);
+            } else {
+              $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Lỗi đổi tên truyện!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Cập Nhật Tên Truyện');
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+          }
+        });
+      });
+
+      // 14. Đóng Quick Modals
+      $('.btn-close-quick-modal').on('click', function(e) {
+        e.preventDefault();
+        $('#modalChangeCoverDirect, #modalEditTitleDirect').hide();
+      });
+
+      $('#modalChangeCoverDirect, #modalEditTitleDirect').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
       });
     }
   };

@@ -22,9 +22,11 @@ $chap_count = count($chapters);
 $first_chap_url = !empty($chapters) ? get_permalink($chapters[0]->ID) : '#';
 $last_chap_url  = !empty($chapters) ? get_permalink(end($chapters)->ID) : '#';
 
-// Bookmarked check
+// Bookmarked check & Role check
 $is_bookmarked = false;
-$can_change_status = false;
+$can_manage_story = is_user_logged_in() && (current_user_can('administrator') || current_user_can('dich_gia'));
+$can_change_status = $can_manage_story;
+
 if (is_user_logged_in()) {
     global $wpdb;
     $current_uid = get_current_user_id();
@@ -32,7 +34,7 @@ if (is_user_logged_in()) {
     $is_bookmarked = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_bm WHERE user_id = %d AND story_id = %d", $current_uid, $story_id));
 
     $post_author_id = (int) get_post_field('post_author', $story_id);
-    if (current_user_can('administrator') || ($post_author_id === $current_uid)) {
+    if ($current_user_can('administrator') || ($post_author_id === $current_uid)) {
         $can_change_status = true;
     }
 }
@@ -49,21 +51,35 @@ if (!$thumb_url) {
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--primary-green); font-weight: 600;"><?php the_title(); ?></span>
+            <span style="color: var(--primary-green); font-weight: 600;" id="breadcrumbStoryTitle"><?php the_title(); ?></span>
         </nav>
 
         <!-- CENTER 2: PHẦN LEFT (ẢNH) & PHẦN RIGHT (THÔNG TIN) -->
         <div class="story-detail-top">
             <!-- Left: Hình ảnh truyện -->
             <div class="story-cover-col">
-                <div class="story-cover-frame">
-                    <img src="<?php echo esc_url($thumb_url); ?>" alt="<?php the_title_attribute(); ?>" />
+                <div class="story-cover-frame" id="storyCoverFrame">
+                    <img id="mainStoryCoverImg" src="<?php echo esc_url($thumb_url); ?>" alt="<?php the_title_attribute(); ?>" />
+                    <?php if ($can_manage_story) : ?>
+                        <button type="button" class="btn-change-cover-overlay" id="btnChangeCoverOverlay" data-story-id="<?php echo $story_id; ?>" title="Đổi ảnh bìa truyện (Admin & Dịch giả)">
+                            <i class="fa-solid fa-camera"></i>
+                            <i class="fa-solid fa-pen"></i>
+                            <span>Đổi ảnh</span>
+                        </button>
+                    <?php endif; ?>
                 </div>
             </div>
 
             <!-- Right: Thông tin truyện -->
             <div class="story-info-col">
-                <h1 class="story-info-title"><?php the_title(); ?></h1>
+                <div class="story-title-header-wrap">
+                    <h1 class="story-info-title" id="storyTitleText"><?php the_title(); ?></h1>
+                    <?php if ($can_manage_story) : ?>
+                        <button type="button" class="btn-edit-title-inline" id="btnEditTitleInline" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa tên truyện (Admin & Dịch giả)">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    <?php endif; ?>
+                </div>
 
                 <div class="story-info-meta-list">
                     <?php if (!empty($author)) : ?>
@@ -164,7 +180,11 @@ if (!$thumb_url) {
                         <?php echo $is_bookmarked ? 'Đã Lưu Tủ Truyện' : 'Lưu Vào Tủ Truyện'; ?>
                     </button>
 
-                    <?php if (current_user_can('dich_gia') || current_user_can('administrator')) : ?>
+                    <?php if ($can_manage_story) : ?>
+                        <button type="button" class="btn btn-outline btn-edit-story" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa toàn bộ thông tin truyện (Admin & Dịch giả)">
+                            <i class="fa-solid fa-pen-to-square"></i> Chỉnh Sửa Truyện
+                        </button>
+
                         <a href="<?php echo esc_url(add_query_arg('story_id', $story_id, home_url('/them-chuong/'))); ?>" class="btn btn-outline" style="border-style: dashed;">
                             <i class="fa-solid fa-plus-circle"></i> Thêm Chương Mới
                         </a>
@@ -215,15 +235,22 @@ if (!$thumb_url) {
                         $chap_num   = get_post_meta($chap->ID, '_chuong_number', true) ?: 1;
                         $chap_views = muop_get_chapter_views($chap->ID);
                     ?>
-                        <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
-                            <span class="chapter-item-title"><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
-                            <span class="chapter-item-meta">
-                                <span class="chapter-item-views" title="Lượt xem">
-                                    <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
+                        <div class="chapter-item-row">
+                            <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
+                                <span class="chapter-item-title"><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
+                                <span class="chapter-item-meta">
+                                    <span class="chapter-item-views" title="Lượt xem">
+                                        <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
+                                    </span>
+                                    <span class="chapter-item-date"><?php echo get_the_time('d/m/Y', $chap->ID); ?></span>
                                 </span>
-                                <span class="chapter-item-date"><?php echo get_the_time('d/m/Y', $chap->ID); ?></span>
-                            </span>
-                        </a>
+                            </a>
+                            <?php if ($can_manage_story) : ?>
+                                <button type="button" class="btn-edit-chapter-direct" data-story-id="<?php echo $story_id; ?>" data-chapter-id="<?php echo $chap->ID; ?>" title="Chỉnh sửa nội dung chương này (Admin & Dịch giả)">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                            <?php endif; ?>
+                        </div>
                     <?php endforeach; ?>
                 </div>
             <?php else : ?>
@@ -288,4 +315,9 @@ if (!$thumb_url) {
 </div>
 
 <?php
+if ($can_manage_story) {
+    get_template_part('templates/modal-edit-story-master');
+    get_template_part('templates/modal-quick-edit-story');
+}
+
 get_footer();

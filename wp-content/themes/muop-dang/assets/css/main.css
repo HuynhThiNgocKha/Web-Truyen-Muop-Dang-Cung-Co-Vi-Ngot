@@ -1036,6 +1036,7 @@ img {
 }
 
 .story-cover-frame {
+  position: relative;
   width: 100%;
   aspect-ratio: 5 / 7;
   border-radius: var(--radius-md);
@@ -5407,5 +5408,165 @@ img {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
+
+/* -------------------------------------------------------------
+ * EDIT BUTTONS & OVERLAYS (Admin & Dịch Giả)
+ * ----------------------------------------------------------- */
+.btn-change-cover-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  opacity: 0.9;
+  z-index: 5;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.btn-change-cover-overlay:hover {
+  background: var(--primary-green);
+  opacity: 1;
+  border-color: transparent;
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 4px 14px rgba(46, 125, 50, 0.4);
+  color: #ffffff;
+}
+
+.btn-change-cover-overlay i {
+  font-size: 11.5px;
+}
+
+.story-title-header-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.story-title-header-wrap .story-info-title {
+  margin-bottom: 0;
+}
+
+.btn-edit-title-inline {
+  background: var(--pastel-green);
+  border: 1px solid var(--border-color);
+  color: var(--primary-green);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-edit-title-inline:hover {
+  background: var(--primary-green);
+  color: #ffffff;
+  border-color: var(--primary-green);
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.25);
+}
+
+.chapter-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.chapter-item-row .chapter-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-edit-chapter-direct {
+  background: var(--pastel-green);
+  border: 1px solid var(--border-color);
+  color: var(--primary-green);
+  width: 36px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-edit-chapter-direct:hover {
+  background: var(--primary-green);
+  color: #ffffff;
+  border-color: var(--primary-green);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.25);
+}
+
+.preset-cover-card {
+  aspect-ratio: 5 / 7;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  background: var(--bg-card);
+}
+
+.preset-cover-card:hover {
+  border-color: var(--primary-green);
+  transform: scale(1.04);
+}
+
+.preset-cover-card.is-selected {
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.35);
+}
+
+.preset-cover-card.is-selected::after {
+  content: '\f00c';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--primary-green);
+  color: #ffffff;
+  font-size: 10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preset-cover-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 
 
