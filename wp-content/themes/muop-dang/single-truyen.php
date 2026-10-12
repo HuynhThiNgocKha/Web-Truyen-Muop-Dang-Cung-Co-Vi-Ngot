@@ -49,8 +49,6 @@ if (!$thumb_url) {
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Truyện</a>
-            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
             <span style="color: var(--primary-green); font-weight: 600;"><?php the_title(); ?></span>
         </nav>
 
