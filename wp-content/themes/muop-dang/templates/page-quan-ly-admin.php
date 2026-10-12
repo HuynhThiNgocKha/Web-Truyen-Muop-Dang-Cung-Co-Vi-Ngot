@@ -204,7 +204,7 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                     <thead>
                         <tr>
                             <th>Tên Truyện</th>
-                            <th>Dịch Giả / Tác Giả</th>
+                            <th>Dịch Giả</th>
                             <th>Trạng Thái</th>
                             <th>Số Chương</th>
                             <th>Lượt Xem</th>
@@ -218,6 +218,17 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                             $st_views    = muop_get_story_views($st->ID);
                             $st_nominate = get_post_meta($st->ID, '_truyen_nominated', true) ?: 'none';
                             $st_chaps    = count(muop_get_story_chapters($st->ID));
+                            $st_team     = get_post_meta($st->ID, '_truyen_team', true);
+                            if (empty($st_team)) {
+                                $st_team = get_post_meta($st->ID, '_truyen_dich_gia', true);
+                            }
+                            if (empty($st_team)) {
+                                $team_terms = wp_get_post_terms($st->ID, 'team_dich');
+                                $st_team = !empty($team_terms) ? $team_terms[0]->name : '';
+                            }
+                            if (empty($st_team)) {
+                                $st_team = 'Mướp Đắng Cũng Có Vị Ngọt';
+                            }
                         ?>
                             <tr>
                                 <td>
@@ -225,7 +236,10 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                                         <?php echo esc_html($st->post_title); ?>
                                     </a>
                                 </td>
-                                <td><?php echo esc_html($st_author); ?></td>
+                                <td>
+                                    <span style="font-weight: 600; color: var(--text-main); display: block;"><?php echo esc_html($st_team); ?></span>
+                                    <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px;"><i class="fa-solid fa-user-pen"></i> Đăng bởi: <?php echo esc_html($st_author); ?></span>
+                                </td>
                                 <td>
                                     <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
                                         <?php if ($st->post_status === 'publish') : ?>
@@ -282,6 +296,17 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                     $st_views    = muop_get_story_views($st->ID);
                     $st_nominate = get_post_meta($st->ID, '_truyen_nominated', true) ?: 'none';
                     $st_chaps    = count(muop_get_story_chapters($st->ID));
+                    $st_team     = get_post_meta($st->ID, '_truyen_team', true);
+                    if (empty($st_team)) {
+                        $st_team = get_post_meta($st->ID, '_truyen_dich_gia', true);
+                    }
+                    if (empty($st_team)) {
+                        $team_terms = wp_get_post_terms($st->ID, 'team_dich');
+                        $st_team = !empty($team_terms) ? $team_terms[0]->name : '';
+                    }
+                    if (empty($st_team)) {
+                        $st_team = 'Mướp Đắng Cũng Có Vị Ngọt';
+                    }
                 ?>
                     <div class="admin-story-card">
                         <div class="admin-story-card-top">
@@ -300,6 +325,8 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                         </div>
 
                         <div class="admin-story-card-meta">
+                            <span><i class="fa-solid fa-users"></i> <?php echo esc_html($st_team); ?></span>
+                            <span>•</span>
                             <span><i class="fa-solid fa-user-pen"></i> <?php echo esc_html($st_author); ?></span>
                             <span>•</span>
                             <span><i class="fa-solid fa-book-open"></i> <strong><?php echo $st_chaps; ?></strong> c</span>

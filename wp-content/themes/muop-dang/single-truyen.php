@@ -11,6 +11,13 @@ $views    = muop_get_story_views($story_id);
 $status   = get_post_meta($story_id, '_truyen_status', true);
 $author   = get_post_meta($story_id, '_truyen_author_name', true);
 $team     = get_post_meta($story_id, '_truyen_team', true);
+if (empty($team)) {
+    $team_terms = get_the_terms($story_id, 'team_dich');
+    $team = (!empty($team_terms) && !is_wp_error($team_terms)) ? $team_terms[0]->name : get_post_meta($story_id, '_truyen_dich_gia', true);
+}
+if (empty($team)) {
+    $team = 'Mướp Đắng Cũng Có Vị Ngọt';
+}
 $updated_data = muop_get_story_last_updated($story_id);
 $updated      = $updated_data['display'];
 

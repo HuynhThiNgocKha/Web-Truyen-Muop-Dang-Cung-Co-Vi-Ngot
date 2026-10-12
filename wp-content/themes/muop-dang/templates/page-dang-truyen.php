@@ -56,7 +56,7 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
 
                     <div class="form-group">
                         <label class="form-label" for="storyTeam">Team (Dịch Giả)</label>
-                        <input type="text" id="storyTeam" name="team_name" class="form-input" value="<?php echo esc_attr($current_user->display_name); ?>" placeholder="Tên team dịch" />
+                        <input type="text" id="storyTeam" name="team_name" class="form-input" value="<?php echo esc_attr(current_user_can('administrator') ? 'Mướp Đắng Cũng Có Vị Ngọt' : $current_user->display_name); ?>" placeholder="Tên team dịch" />
                     </div>
                 </div>
 
