@@ -393,7 +393,23 @@ $preset_avatars = array(
                         </div>
                     </div>
 
-                    <!-- 2. Kiểu chữ (Font) -->
+                    <!-- 2. Khoảng cách các đoạn -->
+                    <div class="form-setting-group">
+                        <label class="form-setting-title"><i class="fa-solid fa-arrows-up-down"></i> Khoảng cách các đoạn:</label>
+                        <div class="setting-spacing-chips" id="profileSpacingChips">
+                            <button type="button" class="spacing-chip-btn" data-spacing="8">Gọn (8px)</button>
+                            <button type="button" class="spacing-chip-btn active" data-spacing="14">Vừa (14px)</button>
+                            <button type="button" class="spacing-chip-btn" data-spacing="20">Thoáng (20px)</button>
+                            <button type="button" class="spacing-chip-btn" data-spacing="26">Rộng (26px)</button>
+                        </div>
+                        <div class="size-adjuster-wrap" style="margin-top: 8px;">
+                            <button type="button" class="font-size-btn-sm" id="btnProfileSpacingDec" title="Giảm khoảng cách đoạn"><i class="fa-solid fa-minus"></i></button>
+                            <span class="size-val-display" id="profileSpacingDisplay">14px</span>
+                            <button type="button" class="font-size-btn-sm" id="btnProfileSpacingInc" title="Tăng khoảng cách đoạn"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- 3. Kiểu chữ (Font) -->
                     <div class="form-setting-group">
                         <label class="form-setting-title"><i class="fa-solid fa-font"></i> Kiểu phông chữ (Font):</label>
                         <div class="setting-font-chips" id="profileFontChips">

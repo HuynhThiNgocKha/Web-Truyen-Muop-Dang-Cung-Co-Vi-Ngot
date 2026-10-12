@@ -1845,7 +1845,7 @@ img {
 
 .chapter-body-text {
   font-size: 21px;
-  line-height: 2.05;
+  line-height: var(--reading-line-height, 1.85);
   color: var(--text-main);
   letter-spacing: 0.012em;
   word-break: break-word;
@@ -1853,8 +1853,8 @@ img {
 }
 
 .chapter-body-text p {
-  margin-bottom: 26px;
-  line-height: 2.05;
+  margin-bottom: var(--reading-paragraph-spacing, 14px);
+  line-height: var(--reading-line-height, 1.85);
 }
 
 .chapter-body-text p:last-child {
@@ -1864,7 +1864,7 @@ img {
 .chapter-body-text br {
   display: block;
   content: "";
-  margin-bottom: 18px;
+  margin-bottom: calc(var(--reading-paragraph-spacing, 14px) * 0.65);
 }
 
 /* Kiểu chữ đọc truyện (Reader Fonts) */
@@ -2117,6 +2117,38 @@ img {
 }
 
 .font-chip-btn.active {
+  background: var(--soft-green);
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--primary-green);
+}
+
+/* Paragraph Spacing Chips (Khoảng cách các đoạn) */
+.setting-spacing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.spacing-chip-btn {
+  padding: 6px 13px;
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.spacing-chip-btn:hover {
+  border-color: var(--primary-green);
+  color: var(--primary-green);
+}
+
+.spacing-chip-btn.active {
   background: var(--soft-green);
   border-color: var(--primary-green);
   color: var(--primary-green);
@@ -4217,12 +4249,12 @@ img {
   }
   .chapter-body-text {
     font-size: 19px;
-    line-height: 2.0;
+    line-height: var(--reading-line-height, 1.8);
     letter-spacing: 0.012em;
   }
   .chapter-body-text p {
-    margin-bottom: 24px;
-    line-height: 2.0;
+    margin-bottom: var(--reading-paragraph-spacing, 13px);
+    line-height: var(--reading-line-height, 1.8);
   }
   .chapter-body-text p:last-child {
     margin-bottom: 0;
@@ -4230,7 +4262,7 @@ img {
   .chapter-body-text br {
     display: block;
     content: "";
-    margin-bottom: 16px;
+    margin-bottom: calc(var(--reading-paragraph-spacing, 13px) * 0.65);
   }
 
   /* Admin Dashboard Mobile Tidy & Compact Optimization */

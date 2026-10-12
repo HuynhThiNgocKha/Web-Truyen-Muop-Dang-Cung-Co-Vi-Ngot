@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.2');
+define('MUOP_THEME_VERSION', '2.2.3');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -1359,12 +1359,14 @@ function muop_ajax_save_reading_preferences_handler() {
     $font_family = isset($_POST['font_family']) ? sanitize_text_field($_POST['font_family']) : 'sans-serif';
     $text_color_light = isset($_POST['text_color_light']) ? sanitize_text_field($_POST['text_color_light']) : '#262626';
     $text_color_dark = isset($_POST['text_color_dark']) ? sanitize_text_field($_POST['text_color_dark']) : '#E5E7EB';
+    $paragraph_spacing = isset($_POST['paragraph_spacing']) ? intval($_POST['paragraph_spacing']) : 14;
     
     $prefs = array(
-        'font_size'        => $font_size,
-        'font_family'      => $font_family,
-        'text_color_light' => $text_color_light,
-        'text_color_dark'  => $text_color_dark,
+        'font_size'         => $font_size,
+        'font_family'       => $font_family,
+        'text_color_light'  => $text_color_light,
+        'text_color_dark'   => $text_color_dark,
+        'paragraph_spacing' => $paragraph_spacing,
     );
     update_user_meta($user_id, 'muop_reading_preferences', $prefs);
     wp_send_json_success(array('message' => 'Đã lưu cài đặt đọc truyện thành công!', 'preferences' => $prefs));

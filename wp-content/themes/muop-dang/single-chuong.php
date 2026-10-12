@@ -324,7 +324,23 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
             </div>
         </div>
 
-        <!-- 2. KIỂU CHỮ (FONT) -->
+        <!-- 2. KHOẢNG CÁCH CÁC ĐOẠN (DÃN ĐOẠN) -->
+        <div class="setting-item-block">
+            <label class="setting-item-label"><i class="fa-solid fa-arrows-up-down"></i> Khoảng cách các đoạn</label>
+            <div class="setting-spacing-chips" id="readingSpacingChips">
+                <button type="button" class="spacing-chip-btn" data-spacing="8">Gọn (8px)</button>
+                <button type="button" class="spacing-chip-btn active" data-spacing="14">Vừa (14px)</button>
+                <button type="button" class="spacing-chip-btn" data-spacing="20">Thoáng (20px)</button>
+                <button type="button" class="spacing-chip-btn" data-spacing="26">Rộng (26px)</button>
+            </div>
+            <div class="setting-size-row" style="margin-top: 10px;">
+                <button type="button" class="font-size-btn-sm" id="btnQuickSpacingDec" title="Giảm khoảng cách đoạn"><i class="fa-solid fa-minus"></i></button>
+                <span class="setting-size-badge" id="settingSpacingBadge">14px</span>
+                <button type="button" class="font-size-btn-sm" id="btnQuickSpacingInc" title="Tăng khoảng cách đoạn"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+
+        <!-- 3. KIỂU CHỮ (FONT) -->
         <div class="setting-item-block">
             <label class="setting-item-label"><i class="fa-solid fa-font"></i> Kiểu chữ (Font)</label>
             <div class="setting-font-chips" id="readingFontChips">

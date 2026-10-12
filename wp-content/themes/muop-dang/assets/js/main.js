@@ -228,7 +228,8 @@
       fontSize: ($(window).width() <= 768) ? 19 : 21,
       fontFamily: 'sans-serif',
       textColorLight: '#262626',
-      textColorDark: '#E5E7EB'
+      textColorDark: '#E5E7EB',
+      paragraphSpacing: ($(window).width() <= 768) ? 13 : 14
     },
 
     init() {
@@ -277,11 +278,15 @@
 
       if (source.textColorDark) this.prefs.textColorDark = source.textColorDark;
       else if (source.text_color_dark) this.prefs.textColorDark = source.text_color_dark;
+
+      if (source.paragraphSpacing) this.prefs.paragraphSpacing = parseInt(source.paragraphSpacing, 10);
+      else if (source.paragraph_spacing) this.prefs.paragraphSpacing = parseInt(source.paragraph_spacing, 10);
     },
 
     savePreferences(syncServer = false) {
       localStorage.setItem('muop_reading_prefs', JSON.stringify(this.prefs));
       localStorage.setItem('muop_reading_font_size', this.prefs.fontSize);
+      localStorage.setItem('muop_reading_paragraph_spacing', this.prefs.paragraphSpacing);
 
       if (syncServer && muopConfig.isLoggedIn) {
         $.ajax({
@@ -293,7 +298,8 @@
             font_size: this.prefs.fontSize,
             font_family: this.prefs.fontFamily,
             text_color_light: this.prefs.textColorLight,
-            text_color_dark: this.prefs.textColorDark
+            text_color_dark: this.prefs.textColorDark,
+            paragraph_spacing: this.prefs.paragraphSpacing
           }
         });
       }
@@ -303,7 +309,25 @@
       this.applyFontSize(this.prefs.fontSize);
       this.applyFontFamily(this.prefs.fontFamily);
       this.applyTextColor();
+      this.applyParagraphSpacing(this.prefs.paragraphSpacing);
       this.updateColorsPaletteUI();
+    },
+
+    applyParagraphSpacing(spacing) {
+      spacing = parseInt(spacing, 10) || (($(window).width() <= 768) ? 13 : 14);
+      this.prefs.paragraphSpacing = spacing;
+
+      document.documentElement.style.setProperty('--reading-paragraph-spacing', spacing + 'px');
+      $('.chapter-body-text, #previewBodyText').css('--reading-paragraph-spacing', spacing + 'px');
+      $('.chapter-body-text p, #previewBodyText p').css('margin-bottom', spacing + 'px');
+      $('.chapter-body-text br, #previewBodyText br').css('margin-bottom', Math.round(spacing * 0.65) + 'px');
+
+      $('#settingSpacingBadge, #profileSpacingDisplay').text(spacing + 'px');
+
+      $('.setting-spacing-chips .spacing-chip-btn, #profileSpacingChips .spacing-chip-btn').removeClass('active');
+      $(`.setting-spacing-chips .spacing-chip-btn[data-spacing="${spacing}"], #profileSpacingChips .spacing-chip-btn[data-spacing="${spacing}"]`).addClass('active');
+
+      this.savePreferences(false);
     },
 
     applyFontSize(size) {
@@ -596,6 +620,24 @@
         }
       });
 
+      // Paragraph spacing chips selection
+      $(document).on('click', '#readingSpacingChips .spacing-chip-btn', (e) => {
+        const sp = $(e.currentTarget).data('spacing');
+        this.applyParagraphSpacing(sp);
+      });
+
+      $('#btnQuickSpacingDec').on('click', () => {
+        if (this.prefs.paragraphSpacing > 6) {
+          this.applyParagraphSpacing(this.prefs.paragraphSpacing - 2);
+        }
+      });
+
+      $('#btnQuickSpacingInc').on('click', () => {
+        if (this.prefs.paragraphSpacing < 36) {
+          this.applyParagraphSpacing(this.prefs.paragraphSpacing + 2);
+        }
+      });
+
       // Font chips selection
       $(document).on('click', '#readingFontChips .font-chip-btn', (e) => {
         const font = $(e.currentTarget).data('font');
@@ -649,6 +691,7 @@
         this.prefs.fontFamily = 'sans-serif';
         this.prefs.textColorLight = '#262626';
         this.prefs.textColorDark = '#E5E7EB';
+        this.prefs.paragraphSpacing = ($(window).width() <= 768) ? 13 : 14;
         this.applyAllPreferences();
         this.savePreferences(true);
       });
@@ -665,6 +708,20 @@
       });
       $('#btnProfileFontDec').on('click', () => {
         if (this.prefs.fontSize > 15) this.applyFontSize(this.prefs.fontSize - 1);
+      });
+
+      // Spacing buttons in profile
+      $('#btnProfileSpacingInc').on('click', () => {
+        if (this.prefs.paragraphSpacing < 36) this.applyParagraphSpacing(this.prefs.paragraphSpacing + 2);
+      });
+      $('#btnProfileSpacingDec').on('click', () => {
+        if (this.prefs.paragraphSpacing > 6) this.applyParagraphSpacing(this.prefs.paragraphSpacing - 2);
+      });
+
+      // Spacing chips in profile
+      $('#profileSpacingChips .spacing-chip-btn').on('click', (e) => {
+        const sp = $(e.currentTarget).data('spacing');
+        this.applyParagraphSpacing(sp);
       });
 
       // Font chips
@@ -718,6 +775,7 @@
         this.prefs.fontFamily = 'sans-serif';
         this.prefs.textColorLight = '#262626';
         this.prefs.textColorDark = '#E5E7EB';
+        this.prefs.paragraphSpacing = ($(window).width() <= 768) ? 13 : 14;
         this.applyAllPreferences();
         this.savePreferences(true);
         $('#profileReadingSettingsAlert').html(`
