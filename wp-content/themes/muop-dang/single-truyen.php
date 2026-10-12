@@ -239,9 +239,11 @@ if (!$thumb_url) {
                             <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" class="chapter-item">
                                 <span class="chapter-item-title"><i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i> <?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
                                 <span class="chapter-item-meta">
-                                    <span class="chapter-item-views" title="Lượt xem">
-                                        <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
-                                    </span>
+                                    <?php if ($can_manage_story) : ?>
+                                        <span class="chapter-item-views" title="Lượt xem chương (Admin & Dịch giả)">
+                                            <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
+                                        </span>
+                                    <?php endif; ?>
                                     <span class="chapter-item-date" title="<?php echo esc_attr(get_the_time('d/m/Y H:i', $chap->ID)); ?>"><?php echo esc_html($chap_time_ago); ?></span>
                                 </span>
                             </a>
