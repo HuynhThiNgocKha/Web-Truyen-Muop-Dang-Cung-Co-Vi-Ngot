@@ -23,18 +23,10 @@ $all_teams = get_terms(array(
             <span style="color: var(--primary-green); font-weight: 600;">Danh Sách Team Dịch</span>
         </nav>
 
-        <div class="section-header team-page-header">
-            <div>
-                <h1 class="section-title">
-                    <i class="fa-solid fa-users"></i> Danh Sách Các Team Dịch
-                </h1>
-                <p class="team-page-subtitle">
-                    Khám phá các nhóm dịch giả tài năng, theo dõi và đón đọc những bộ truyện hay nhất!
-                </p>
-            </div>
-            <span class="team-page-count">
-                Hiện có <strong><?php echo count($all_teams); ?></strong> Team Dịch
-            </span>
+        <div class="section-header" style="margin-bottom: 24px;">
+            <h1 class="section-title">
+                <i class="fa-solid fa-users"></i> Danh Sách Các Team Dịch
+            </h1>
         </div>
 
         <?php if (!empty($all_teams) && !is_wp_error($all_teams)) : ?>

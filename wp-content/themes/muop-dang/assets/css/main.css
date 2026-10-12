@@ -5476,29 +5476,6 @@ img {
 /* ==========================================================================
    PAGE: DANH SÁCH TEAM DỊCH & TỦ TRUYỆN
    ========================================================================== */
-.team-page-header {
-  margin-bottom: 24px;
-  gap: 16px;
-}
-
-.team-page-subtitle {
-  font-size: 14px;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-
-.team-page-count {
-  font-size: 13.5px;
-  color: var(--text-muted);
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.team-page-count strong {
-  color: var(--primary-green);
-}
-
 .team-card-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5627,24 +5604,6 @@ img {
 }
 
 @media (max-width: 600px) {
-  .team-page-header {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 8px !important;
-    margin-bottom: 16px !important;
-  }
-  .team-page-subtitle {
-    font-size: 13px !important;
-    line-height: 1.4 !important;
-  }
-  .team-page-count {
-    font-size: 12px !important;
-    display: inline-block;
-    padding: 3px 10px;
-    background: var(--soft-green);
-    color: var(--primary-green);
-    border-radius: var(--radius-full);
-  }
   .team-card-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 10px !important;
