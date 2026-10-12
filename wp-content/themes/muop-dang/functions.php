@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.11');
+define('MUOP_THEME_VERSION', '2.2.12');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -2212,5 +2212,34 @@ function muop_ajax_update_team_info_handler() {
         'redirect_url' => $redirect_url
     ));
 }
+
+/**
+ * 25. Kiểm tra điều kiện xuất hiện Popup mở khóa Shopee
+ * Quy tắc:
+ * - Truyện <= 2 chương: không xuất hiện
+ * - Truyện 3 chương: xuất hiện ở chương 1 và chương 3
+ * - Truyện 4 và 5 chương: xuất hiện ở chương 2 và chương 4
+ * - Truyện từ 6 chương trở lên: xuất hiện ở chương 2 và cách 3 chương xuất hiện 1 lần (2, 5, 8, 11, ...)
+ */
+function muop_is_shopee_checkpoint($chap_order, $total_chapters) {
+    $chap_order     = (int) $chap_order;
+    $total_chapters = (int) $total_chapters;
+
+    if ($total_chapters <= 2) {
+        return false;
+    }
+
+    if ($total_chapters === 3) {
+        return ($chap_order === 1 || $chap_order === 3);
+    }
+
+    if ($total_chapters === 4 || $total_chapters === 5) {
+        return ($chap_order === 2 || $chap_order === 4);
+    }
+
+    // Từ 6 chương trở lên: chương 2, 5, 8, 11, 14, ...
+    return ($chap_order >= 2) && (($chap_order - 2) % 3 === 0);
+}
+
 
 

@@ -110,9 +110,26 @@
 
       const storyId = $readingWrapper.data('story-id');
       const chapNum = parseInt($readingWrapper.data('chapter-num'), 10) || 1;
+      const totalChapters = parseInt($readingWrapper.data('total-chapters'), 10) || 0;
+      const checkpointAttr = $readingWrapper.data('is-checkpoint');
 
-      // Rule: Starts at chapter 2, and every 3 chapters (2, 5, 8, 11, 14, ...)
-      const isShopeeCheckpoint = (chapNum >= 2) && ((chapNum - 2) % 3 === 0);
+      // Rule:
+      // - Truyện <= 2 chương: không xuất hiện
+      // - Truyện 3 chương: xuất hiện ở chương 1 và chương 3
+      // - Truyện 4 và 5 chương: xuất hiện ở chương 2 và chương 4
+      // - Truyện từ 6 chương trở lên: xuất hiện ở chương 2 và cách 3 chương (2, 5, 8, 11, ...)
+      let isShopeeCheckpoint = false;
+      if (typeof checkpointAttr !== 'undefined') {
+        isShopeeCheckpoint = (checkpointAttr === 1 || checkpointAttr === '1');
+      } else {
+        if (totalChapters === 3) {
+          isShopeeCheckpoint = (chapNum === 1 || chapNum === 3);
+        } else if (totalChapters === 4 || totalChapters === 5) {
+          isShopeeCheckpoint = (chapNum === 2 || chapNum === 4);
+        } else if (totalChapters >= 6) {
+          isShopeeCheckpoint = (chapNum >= 2) && ((chapNum - 2) % 3 === 0);
+        }
+      }
 
       if (isShopeeCheckpoint) {
         const storageKey = `muop_unlocked_s${storyId}_c${chapNum}`;

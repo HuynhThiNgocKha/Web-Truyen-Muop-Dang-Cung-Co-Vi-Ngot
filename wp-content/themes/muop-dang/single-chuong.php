@@ -35,16 +35,22 @@ foreach ($all_chapters as $idx => $c) {
     }
 }
 
-// Shopee Checkpoint rule: starts at Chapter 2, every 3 chapters: (chap_num >= 2) && ((chap_num - 2) % 3 == 0)
-$is_checkpoint = ($chap_num >= 2) && (($chap_num - 2) % 3 === 0);
-$shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
+$total_chapters = count($all_chapters);
+$chap_order     = ($total_chapters > 0) ? ($current_index + 1) : $chap_num;
+
+// Shopee Checkpoint rule: 
+// 3 chương -> chương 1 & 3; 4-5 chương -> chương 2 & 4; 6+ chương -> chương 2, 5, 8, 11...
+$is_checkpoint  = muop_is_shopee_checkpoint($chap_order, $total_chapters);
+$shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
 ?>
 
 <div class="container">
     <div class="chapter-reading-wrapper" 
          data-story-id="<?php echo esc_attr($story_id); ?>" 
          data-chapter-id="<?php echo esc_attr($chapter_id); ?>" 
-         data-chapter-num="<?php echo esc_attr($chap_num); ?>">
+         data-chapter-num="<?php echo esc_attr($chap_order); ?>"
+         data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
+         data-is-checkpoint="<?php echo $is_checkpoint ? '1' : '0'; ?>">
 
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB DẠNG NGANG TRÊN WEB) -->
         <nav class="breadcrumbs reading-chapter-breadcrumbs">
@@ -204,7 +210,7 @@ $shopee_url    = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp')
         <h3 class="shopee-modal-title">Ủng Hộ Mướp Đắng Nhé! 🌱</h3>
         
         <div class="shopee-modal-msg">
-            <p style="margin-bottom: 8px;"><strong>1. Để giúp Mướp có thể duy trì web lâu dài mọi người click vào link này nha.</strong></p>
+            <p style="margin-bottom: 8px;"><strong>Để giúp Mướp có thể duy trì web lâu dài mọi người click vào link này nha.</strong></p>
             <p style="font-size: 13px; color: var(--text-muted);">Bạn cần nhấn mở link Shopee dưới đây để hệ thống tự động mở khóa chương truyện này cho bạn đọc tiếp nhé!</p>
         </div>
 
