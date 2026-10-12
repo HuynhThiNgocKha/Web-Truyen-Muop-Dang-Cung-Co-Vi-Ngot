@@ -793,16 +793,28 @@ img {
 }
 
 .section-view-all {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-muted);
-  display: flex;
+  color: var(--primary-green);
+  background: var(--soft-green);
+  border: 1px solid var(--border-color);
+  padding: 5px 14px;
+  border-radius: var(--radius-full, 999px);
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .section-view-all:hover {
-  color: var(--primary-green);
+  background: var(--primary-green);
+  color: #ffffff;
+  border-color: var(--primary-green);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(43, 110, 78, 0.2);
 }
 
 /* Story Grid */
@@ -3496,7 +3508,7 @@ img {
     min-width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    aspect-ratio: 1 / 1.15 !important;
+    aspect-ratio: 1 / 1.28 !important;
     border-radius: 8px 8px 0 0 !important;
     position: relative !important;
     overflow: hidden !important;
@@ -3555,7 +3567,7 @@ img {
   }
 
   .story-card-body {
-    padding: 8px 8px 10px !important;
+    padding: 10px 8px 12px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
@@ -3613,6 +3625,10 @@ img {
   }
   .section-title {
     font-size: 17px;
+  }
+  .section-view-all {
+    font-size: 12px !important;
+    padding: 3px 11px !important;
   }
   /* Welcome / Hero Banner trên Mobile (Bố cục gọn gàng chuẩn Hình 2, không bị bóp chữ thành cột dọc) */
   .welcome-banner {

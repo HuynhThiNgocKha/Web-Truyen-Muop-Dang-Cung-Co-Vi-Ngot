@@ -17,6 +17,19 @@ $bookmarks = intval(get_post_meta($story_id, '_truyen_bookmarks_count', true));
 $chapters   = muop_get_story_chapters($story_id);
 $chap_count = count($chapters);
 
+// Số chương mới nhất nếu có
+$latest_chapter_num = 0;
+if (!empty($chapters)) {
+    $last_chap = end($chapters);
+    $latest_chapter_num = intval(get_post_meta($last_chap->ID, '_chuong_number', true));
+    if (!$latest_chapter_num) {
+        $latest_chapter_num = $chap_count;
+    }
+}
+
+// Kiểm tra xem có phải mục "Truyện Mới Cập Nhật" hay không
+$is_new_updated = (!empty($args) && !empty($args['show_latest_chapter'])) || is_page('truyen-moi');
+
 // Thời gian cập nhật gần nhất
 $time_diff = human_time_diff(get_post_modified_time('U', false, $story_id), current_time('timestamp')) . ' trước';
 
@@ -67,7 +80,11 @@ if (!$thumb_url) {
         <!-- Hàng hiển thị: Chương & Thời gian cập nhật (chuẩn Hình 2) -->
         <div class="story-card-subrow">
             <span class="story-sub-chap">
-                Chương <?php echo $chap_count ?: 1; ?>
+                <?php if ($is_new_updated) : ?>
+                    Chương <?php echo $latest_chapter_num ?: 1; ?>
+                <?php else : ?>
+                    Chương: <?php echo $chap_count; ?>
+                <?php endif; ?>
             </span>
             <span class="story-sub-time">
                 <?php echo esc_html($time_diff); ?>

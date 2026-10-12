@@ -40,7 +40,7 @@ $query = new WP_Query(array(
             <?php
             if ($query->have_posts()) :
                 while ($query->have_posts()) : $query->the_post();
-                    get_template_part('template-parts/story-card');
+                    get_template_part('template-parts/story-card', null, array('show_latest_chapter' => true));
                 endwhile;
             else :
                 echo '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">Chưa có truyện nào.</p>';

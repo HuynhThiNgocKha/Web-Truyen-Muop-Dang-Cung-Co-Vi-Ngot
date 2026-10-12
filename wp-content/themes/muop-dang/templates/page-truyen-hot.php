@@ -24,12 +24,12 @@ $query = new WP_Query(array(
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--primary-green); font-weight: 600;">Truyện Hot Nhiều Lượt Xem</span>
+            <span style="color: var(--primary-green); font-weight: 600;">Truyện Hot</span>
         </nav>
 
         <div class="section-header">
             <h1 class="section-title">
-                <i class="fa-solid fa-fire"></i> Bảng Xếp Hạng Truyện Hot
+                <i class="fa-solid fa-fire-flame-curved"></i> Truyện Hot
             </h1>
             <span style="font-size: 13.5px; color: var(--text-muted);">
                 Sắp xếp theo số lượt xem thực tế

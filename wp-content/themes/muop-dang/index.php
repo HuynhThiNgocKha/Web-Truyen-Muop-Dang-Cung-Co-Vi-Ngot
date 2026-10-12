@@ -31,7 +31,6 @@ get_header();
             <h2 class="section-title">
                 <i class="fa-solid fa-star"></i> Truyện Đề Cử
             </h2>
-            <span class="badge badge-nominate">BTV Khuyên Đọc</span>
         </div>
 
         <div class="story-grid">
@@ -77,7 +76,7 @@ get_header();
                 <i class="fa-solid fa-clock-rotate-left"></i> Truyện Mới Cập Nhật
             </h2>
             <a href="<?php echo esc_url(home_url('/truyen-moi/')); ?>" class="section-view-all">
-                Xem thêm <i class="fa-solid fa-arrow-right"></i>
+                Xem thêm
             </a>
         </div>
 
@@ -93,7 +92,7 @@ get_header();
 
             if ($query_new->have_posts()) :
                 while ($query_new->have_posts()) : $query_new->the_post();
-                    get_template_part('template-parts/story-card');
+                    get_template_part('template-parts/story-card', null, array('show_latest_chapter' => true));
                 endwhile;
                 wp_reset_postdata();
             else :
@@ -107,10 +106,10 @@ get_header();
     <section class="section-block">
         <div class="section-header">
             <h2 class="section-title">
-                <i class="fa-solid fa-fire-flame-curved"></i> Truyện Hot Nhiều Lượt Xem
+                <i class="fa-solid fa-fire-flame-curved"></i> Truyện Hot
             </h2>
             <a href="<?php echo esc_url(home_url('/truyen-hot/')); ?>" class="section-view-all">
-                Xem thêm <i class="fa-solid fa-arrow-right"></i>
+                Xem thêm
             </a>
         </div>
 
@@ -141,10 +140,10 @@ get_header();
     <section class="section-block">
         <div class="section-header">
             <h2 class="section-title">
-                <i class="fa-solid fa-circle-check"></i> Truyện Đã Hoàn Thành (Full)
+                <i class="fa-solid fa-circle-check"></i> Truyện Full
             </h2>
             <a href="<?php echo esc_url(home_url('/truyen-full/')); ?>" class="section-view-all">
-                Xem thêm <i class="fa-solid fa-arrow-right"></i>
+                Xem thêm
             </a>
         </div>
 

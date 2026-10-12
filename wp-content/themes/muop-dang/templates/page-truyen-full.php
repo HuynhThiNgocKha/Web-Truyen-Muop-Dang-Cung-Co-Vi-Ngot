@@ -30,12 +30,12 @@ $query = new WP_Query(array(
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--primary-green); font-weight: 600;">Truyện Đã Hoàn Thành (Full)</span>
+            <span style="color: var(--primary-green); font-weight: 600;">Truyện Full</span>
         </nav>
 
         <div class="section-header">
             <h1 class="section-title">
-                <i class="fa-solid fa-circle-check"></i> Truyện Đã Hoàn Thành (Full)
+                <i class="fa-solid fa-circle-check"></i> Truyện Full
             </h1>
             <span style="font-size: 13.5px; color: var(--text-muted);">
                 Đọc trọn bộ không lo chờ chương mới
