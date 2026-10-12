@@ -147,7 +147,7 @@ $avatar_initial = !empty($team_name) ? mb_strtoupper(mb_substr($team_name, 0, 1,
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            <span style="color: var(--text-muted);">Team Dịch</span>
+            <a href="<?php echo esc_url(home_url('/team-dich/')); ?>">Team Dịch</a>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
             <span style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html($team_name); ?></span>
         </nav>
