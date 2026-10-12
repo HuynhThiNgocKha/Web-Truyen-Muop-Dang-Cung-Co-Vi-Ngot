@@ -77,6 +77,36 @@ $genres = get_terms(array(
                     </div>
                 <?php endif; ?>
 
+                <!-- Chuông Thông Báo (Chỉ hiển thị khi đã đăng nhập theo yêu cầu Hình 1) -->
+                <?php if ($is_logged_in) : 
+                    $unread_notifs_count = muop_get_unread_notification_count($current_user->ID);
+                ?>
+                    <div class="notif-wrapper" id="notifWrapper">
+                        <button type="button" class="notif-bell-btn" id="notifToggleBtn" title="Thông báo" aria-haspopup="true" aria-expanded="false">
+                            <i class="fa-regular fa-bell"></i>
+                            <span class="notif-badge" id="notifBadgeCount" style="<?php echo ($unread_notifs_count > 0) ? '' : 'display: none;'; ?>">
+                                <?php echo ($unread_notifs_count > 99) ? '99+' : $unread_notifs_count; ?>
+                            </span>
+                        </button>
+
+                        <!-- Panel Dropdown Thông Báo -->
+                        <div class="notif-dropdown-panel" id="notifDropdownPanel" aria-hidden="true">
+                            <div class="notif-header">
+                                <div class="notif-header-title">
+                                    <i class="fa-solid fa-bell"></i> Thông Báo
+                                    <span class="notif-unread-count-pill" id="notifUnreadCountPill"><?php echo $unread_notifs_count; ?> chưa đọc</span>
+                                </div>
+                                <button type="button" class="notif-mark-all-btn" id="notifMarkAllReadBtn" title="Đánh dấu tất cả đã đọc">
+                                    <i class="fa-solid fa-check-double"></i> Đã đọc tất cả
+                                </button>
+                            </div>
+                            <div class="notif-body" id="notifListContainer">
+                                <div class="notif-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải thông báo...</div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <!-- User Account / Login / Register -->
                 <?php if ($is_logged_in) : 
                     $user_custom_avatar = get_user_meta($current_user->ID, 'muop_user_avatar', true);

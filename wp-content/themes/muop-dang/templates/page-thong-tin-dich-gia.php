@@ -18,6 +18,16 @@ $registered   = date('d/m/Y', strtotime($current_user->user_registered));
 $avatar_char  = strtoupper(substr($current_user->display_name, 0, 1));
 $custom_avatar = get_user_meta($user_id, 'muop_user_avatar', true);
 $user_bio      = get_user_meta($user_id, 'description', true);
+$bank_name     = get_user_meta($user_id, '_muop_bank_name', true) ?: '';
+$bank_holder   = get_user_meta($user_id, '_muop_bank_account_holder', true) ?: '';
+$bank_number   = get_user_meta($user_id, '_muop_bank_account_number', true) ?: '';
+
+global $wpdb;
+$table_payments = $wpdb->prefix . 'muop_translator_payments';
+$my_payments = $wpdb->get_results($wpdb->prepare(
+    "SELECT * FROM $table_payments WHERE translator_id = %d ORDER BY id DESC",
+    $user_id
+));
 
 // Stories of this translator
 $my_stories = get_posts(array(
@@ -199,6 +209,111 @@ if (!empty($story_ids)) {
                     <div class="kpi-value"><?php echo number_format($story_count); ?></div>
                     <div class="kpi-label">Tổng Truyện Đã Đăng</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- THÔNG TIN TÀI KHOẢN NGÂN HÀNG & LỊCH SỬ THANH TOÁN KÈM BILL -->
+        <div class="translator-salary-box" id="salaryHistory" style="display: grid; grid-template-columns: 360px 1fr; gap: 20px; margin-top: 24px; margin-bottom: 24px;">
+            <!-- Cột 1: Thông tin tài khoản ngân hàng nhận nhuận bút -->
+            <div class="dash-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm);">
+                <div class="dash-section-header" style="margin-bottom: 12px;">
+                    <h3 class="dash-section-title" style="font-size: 15px; margin: 0; color: var(--primary-green);">
+                        <i class="fa-solid fa-building-columns"></i> Tài Khoản Nhận Nhuận Bút
+                    </h3>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
+                    Vui lòng điền chính xác tài khoản ngân hàng chính chủ để Admin đối soát và chuyển khoản tiền nhuận bút kèm gửi bill làm bằng chứng.
+                </p>
+                <form id="formTranslatorBankInfo">
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Tên Chủ Tài Khoản (Họ và tên) <span style="color: #dc2626;">*</span></label>
+                        <input type="text" name="bank_account_holder" class="form-input" value="<?php echo esc_attr($bank_holder); ?>" placeholder="VD: NGUYEN VAN A" required style="text-transform: uppercase;" />
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Tên Ngân Hàng <span style="color: #dc2626;">*</span></label>
+                        <input type="text" name="bank_name" class="form-input" list="vietnamBanksList" value="<?php echo esc_attr($bank_name); ?>" placeholder="VD: MB Bank, Vietcombank, Techcombank..." required />
+                        <datalist id="vietnamBanksList">
+                            <option value="MB Bank (Quân Đội)">
+                            <option value="Vietcombank">
+                            <option value="Techcombank">
+                            <option value="BIDV">
+                            <option value="VietinBank">
+                            <option value="Agribank">
+                            <option value="VPBank">
+                            <option value="ACB">
+                            <option value="TPBank">
+                            <option value="Sacombank">
+                            <option value="VIB">
+                            <option value="MSB">
+                            <option value="SHB">
+                            <option value="OCB">
+                            <option value="Timo">
+                            <option value="Cake by VPBank">
+                        </datalist>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Số Tài Khoản <span style="color: #dc2626;">*</span></label>
+                        <input type="text" name="bank_account_number" class="form-input" value="<?php echo esc_attr($bank_number); ?>" placeholder="VD: 0987654321..." required />
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btnSaveBankInfo" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; font-size: 13px;">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu Thông Tin Ngân Hàng
+                    </button>
+                    <div id="bankInfoSaveMsg" style="margin-top: 10px; font-size: 12px; display: none;"></div>
+                </form>
+            </div>
+
+            <!-- Cột 2: Lịch sử nhận nhuận bút & Bill chuyển khoản -->
+            <div class="dash-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm);">
+                <div class="dash-section-header" style="margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+                    <h3 class="dash-section-title" style="font-size: 15px; margin: 0; color: var(--primary-green);">
+                        <i class="fa-solid fa-receipt"></i> Lịch Sử Nhận Tiền & Bill Chuyển Khoản
+                    </h3>
+                    <span class="count-badge">(<?php echo count($my_payments); ?> đợt)</span>
+                </div>
+
+                <?php if (!empty($my_payments)) : ?>
+                    <div class="table-responsive">
+                        <table class="data-table" style="font-size: 13px;">
+                            <thead>
+                                <tr>
+                                    <th>Kỳ Quyết Toán</th>
+                                    <th>Lượt Xem</th>
+                                    <th>Số Tiền Nhận</th>
+                                    <th>Trạng Thái</th>
+                                    <th>Thời Gian</th>
+                                    <th>Hóa Đơn / Bill</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($my_payments as $pay) : ?>
+                                    <tr>
+                                        <td><strong>Tháng <?php echo esc_html($pay->period); ?></strong></td>
+                                        <td><i class="fa-solid fa-eye"></i> <?php echo number_format($pay->views); ?></td>
+                                        <td style="color: #2E7D32; font-weight: 800; font-size: 14px;"><?php echo number_format($pay->amount); ?> VNĐ</td>
+                                        <td>
+                                            <span class="badge badge-full"><i class="fa-solid fa-check-circle"></i> Đã thanh toán</span>
+                                        </td>
+                                        <td style="font-size: 12px; color: var(--text-muted);"><?php echo date('d/m/Y H:i', strtotime($pay->created_at)); ?></td>
+                                        <td>
+                                            <?php if (!empty($pay->bill_image)) : ?>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-view-bill" data-bill-url="<?php echo esc_url($pay->bill_image); ?>" style="padding: 4px 10px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                                                    <i class="fa-solid fa-receipt"></i> Xem Bill
+                                                </button>
+                                            <?php else : ?>
+                                                <span style="color: var(--text-muted); font-size: 11px;">Không có bill</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else : ?>
+                    <div style="text-align: center; padding: 40px 20px; background: var(--pastel-green); border-radius: var(--radius-sm); color: var(--text-muted);">
+                        <i class="fa-solid fa-money-check-dollar" style="font-size: 32px; color: var(--avocado-green); margin-bottom: 8px;"></i>
+                        <p style="margin: 0; font-size: 13px;">Chưa có lượt thanh toán nào. Admin sẽ chuyển tiền và gửi bill đính kèm vào cuối mỗi chu kỳ đối soát!</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 

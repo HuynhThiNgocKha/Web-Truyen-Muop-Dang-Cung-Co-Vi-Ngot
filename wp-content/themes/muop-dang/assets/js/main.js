@@ -113,27 +113,17 @@
       const totalChapters = parseInt($readingWrapper.data('total-chapters'), 10) || 0;
       const checkpointAttr = $readingWrapper.data('is-checkpoint');
 
-      // Rule:
-      // - Truyện <= 2 chương: không xuất hiện
-      // - Truyện 3 chương: xuất hiện ở chương 1 và chương 3
-      // - Truyện 4 và 5 chương: xuất hiện ở chương 2 và chương 4
-      // - Truyện từ 6 chương trở lên: xuất hiện ở chương 2 và cách 3 chương (2, 5, 8, 11, ...)
+      // Quy tắc: Bất kỳ chương nào không phải chương 1 đều xuất hiện popup link Shopee để mở khóa
       let isShopeeCheckpoint = false;
       if (typeof checkpointAttr !== 'undefined') {
         isShopeeCheckpoint = (checkpointAttr === 1 || checkpointAttr === '1');
       } else {
-        if (totalChapters === 3) {
-          isShopeeCheckpoint = (chapNum === 1 || chapNum === 3);
-        } else if (totalChapters === 4 || totalChapters === 5) {
-          isShopeeCheckpoint = (chapNum === 2 || chapNum === 4);
-        } else if (totalChapters >= 6) {
-          isShopeeCheckpoint = (chapNum >= 2) && ((chapNum - 2) % 3 === 0);
-        }
+        isShopeeCheckpoint = (chapNum > 1);
       }
 
       if (isShopeeCheckpoint) {
         const storageKey = `muop_unlocked_s${storyId}_c${chapNum}`;
-        const isUnlocked = localStorage.getItem(storageKey);
+        const isUnlocked = sessionStorage.getItem(storageKey);
 
         if (!isUnlocked) {
           // Lock chapter & display modal
@@ -155,7 +145,7 @@
         window.open(shopeeUrl, '_blank');
 
         // 3. Mark unlocked & hide modal
-        localStorage.setItem(storageKey, 'true');
+        sessionStorage.setItem(storageKey, 'true');
         $('#shopeeGatekeeperModal').fadeOut(250);
         $('.chapter-content-box').removeClass('chapter-locked');
       });
@@ -3529,6 +3519,473 @@
     }
   };
 
+  // 17. NOTIFICATIONS & BILL PREVIEW
+  const NotificationManager = {
+    init() {
+      // Toggle dropdown panel
+      $(document).on('click', '#notifToggleBtn', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const $panel = $('#notifDropdownPanel');
+        const isOpen = $panel.hasClass('show');
+
+        // Close user dropdown if open
+        $('#userDropdownPanel').removeClass('show');
+        $('#userMenuWrapper').removeClass('active');
+
+        if (isOpen) {
+          $panel.removeClass('show');
+          $('#notifToggleBtn').attr('aria-expanded', 'false');
+        } else {
+          $panel.addClass('show');
+          $('#notifToggleBtn').attr('aria-expanded', 'true');
+          this.fetchNotifications();
+        }
+      });
+
+      // Prevent closing when clicking inside notif dropdown
+      $(document).on('click', '#notifDropdownPanel', (e) => {
+        e.stopPropagation();
+      });
+
+      // Close dropdown when clicking outside
+      $(document).on('click', (e) => {
+        if (!$(e.target).closest('#notifWrapper').length) {
+          $('#notifDropdownPanel').removeClass('show');
+          $('#notifToggleBtn').attr('aria-expanded', 'false');
+        }
+      });
+
+      // Close on Escape
+      $(document).on('keydown', (e) => {
+        if (e.key === 'Escape') {
+          $('#notifDropdownPanel').removeClass('show');
+          $('#notifToggleBtn').attr('aria-expanded', 'false');
+        }
+      });
+
+      // Mark all read
+      $(document).on('click', '#notifMarkAllReadBtn', (e) => {
+        e.preventDefault();
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_mark_all_notifs_read',
+            nonce: muopConfig.nonce
+          },
+          success: (res) => {
+            if (res && res.success) {
+              $('#notifBadgeCount').hide().text('0');
+              $('#notifUnreadCountPill').text('0 chưa đọc');
+              $('.notif-item').removeClass('unread');
+            }
+          }
+        });
+      });
+
+      // Click individual notif item
+      $(document).on('click', '.notif-item', function(e) {
+        const notifId = $(this).data('id');
+        const link = $(this).data('link');
+        const hasBill = $(this).data('bill');
+
+        // Mark as read
+        if ($(this).hasClass('unread')) {
+          $(this).removeClass('unread');
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_mark_notification_read',
+              notif_id: notifId,
+              nonce: muopConfig.nonce
+            },
+            success: (res) => {
+              if (res && res.success) {
+                const count = res.data.unread_count;
+                if (count > 0) {
+                  $('#notifBadgeCount').text(count > 99 ? '99+' : count).show();
+                  $('#notifUnreadCountPill').text(count + ' chưa đọc');
+                } else {
+                  $('#notifBadgeCount').hide().text('0');
+                  $('#notifUnreadCountPill').text('0 chưa đọc');
+                }
+              }
+            }
+          });
+        }
+
+        // If clicked on "Xem Bill" or notification has bill image
+        if ($(e.target).closest('.notif-bill-preview-btn').length || (hasBill && !link)) {
+          e.preventDefault();
+          const billUrl = hasBill || $(e.target).closest('.notif-bill-preview-btn').data('bill-url');
+          if (billUrl) {
+            NotificationManager.openBillModal(billUrl);
+          }
+          return;
+        }
+
+        if (link && !$(e.target).closest('.notif-bill-preview-btn').length) {
+          window.location.href = link;
+        }
+      });
+
+      // Global Bill Modal handlers
+      $(document).on('click', '.btn-view-bill', function(e) {
+        e.preventDefault();
+        const billUrl = $(this).data('bill-url');
+        if (billUrl) {
+          NotificationManager.openBillModal(billUrl);
+        }
+      });
+
+      $('#btnCloseBillModal, #btnDismissBillModal').on('click', () => {
+        $('#billPreviewModal').hide();
+      });
+
+      $('#billPreviewModal').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+    },
+
+    openBillModal(billUrl) {
+      $('#billModalImg').attr('src', billUrl);
+      $('#btnDownloadBill').attr('href', billUrl);
+      $('#billPreviewModal').css('display', 'flex');
+    },
+
+    fetchNotifications() {
+      const $container = $('#notifListContainer');
+      $container.html('<div class="notif-loading"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải thông báo...</div>');
+
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_get_notifications',
+          nonce: muopConfig.nonce
+        },
+        success: (res) => {
+          if (typeof res === 'string') {
+            try { res = JSON.parse(res); } catch (e) {}
+          }
+          if (res && res.success) {
+            const notifs = res.data.notifications || [];
+            const unread = res.data.unread_count || 0;
+
+            if (unread > 0) {
+              $('#notifBadgeCount').text(unread > 99 ? '99+' : unread).show();
+              $('#notifUnreadCountPill').text(unread + ' chưa đọc');
+            } else {
+              $('#notifBadgeCount').hide();
+              $('#notifUnreadCountPill').text('0 chưa đọc');
+            }
+
+            if (notifs.length === 0) {
+              $container.html('<div class="notif-empty"><i class="fa-regular fa-bell-slash" style="font-size:26px;display:block;margin-bottom:8px;color:var(--text-muted);"></i>Bạn chưa có thông báo nào.</div>');
+              return;
+            }
+
+            let html = '';
+            notifs.forEach(n => {
+              const unreadClass = n.is_read ? '' : 'unread';
+              const billBtn = n.image ? `<button type="button" class="notif-bill-preview-btn" data-bill-url="${n.image}"><i class="fa-solid fa-receipt"></i> Xem Bill Chuyển Khoản</button>` : '';
+              html += `
+                <div class="notif-item ${unreadClass}" data-id="${n.id}" data-link="${n.link || ''}" data-bill="${n.image || ''}">
+                  <div class="notif-icon-box" style="background: ${n.icon_color}18; color: ${n.icon_color};">
+                    <i class="${n.icon}"></i>
+                  </div>
+                  <div class="notif-content">
+                    <div class="notif-title">${n.title}</div>
+                    <div class="notif-message">${n.message}</div>
+                    ${billBtn}
+                    <div class="notif-time"><i class="fa-regular fa-clock"></i> ${n.time_ago}</div>
+                  </div>
+                </div>
+              `;
+            });
+            $container.html(html);
+          } else {
+            $container.html('<div class="notif-empty">Không thể tải thông báo. Vui lòng thử lại sau!</div>');
+          }
+        },
+        error: () => {
+          $container.html('<div class="notif-empty">Lỗi kết nối khi tải thông báo.</div>');
+        }
+      });
+    }
+  };
+
+  // 18. CHAPTER REPORT MODAL (HÌNH 2)
+  const ChapterReportManager = {
+    init() {
+      // Mở modal báo lỗi chương
+      $(document).on('click', '#btnOpenReportChapterModal', (e) => {
+        e.preventDefault();
+        $('#reportChapterModal').css('display', 'flex');
+      });
+
+      // Đóng modal
+      $('#btnCloseReportChapterModal, #btnCancelReportChapter').on('click', () => {
+        $('#reportChapterModal').hide();
+      });
+
+      $('#reportChapterModal').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Submit form báo lỗi
+      $('#formSubmitChapterReport').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSubmitReportChapter');
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: $(this).serialize() + '&action=muop_submit_chapter_report&nonce=' + muopConfig.nonce,
+          success: (res) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              alert(res.data.message || 'Cảm ơn bạn đã báo lỗi! Ban quản trị sẽ kiểm tra khắc phục.');
+              $('#formSubmitChapterReport')[0].reset();
+              $('#reportChapterModal').hide();
+            } else {
+              alert(getAjaxMsg(res, 'Lỗi gửi báo lỗi!'));
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            alert(msg);
+          }
+        });
+      });
+    }
+  };
+
+  // 19. TRANSLATOR BANK INFO MANAGEMENT
+  const TranslatorBankManager = {
+    init() {
+      $('#formTranslatorBankInfo').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSaveBankInfo');
+        const $msg = $('#bankInfoSaveMsg');
+        const originalHtml = $btn.html();
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $msg.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: $(this).serialize() + '&action=muop_save_translator_bank&nonce=' + muopConfig.nonce,
+          success: (res) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $msg.css('color', '#16a34a').text(res.data.message || 'Đã lưu thông tin tài khoản thành công!').fadeIn();
+              setTimeout(() => $msg.fadeOut(300), 3000);
+            } else {
+              $msg.css('color', '#dc2626').text(getAjaxMsg(res, 'Lỗi lưu thông tin ngân hàng!')).fadeIn();
+            }
+          },
+          error: () => {
+            $btn.prop('disabled', false).html(originalHtml);
+            $msg.css('color', '#dc2626').text('Lỗi kết nối máy chủ!').fadeIn();
+          }
+        });
+      });
+    }
+  };
+
+  // 20. ADMIN EXTRA MANAGERS (PAY SALARY, REPLY REPORT, BROADCAST)
+  const AdminExtraManager = {
+    init() {
+      // A. Mở Modal Thanh Toán Lương
+      $(document).on('click', '.btn-open-pay-modal', function(e) {
+        e.preventDefault();
+        const trId = $(this).data('translator-id');
+        const trName = $(this).data('translator-name');
+        const amount = $(this).data('amount');
+        const views = $(this).data('views');
+        const period = $(this).data('period');
+        const bank = $(this).data('bank') || 'Chưa cập nhật tài khoản';
+
+        $('#payTranslatorId').val(trId);
+        $('#payTranslatorName').val(trName);
+        $('#payViews').val(views);
+        $('#payPeriod').val(period);
+        $('#payAmount').val(amount);
+        $('#payBankInfo').val(bank);
+        $('#payBillFile').val('');
+        $('#payStatusMsg').hide();
+
+        $('#admModalPaySalary').css('display', 'flex');
+      });
+
+      $('#btnClosePayModal, #btnCancelPayModal').on('click', () => {
+        $('#admModalPaySalary').hide();
+      });
+
+      $('#admModalPaySalary').on('click', function(e) {
+        if (e.target === this) $(this).hide();
+      });
+
+      // Submit Thanh Toán Lương Kèm Bill
+      $('#formAdminPaySalary').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSubmitPaySalary');
+        const $msg = $('#payStatusMsg');
+        const originalHtml = $btn.html();
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang tải lên bill & gửi...');
+        $msg.hide();
+
+        const formData = new FormData(this);
+        formData.append('action', 'muop_admin_pay_salary');
+        formData.append('nonce', muopConfig.nonce);
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: (res) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              alert(res.data.message || 'Thanh toán và gửi bill thành công!');
+              $('#admModalPaySalary').hide();
+              window.location.reload();
+            } else {
+              $msg.css('color', '#dc2626').text(getAjaxMsg(res, 'Lỗi thanh toán!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $msg.css('color', '#dc2626').text(errorMsg).fadeIn();
+          }
+        });
+      });
+
+      // B. Mở Modal Phản Hồi Báo Lỗi
+      $(document).on('click', '.btn-open-reply-report', function(e) {
+        e.preventDefault();
+        const repId = $(this).data('report-id');
+        const story = $(this).data('story');
+        const chapNum = $(this).data('chapter-num');
+        const reply = $(this).data('reply') || '';
+        const status = $(this).data('status') || 'pending';
+
+        $('#replyReportId').val(repId);
+        $('#replyStoryName').text(`${story} (Chương ${chapNum})`);
+        $('#replyTextarea').val(reply);
+        $('#replyStatusSelect').val(status);
+        $('#replyStatusMsg').hide();
+
+        $('#admModalReplyReport').css('display', 'flex');
+      });
+
+      $('#btnCloseReplyModal, #btnCancelReplyModal').on('click', () => {
+        $('#admModalReplyReport').hide();
+      });
+
+      $('#admModalReplyReport').on('click', function(e) {
+        if (e.target === this) $(this).hide();
+      });
+
+      // Submit Phản Hồi Báo Lỗi
+      $('#formAdminReplyReport').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSubmitReplyReport');
+        const $msg = $('#replyStatusMsg');
+        const originalHtml = $btn.html();
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang gửi...');
+        $msg.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: $(this).serialize() + '&action=muop_admin_reply_report&nonce=' + muopConfig.nonce,
+          success: (res) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              alert(res.data.message || 'Phản hồi báo lỗi thành công!');
+              $('#admModalReplyReport').hide();
+              window.location.reload();
+            } else {
+              $msg.css('color', '#dc2626').text(getAjaxMsg(res, 'Lỗi phản hồi!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $msg.css('color', '#dc2626').text(errorMsg).fadeIn();
+          }
+        });
+      });
+
+      // C. Submit Broadcast Thông Báo Hệ Thống
+      $('#formAdminBroadcast').on('submit', function(e) {
+        e.preventDefault();
+        const $btn = $('#btnSubmitBroadcast');
+        const $msg = $('#broadcastStatusMsg');
+        const originalHtml = $btn.html();
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang phát thông báo...');
+        $msg.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: $(this).serialize() + '&action=muop_admin_send_broadcast&nonce=' + muopConfig.nonce,
+          success: (res) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              $msg.css('color', '#16a34a').text(res.data.message || 'Đã gửi thông báo thành công!').fadeIn();
+              $('#formAdminBroadcast')[0].reset();
+              setTimeout(() => $msg.fadeOut(300), 4000);
+            } else {
+              $msg.css('color', '#dc2626').text(getAjaxMsg(res, 'Lỗi phát thông báo!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $msg.css('color', '#dc2626').text(errorMsg).fadeIn();
+          }
+        });
+      });
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     localStorage.removeItem('muop_accent_color');
@@ -3548,6 +4005,10 @@
     StoryStatusManager.init();
     StorySummaryManager.init();
     TeamManager.init();
+    NotificationManager.init();
+    ChapterReportManager.init();
+    TranslatorBankManager.init();
+    AdminExtraManager.init();
   });
 
 })(jQuery);

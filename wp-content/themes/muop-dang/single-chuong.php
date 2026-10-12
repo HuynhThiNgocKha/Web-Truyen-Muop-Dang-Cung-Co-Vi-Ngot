@@ -38,9 +38,8 @@ foreach ($all_chapters as $idx => $c) {
 $total_chapters = count($all_chapters);
 $chap_order     = ($total_chapters > 0) ? ($current_index + 1) : $chap_num;
 
-// Shopee Checkpoint rule: 
-// 3 chương -> chương 1 & 3; 4-5 chương -> chương 2 & 4; 6+ chương -> chương 2, 5, 8, 11...
-$is_checkpoint  = muop_is_shopee_checkpoint($chap_order, $total_chapters);
+// Bất kỳ chương nào không phải chương 1 (từ chương 2 trở đi) đều xuất hiện popup link Shopee để mở khóa
+$is_checkpoint  = ($chap_order > 1 || $chap_num > 1);
 $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
 ?>
 
@@ -90,12 +89,15 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 <?php endif; ?>
             </div>
 
-            <!-- Điều chỉnh cỡ chữ & mở popup cài đặt đọc truyện theo Ảnh 3 -->
+            <!-- Điều chỉnh cỡ chữ & mở popup cài đặt đọc truyện theo Ảnh 3 & Nút Báo lỗi theo Ảnh 2 -->
             <div class="reading-font-bar">
                 <button type="button" class="font-size-btn" id="btnFontDec" title="Giảm cỡ chữ">A-</button>
                 <button type="button" class="font-size-btn" id="btnFontInc" title="Tăng cỡ chữ">A+</button>
                 <button type="button" class="font-size-btn btn-reading-settings-trigger" id="btnOpenReadingSettingsTop" title="Tùy chỉnh font chữ & màu sắc">
                     <i class="fa-solid fa-palette"></i>
+                </button>
+                <button type="button" class="font-size-btn btn-report-chapter-trigger" id="btnOpenReportChapterModal" title="Báo lỗi chương này">
+                    <i class="fa-solid fa-flag"></i> Báo lỗi
                 </button>
             </div>
         </div>
@@ -414,6 +416,59 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 </a>
             <?php endif; ?>
         </div>
+    </div>
+</div>
+
+<!-- MODAL POPUP BÁO LỖI CHƯƠNG THEO ẢNH 2 -->
+<div class="modal-backdrop" id="reportChapterModal" style="display: none;" aria-hidden="true">
+    <div class="modal-content report-chapter-modal-content" style="max-width: 480px; padding: 22px; border-radius: var(--radius-md);">
+        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; color: #dc2626; font-size: 16px; margin: 0; font-weight: 700;">
+                <i class="fa-solid fa-triangle-exclamation"></i> Báo Lỗi Chương Truyện
+            </h3>
+            <button type="button" class="btn-close-modal" id="btnCloseReportChapterModal" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted);" aria-label="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <form id="formSubmitChapterReport">
+            <input type="hidden" name="story_id" value="<?php echo esc_attr($story_id); ?>" />
+            <input type="hidden" name="chapter_id" value="<?php echo esc_attr(get_the_ID()); ?>" />
+            <input type="hidden" name="chapter_num" value="<?php echo esc_attr($chap_num); ?>" />
+            
+            <div class="report-info-banner" style="background: var(--pastel-green); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 13px; line-height: 1.6;">
+                <div>Truyện: <strong style="color: var(--primary-green);"><?php echo esc_html($story ? $story->post_title : ''); ?></strong></div>
+                <div>Chương: <strong>Chương <?php echo esc_html($chap_num); ?> - <?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></strong></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px;">
+                    Loại lỗi gặp phải:
+                </label>
+                <select name="issue_type" class="form-input" style="width: 100%; font-size: 13px;" required>
+                    <option value="Lỗi chính tả / ngữ pháp">Lỗi chính tả / Ngữ pháp / Dịch thuật</option>
+                    <option value="Thiếu nội dung / Mất chữ / Trắng trang">Thiếu nội dung / Mất chữ / Trắng trang</option>
+                    <option value="Trùng lặp nội dung">Trùng lặp nội dung với chương khác</option>
+                    <option value="Sai thứ tự chương">Sai thứ tự chương truyện</option>
+                    <option value="Lỗi định dạng / Hiển thị dính chữ">Lỗi định dạng hiển thị / Chữ dính liền</option>
+                    <option value="Khiếu nại bản quyền / Nội dung phản cảm">Khiếu nại bản quyền / Nội dung không phù hợp</option>
+                    <option value="Lỗi khác">Lỗi khác</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label" style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px;">
+                    Mô tả chi tiết lỗi: <span style="color: #dc2626;">*</span>
+                </label>
+                <textarea name="description" class="form-input" rows="4" style="width: 100%; font-size: 13px; resize: vertical;" placeholder="Vui lòng mô tả cụ thể câu văn bị lỗi, từ ngữ hoặc vấn đề bạn gặp phải để BQT và dịch giả kiểm tra khắc phục..." required></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="btnCancelReportChapter" style="padding: 7px 16px; font-size: 13px;">Hủy</button>
+                <button type="submit" class="btn btn-danger" id="btnSubmitReportChapter" style="background: #dc2626; border-color: #dc2626; color: #fff; padding: 7px 18px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-paper-plane"></i> Gửi Báo Lỗi
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 

@@ -69,6 +69,11 @@ if (empty($translators)) {
 
 // All Genres
 $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
+
+// Chapter Error Reports (Báo lỗi chương truyện & khiếu nại)
+$table_reports = $wpdb->prefix . 'muop_chapter_reports';
+$all_reports = $wpdb->get_results("SELECT * FROM $table_reports ORDER BY id DESC LIMIT 50");
+$pending_reports_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table_reports WHERE status = 'pending'");
 ?>
 
 <div class="container">
@@ -173,6 +178,12 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
             </button>
             <button type="button" class="dash-tab-btn" data-tab="admTabComments">
                 <i class="fa-solid fa-comments"></i> Bình Luận & Phản Hồi
+            </button>
+            <button type="button" class="dash-tab-btn" data-tab="admTabReports">
+                <i class="fa-solid fa-triangle-exclamation"></i> Báo Lỗi Chương (<?php echo $pending_reports_count; ?>)
+            </button>
+            <button type="button" class="dash-tab-btn" data-tab="admTabBroadcast">
+                <i class="fa-solid fa-bullhorn"></i> Thông Báo Hệ Thống
             </button>
         </div>
 
@@ -580,11 +591,12 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                         <tr>
                             <th>Dịch Giả</th>
                             <th>Email</th>
-                            <th>Số Truyện Đã Đăng</th>
+                            <th>Số Truyện</th>
                             <th>Lượt Xem Tháng Này</th>
-                            <th>Lương Tháng Này (8đ)</th>
-                            <th>Lương Tháng Trước</th>
-                            <th>Trạng Thái Quyết Toán</th>
+                            <th>Nhuận Bút Tháng Này</th>
+                            <th>Thông Tin Ngân Hàng</th>
+                            <th>Trạng Thái</th>
+                            <th>Hành Động</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -603,6 +615,11 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
 
                             $sal_cur  = $tr_views_month * $rate;
                             $sal_last = $tr_views_last * $rate;
+
+                            $tr_bank_name   = get_user_meta($tr->ID, '_muop_bank_name', true);
+                            $tr_bank_holder = get_user_meta($tr->ID, '_muop_bank_account_holder', true);
+                            $tr_bank_num    = get_user_meta($tr->ID, '_muop_bank_account_number', true);
+                            $tr_bank_str    = $tr_bank_num ? ($tr_bank_name . ' - ' . $tr_bank_num . ' (' . $tr_bank_holder . ')') : '';
                         ?>
                             <tr>
                                 <td><strong><?php echo esc_html($tr->display_name); ?></strong></td>
@@ -612,16 +629,89 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                                 <td style="font-size: 15px; font-weight: 800; color: #2E7D32;">
                                     <?php echo number_format($sal_cur); ?> VNĐ
                                 </td>
-                                <td style="color: var(--text-muted); font-weight: 600;">
-                                    <?php echo number_format($sal_last); ?> VNĐ
+                                <td style="font-size: 12px;">
+                                    <?php if (!empty($tr_bank_num)) : ?>
+                                        <strong><?php echo esc_html($tr_bank_name); ?></strong><br>
+                                        <span style="font-family: monospace; font-size: 12.5px;"><?php echo esc_html($tr_bank_num); ?></span><br>
+                                        <span style="color: var(--text-muted);"><?php echo esc_html($tr_bank_holder); ?></span>
+                                    <?php else : ?>
+                                        <span style="color: #ea580c; font-size: 11.5px;"><i class="fa-solid fa-triangle-exclamation"></i> Chưa cập nhật</span>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <span class="badge badge-full"><i class="fa-solid fa-check"></i> Sẵn sàng thanh toán</span>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-primary btn-sm btn-open-pay-modal" 
+                                            data-translator-id="<?php echo $tr->ID; ?>" 
+                                            data-translator-name="<?php echo esc_attr($tr->display_name); ?>" 
+                                            data-amount="<?php echo $sal_cur; ?>" 
+                                            data-views="<?php echo $tr_views_month; ?>" 
+                                            data-period="<?php echo date('m/Y'); ?>" 
+                                            data-bank="<?php echo esc_attr($tr_bank_str); ?>" 
+                                            style="padding: 4px 10px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                                        <i class="fa-solid fa-receipt"></i> Thanh Toán & Gửi Bill
+                                    </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Lịch sử các lần chuyển khoản nhuận bút kèm bill đã thanh toán -->
+            <div style="margin-top: 32px;">
+                <h4 style="font-size: 15px; font-weight: 700; color: var(--primary-green); margin-bottom: 12px;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Quyết Toán & Bill Đã Thanh Toán Gần Đây
+                </h4>
+                <?php
+                $table_payments = $wpdb->prefix . 'muop_translator_payments';
+                $recent_payments = $wpdb->get_results("SELECT * FROM $table_payments ORDER BY id DESC LIMIT 20");
+                ?>
+                <div class="table-responsive">
+                    <table class="data-table" style="font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th>Kỳ Thanh Toán</th>
+                                <th>Dịch Giả</th>
+                                <th>Lượt Xem</th>
+                                <th>Số Tiền</th>
+                                <th>Ngân Hàng</th>
+                                <th>Thời Gian</th>
+                                <th>Bill Chuyển Khoản</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($recent_payments)) : ?>
+                                <?php foreach ($recent_payments as $rp) : 
+                                    $rp_tr = get_userdata($rp->translator_id);
+                                ?>
+                                    <tr>
+                                        <td><strong>Tháng <?php echo esc_html($rp->period); ?></strong></td>
+                                        <td><strong><?php echo esc_html($rp_tr ? $rp_tr->display_name : 'ID #' . $rp->translator_id); ?></strong></td>
+                                        <td><i class="fa-solid fa-eye"></i> <?php echo number_format($rp->views); ?></td>
+                                        <td style="color: #2E7D32; font-weight: 800;"><?php echo number_format($rp->amount); ?> VNĐ</td>
+                                        <td style="font-size: 12px;"><?php echo esc_html($rp->bank_name . ' - ' . $rp->bank_account_number); ?></td>
+                                        <td style="font-size: 12px; color: var(--text-muted);"><?php echo date('d/m/Y H:i', strtotime($rp->created_at)); ?></td>
+                                        <td>
+                                            <?php if (!empty($rp->bill_image)) : ?>
+                                                <button type="button" class="btn btn-secondary btn-sm btn-view-bill" data-bill-url="<?php echo esc_url($rp->bill_image); ?>" style="padding: 3px 9px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+                                                    <i class="fa-solid fa-receipt"></i> Xem Bill
+                                                </button>
+                                            <?php else : ?>
+                                                <span style="color: var(--text-muted); font-size: 11px;">Không có</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else : ?>
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 20px; color: var(--text-muted);">Chưa có lịch sử thanh toán nào được ghi nhận.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -759,6 +849,233 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                 endif;
                 ?>
             </ul>
+        </div>
+
+        <!-- TAB 7: BÁO LỖI CHƯƠNG & KHIẾU NẠI -->
+        <div id="admTabReports" class="dash-tab-pane">
+            <div class="admin-tab-header" style="margin-bottom: 20px;">
+                <h3 class="admin-tab-title">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Báo Lỗi Chương Truyện & Khiếu Nại (<?php echo count($all_reports); ?>)
+                </h3>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+                    Danh sách lỗi do độc giả báo về. Bạn có thể phản hồi và cập nhật trạng thái xử lý.
+                </p>
+            </div>
+
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Người Báo Lỗi</th>
+                            <th>Truyện & Chương</th>
+                            <th>Loại Lỗi</th>
+                            <th>Nội Dung Mô Tả</th>
+                            <th>Thời Gian</th>
+                            <th>Trạng Thái</th>
+                            <th>Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($all_reports)) : ?>
+                            <?php foreach ($all_reports as $rep) : 
+                                $rep_story = get_post($rep->story_id);
+                                $rep_user = $rep->user_id ? get_userdata($rep->user_id) : null;
+                                $rep_user_name = $rep_user ? $rep_user->display_name : 'Độc giả ẩn danh';
+                            ?>
+                                <tr>
+                                    <td>#<?php echo $rep->id; ?></td>
+                                    <td><strong><?php echo esc_html($rep_user_name); ?></strong></td>
+                                    <td>
+                                        <a href="<?php echo esc_url(get_permalink($rep->chapter_id)); ?>" target="_blank" style="color: var(--primary-green); font-weight: 600;">
+                                            <?php echo esc_html($rep_story ? $rep_story->post_title : 'Truyện'); ?> - Chương <?php echo esc_html($rep->chapter_num); ?>
+                                        </a>
+                                    </td>
+                                    <td><span class="badge" style="background:#FEE2E2; color:#DC2626;"><?php echo esc_html($rep->issue_type); ?></span></td>
+                                    <td style="max-width: 250px; font-size: 12.5px;">
+                                        <?php echo esc_html($rep->description); ?>
+                                        <?php if (!empty($rep->admin_reply)) : ?>
+                                            <div style="margin-top: 4px; padding: 4px 8px; background: #E8F5E9; border-radius: 4px; color: #2E7D32; font-size: 11.5px;">
+                                                <strong>Phản hồi:</strong> <?php echo esc_html($rep->admin_reply); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="font-size: 12px; color: var(--text-muted);"><?php echo date('d/m/Y H:i', strtotime($rep->created_at)); ?></td>
+                                    <td>
+                                        <?php if ($rep->status === 'resolved') : ?>
+                                            <span class="badge badge-full"><i class="fa-solid fa-check"></i> Đã xử lý</span>
+                                        <?php else : ?>
+                                            <span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Chờ xử lý</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-primary btn-sm btn-open-reply-report" 
+                                                data-report-id="<?php echo $rep->id; ?>" 
+                                                data-story="<?php echo esc_attr($rep_story ? $rep_story->post_title : ''); ?>" 
+                                                data-chapter-num="<?php echo $rep->chapter_num; ?>" 
+                                                data-reply="<?php echo esc_attr($rep->admin_reply); ?>" 
+                                                data-status="<?php echo esc_attr($rep->status); ?>" 
+                                                style="padding: 4px 10px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px;">
+                                            <i class="fa-solid fa-reply"></i> Phản Hồi
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else : ?>
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 25px; color: var(--text-muted);">Hiện không có báo lỗi chương nào.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 8: GỬI THÔNG BÁO HỆ THỐNG -->
+        <div id="admTabBroadcast" class="dash-tab-pane">
+            <div class="admin-tab-header" style="margin-bottom: 20px;">
+                <h3 class="admin-tab-title">
+                    <i class="fa-solid fa-bullhorn"></i> Phát Thông Báo Hệ Thống (Broadcast)
+                </h3>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+                    Gửi thông báo tới toàn bộ người dùng, hoặc riêng nhóm dịch giả / độc giả trên hệ thống.
+                </p>
+            </div>
+
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; max-width: 650px; box-shadow: var(--shadow-sm);">
+                <form id="formAdminBroadcast">
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label" style="font-weight: 600;">Gửi Đến Đối Tượng <span style="color: #dc2626;">*</span></label>
+                        <select name="target" class="form-input" style="width: 100%;">
+                            <option value="all">Tất Cả Người Dùng (Độc Giả & Dịch Giả)</option>
+                            <option value="dich_gia">Chỉ Nhóm Dịch Giả (Translators)</option>
+                            <option value="doc_gia">Chỉ Nhóm Độc Giả (Readers)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label" style="font-weight: 600;">Tiêu Đề Thông Báo <span style="color: #dc2626;">*</span></label>
+                        <input type="text" name="title" class="form-input" placeholder="VD: Thông báo cập nhật hệ thống / Sự kiện mới..." required style="width: 100%;" />
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label" style="font-weight: 600;">Nội Dung Chi Tiết <span style="color: #dc2626;">*</span></label>
+                        <textarea name="message" class="form-input" rows="4" placeholder="Nhập nội dung thông báo gửi đến người dùng..." required style="width: 100%;"></textarea>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label" style="font-weight: 600;">Liên Kết Kèm Theo (Tùy chọn)</label>
+                        <input type="url" name="link" class="form-input" placeholder="https://..." style="width: 100%;" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="btnSubmitBroadcast" style="padding: 10px 22px; display: inline-flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-paper-plane"></i> Gửi Thông Báo Ngay
+                    </button>
+                    <div id="broadcastStatusMsg" style="margin-top: 12px; font-size: 13px; display: none;"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL ADMIN THANH TOÁN LƯƠNG & GỬI BILL CHUYỂN KHOẢN -->
+        <div id="admModalPaySalary" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; padding: 16px;">
+            <div class="modal-content" style="background: var(--bg-card); width: 100%; max-width: 480px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; padding: 0;">
+                <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; background: var(--pastel-green);">
+                    <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--primary-green); display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-money-bill-transfer"></i> Quyết Toán & Tải Lên Bill Nhuận Bút
+                    </h4>
+                    <button type="button" class="btn-close-modal" id="btnClosePayModal" style="background: none; border: none; font-size: 18px; color: var(--text-muted); cursor: pointer;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form id="formAdminPaySalary" style="padding: 20px;">
+                    <input type="hidden" name="translator_id" id="payTranslatorId" value="" />
+                    <input type="hidden" name="views" id="payViews" value="0" />
+                    
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Dịch Giả Nhận Tiền:</label>
+                        <input type="text" id="payTranslatorName" class="form-input" readonly style="background: var(--bg-body); font-weight: 700;" />
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Thông Tin Ngân Hàng Nhận:</label>
+                        <input type="text" id="payBankInfo" class="form-input" readonly style="background: var(--bg-body); font-size: 12.5px;" />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group" style="margin: 0;">
+                            <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Kỳ Thanh Toán: <span style="color: #dc2626;">*</span></label>
+                            <input type="text" name="period" id="payPeriod" class="form-input" required />
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Số Tiền (VNĐ): <span style="color: #dc2626;">*</span></label>
+                            <input type="number" name="amount" id="payAmount" class="form-input" required style="font-weight: 700; color: #2E7D32;" />
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Ảnh Biên Lai / Bill Đã Chuyển Khoản: <span style="color: #dc2626;">*</span></label>
+                        <input type="file" name="bill_image" id="payBillFile" accept="image/*" class="form-input" required style="padding: 6px;" />
+                        <span style="font-size: 11.5px; color: var(--text-muted); display: block; margin-top: 4px;">Tải lên ảnh chụp màn hình bill chuyển khoản thành công làm bằng chứng gửi dịch giả</span>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Ghi Chú Cho Dịch Giả (Tùy chọn):</label>
+                        <textarea name="note" class="form-input" rows="2" placeholder="VD: Đã chuyển khoản qua MB Bank lúc 14h..."></textarea>
+                    </div>
+
+                    <div id="payStatusMsg" style="font-size: 12.5px; margin-bottom: 12px; display: none;"></div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" id="btnCancelPayModal" style="padding: 8px 16px; font-size: 13px;">Hủy Bỏ</button>
+                        <button type="submit" class="btn btn-primary" id="btnSubmitPaySalary" style="padding: 8px 20px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-paper-plane"></i> Xác Nhận Thanh Toán
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL ADMIN PHẢN HỒI BÁO LỖI CHƯƠNG -->
+        <div id="admModalReplyReport" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; padding: 16px;">
+            <div class="modal-content" style="background: var(--bg-card); width: 100%; max-width: 460px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; padding: 0;">
+                <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; background: var(--pastel-green);">
+                    <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--primary-green); display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-reply"></i> Phản Hồi Báo Lỗi Chương
+                    </h4>
+                    <button type="button" class="btn-close-modal" id="btnCloseReplyModal" style="background: none; border: none; font-size: 18px; color: var(--text-muted); cursor: pointer;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <form id="formAdminReplyReport" style="padding: 20px;">
+                    <input type="hidden" name="report_id" id="replyReportId" value="" />
+                    
+                    <div style="background: var(--pastel-green); padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 14px; font-size: 12.5px;">
+                        Đang phản hồi cho: <strong id="replyStoryName"></strong>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Nội Dung Phản Hồi: <span style="color: #dc2626;">*</span></label>
+                        <textarea name="reply_text" id="replyTextarea" class="form-input" rows="4" placeholder="Nhập phản hồi gửi độc giả và dịch giả (VD: Cảm ơn bạn, lỗi đã được sửa lại...)" required style="width: 100%;"></textarea>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label class="form-label" style="font-size: 12.5px; font-weight: 600;">Trạng Thái Xử Lý:</label>
+                        <select name="status" id="replyStatusSelect" class="form-input" style="width: 100%;">
+                            <option value="resolved">Đã Xử Lý Xong (Resolved)</option>
+                            <option value="pending">Đang Kiểm Tra (Pending)</option>
+                        </select>
+                    </div>
+
+                    <div id="replyStatusMsg" style="font-size: 12.5px; margin-bottom: 12px; display: none;"></div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" class="btn btn-secondary" id="btnCancelReplyModal" style="padding: 8px 16px; font-size: 13px;">Đóng</button>
+                        <button type="submit" class="btn btn-primary" id="btnSubmitReplyReport" style="padding: 8px 20px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-paper-plane"></i> Gửi Phản Hồi
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>
