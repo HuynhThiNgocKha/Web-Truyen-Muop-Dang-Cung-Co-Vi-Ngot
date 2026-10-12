@@ -5476,6 +5476,29 @@ img {
 /* ==========================================================================
    PAGE: DANH SÁCH TEAM DỊCH & TỦ TRUYỆN
    ========================================================================== */
+.team-page-header {
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.team-page-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.team-page-count {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.team-page-count strong {
+  color: var(--primary-green);
+}
+
 .team-card-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5604,12 +5627,86 @@ img {
 }
 
 @media (max-width: 600px) {
+  .team-page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    margin-bottom: 16px !important;
+  }
+  .team-page-subtitle {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+  .team-page-count {
+    font-size: 12px !important;
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--soft-green);
+    color: var(--primary-green);
+    border-radius: var(--radius-full);
+  }
   .team-card-grid {
-    grid-template-columns: 1fr;
-    gap: 14px;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
   }
   .team-list-card {
-    padding: 18px 14px;
+    padding: 14px 8px !important;
+    gap: 10px !important;
+  }
+  .team-card-avatar {
+    width: 58px !important;
+    height: 58px !important;
+    font-size: 22px !important;
+  }
+  .team-card-name {
+    font-size: 13.5px !important;
+    line-height: 1.3 !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .team-card-header {
+    gap: 4px !important;
+    margin-bottom: 6px !important;
+  }
+  .team-card-header .badge {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+  .team-card-stats {
+    gap: 4px 6px !important;
+    font-size: 11px !important;
+    margin-bottom: 10px !important;
+  }
+  .team-card-btn {
+    padding: 6px 8px !important;
+    font-size: 11.5px !important;
+    gap: 4px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .team-card-grid {
+    gap: 8px !important;
+  }
+  .team-list-card {
+    padding: 12px 6px !important;
+  }
+  .team-card-avatar {
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 18px !important;
+  }
+  .team-card-name {
+    font-size: 12.5px !important;
+  }
+  .team-card-stats {
+    font-size: 10px !important;
+  }
+  .team-card-btn {
+    font-size: 10.5px !important;
+    padding: 5px 4px !important;
   }
 }
 
