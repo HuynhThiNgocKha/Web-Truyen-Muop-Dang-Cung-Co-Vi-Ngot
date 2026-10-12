@@ -196,9 +196,6 @@ if (!empty($story_ids)) {
                     <i class="fa-solid fa-book-bookmark"></i> Quản Lý Truyện Của Tôi 
                     <span class="count-badge">(<?php echo $story_count; ?>)</span>
                 </h2>
-                <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>" class="btn btn-primary" style="padding: 6px 14px; font-size: 13px;">
-                    <i class="fa-solid fa-plus-circle"></i> Đăng Truyện Mới
-                </a>
             </div>
 
             <div class="table-scroll-hint">
