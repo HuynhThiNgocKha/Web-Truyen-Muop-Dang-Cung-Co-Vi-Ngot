@@ -129,26 +129,26 @@ if (!empty($story_ids)) {
 
         <!-- SALARY & REVENUE HIGHLIGHT (8Đ / VIEW) -->
         <div class="salary-highlight-card">
-            <div>
-                <span style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
-                    <i class="fa-solid fa-coins" style="color: #F57F17;"></i> Tiền Nhuận Bút Tháng Hiện Tại (<?php echo date('m/Y'); ?>)
+            <div class="salary-main-col">
+                <span class="salary-label">
+                    <i class="fa-solid fa-coins"></i> Tiền Nhuận Bút Tháng Hiện Tại (<?php echo date('m/Y'); ?>)
                 </span>
                 <div class="salary-amount">
-                    <?php echo number_format($salary_this_month); ?> <span style="font-size: 18px; font-weight: 600;">VNĐ</span>
+                    <?php echo number_format($salary_this_month); ?> <span class="salary-unit">VNĐ</span>
                 </div>
-                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                <div class="salary-subtext">
                     Định mức: <strong><?php echo $rate; ?>đ</strong> / 1 lượt xem • Đạt <strong><?php echo number_format($views_this_month); ?></strong> views trong tháng này
                 </div>
             </div>
 
-            <div style="text-align: right; border-left: 1px solid var(--border-color); padding-left: 28px;">
-                <span style="font-size: 12.5px; color: var(--text-muted); display: block; margin-bottom: 4px;">
+            <div class="salary-prev-col">
+                <span class="salary-prev-label">
                     <i class="fa-solid fa-calendar-days"></i> Nhuận Bút Tháng Trước (<?php echo date('m/Y', strtotime('-1 month')); ?>):
                 </span>
-                <strong style="font-size: 20px; color: var(--primary-green);">
+                <strong class="salary-prev-amount">
                     <?php echo number_format($salary_last_month); ?> VNĐ
                 </strong>
-                <span style="display: block; font-size: 11.5px; color: #2E7D32;">
+                <span class="salary-prev-status">
                     <i class="fa-solid fa-circle-check"></i> Đã quyết toán
                 </span>
             </div>

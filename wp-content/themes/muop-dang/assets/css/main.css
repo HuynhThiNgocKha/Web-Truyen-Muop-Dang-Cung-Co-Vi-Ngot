@@ -2870,25 +2870,93 @@ img {
 
 /* Salary Highlight Card (8 VND per view) */
 .salary-highlight-card {
-  background: linear-gradient(135deg, #E8F5E9, #DCEDC8);
-  border: 1px solid #C5E1A5;
-  border-radius: var(--radius-md);
-  padding: 20px;
+  background: var(--pastel-green);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 24px;
   margin-bottom: 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  gap: 24px;
 }
 
 [data-theme="dark"] .salary-highlight-card {
-  background: linear-gradient(135deg, #1C2B18, #2A3F24);
-  border-color: #385530;
+  background: rgba(46, 125, 50, 0.12);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.salary-main-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.salary-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.salary-label i {
+  color: #F57F17;
 }
 
 .salary-amount {
   font-size: 28px;
   font-weight: 800;
   color: var(--primary-green);
+  line-height: 1.2;
+  margin: 4px 0 6px;
+}
+
+.salary-unit {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.salary-subtext {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.salary-prev-col {
+  text-align: right;
+  border-left: 1px solid var(--border-color);
+  padding-left: 28px;
+  flex-shrink: 0;
+}
+
+.salary-prev-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.salary-prev-amount {
+  font-size: 20px;
+  color: var(--primary-green);
+  font-weight: 800;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.salary-prev-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: #2E7D32;
+  font-weight: 600;
 }
 
 /* Dashboard Tabs */
@@ -4611,6 +4679,44 @@ img {
 
   .profile-header-actions .btn {
     width: 100%;
+    justify-content: center;
+  }
+
+  .salary-highlight-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px 16px;
+    gap: 16px;
+  }
+
+  .salary-main-col {
+    width: 100%;
+    text-align: center;
+  }
+
+  .salary-label {
+    justify-content: center;
+    font-size: 12.5px;
+  }
+
+  .salary-amount {
+    font-size: 26px;
+  }
+
+  .salary-subtext {
+    font-size: 12.5px;
+  }
+
+  .salary-prev-col {
+    width: 100%;
+    text-align: center;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    padding-left: 0;
+    padding-top: 14px;
+  }
+
+  .salary-prev-status {
     justify-content: center;
   }
 
