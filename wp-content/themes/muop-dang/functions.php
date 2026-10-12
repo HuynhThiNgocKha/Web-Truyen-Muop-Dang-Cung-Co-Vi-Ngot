@@ -7,9 +7,14 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.1');
+define('MUOP_THEME_VERSION', '2.2.2');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
+
+// Thiết lập múi giờ chuẩn Việt Nam (GMT+7)
+if (function_exists('date_default_timezone_set')) {
+    date_default_timezone_set('Asia/Ho_Chi_Minh');
+}
 
 // Load MVC (Model - View - Controller) & Client-Server Architecture
 require_once MUOP_THEME_DIR . '/app/bootstrap.php';
@@ -354,12 +359,29 @@ function muop_enqueue_scripts() {
 add_action('wp_enqueue_scripts', 'muop_enqueue_scripts');
 
 // 7. Helper Functions
-function muop_time_ago($from, $to = '') {
+function muop_time_ago($from, $to = null) {
     if (empty($from)) return '';
-    if (empty($to)) {
-        $to = current_time('timestamp');
+    $now = time();
+    if ($to === null || $to === '') {
+        $to = $now;
     }
-    $diff = (int) abs($to - $from);
+    
+    // Hỗ trợ truyền vào chuỗi ngày tháng MySQL
+    if (!is_numeric($from)) {
+        $from = strtotime($from);
+    }
+    if (!$from) return '';
+
+    // Khắc phục trường hợp timestamp bị lệch gmt_offset trong quá khứ
+    $gmt_offset_sec = (int) (get_option('gmt_offset', 7) * 3600);
+    if ($from > $to && abs($from - ($to + $gmt_offset_sec)) < 3600 * 2) {
+        $from -= $gmt_offset_sec;
+    }
+
+    $diff = (int) ($to - $from);
+    if ($diff < 0) {
+        $diff = 0;
+    }
     
     if ($diff < 60) {
         return 'Vừa xong';
@@ -391,6 +413,74 @@ function muop_time_ago($from, $to = '') {
         $years = max(1, round($diff / $year));
         return $years . ' năm trước';
     }
+}
+
+/**
+ * Lấy thời gian cập nhật thực tế chuẩn múi giờ Việt Nam (GMT+7)
+ * Tự động đồng bộ giữa thời gian sửa đổi của truyện và thời gian đăng/sửa của chương mới nhất
+ *
+ * @param int $story_id ID bộ truyện
+ * @return array Mảng thông tin: timestamp, formatted (d/m/Y H:i), time_ago, display
+ */
+function muop_get_story_last_updated($story_id) {
+    $story_id = (int) $story_id;
+    if (!$story_id) {
+        $now = time();
+        return array(
+            'timestamp' => $now,
+            'formatted' => wp_date('d/m/Y H:i', $now),
+            'time_ago'  => 'Vừa xong',
+            'display'   => wp_date('d/m/Y H:i', $now) . ' (Vừa xong)'
+        );
+    }
+
+    // 1. Timestamp sửa đổi của chính truyện
+    $story_mod_ts = (int) get_post_timestamp($story_id, 'modified');
+    if (!$story_mod_ts) {
+        $story_mod_ts = (int) get_post_timestamp($story_id, 'date');
+    }
+
+    // 2. Timestamp của chương mới nhất thuộc truyện
+    $latest_chap_ts = 0;
+    $latest_chaps = get_posts(array(
+        'post_type'      => 'chuong',
+        'post_status'    => 'publish',
+        'posts_per_page' => 1,
+        'meta_key'       => '_chuong_truyen_id',
+        'meta_value'     => $story_id,
+        'orderby'        => 'post_date',
+        'order'          => 'DESC',
+        'fields'         => 'ids'
+    ));
+
+    if (!empty($latest_chaps)) {
+        $cid = $latest_chaps[0];
+        $chap_mod_ts = (int) get_post_timestamp($cid, 'modified');
+        $chap_pub_ts = (int) get_post_timestamp($cid, 'date');
+        $latest_chap_ts = max($chap_mod_ts, $chap_pub_ts);
+    }
+
+    $last_timestamp = max($story_mod_ts, $latest_chap_ts);
+    if (!$last_timestamp) {
+        $last_timestamp = time();
+    }
+
+    $formatted = wp_date('d/m/Y H:i', $last_timestamp);
+    $time_ago  = muop_time_ago($last_timestamp, time());
+
+    // Hiển thị thời gian thật rõ ràng: Ngày giờ chính xác kèm độ mới
+    // Ví dụ: 12/10/2026 16:09 (Vừa xong) hoặc 12/10/2026 15:36 (45 phút trước)
+    $display = $formatted;
+    if (!empty($time_ago)) {
+        $display = $formatted . ' (' . $time_ago . ')';
+    }
+
+    return array(
+        'timestamp' => $last_timestamp,
+        'formatted' => $formatted,
+        'time_ago'  => $time_ago,
+        'display'   => $display
+    );
 }
 
 // Hook vào human_time_diff của WordPress để dịch chuẩn sang tiếng Việt
@@ -1219,6 +1309,7 @@ function muop_ajax_update_story_status_handler() {
     }
 
     update_post_meta($story_id, '_truyen_status', $status);
+    wp_update_post(array('ID' => $story_id));
 
     $label = ($status === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra';
 
@@ -1226,7 +1317,8 @@ function muop_ajax_update_story_status_handler() {
         'message' => 'Đã đổi trạng thái truyện thành: ' . $label,
         'status'  => $status,
         'label'   => $label,
-        'is_full' => ($status === 'hoan_thanh')
+        'is_full' => ($status === 'hoan_thanh'),
+        'updated' => muop_get_story_last_updated($story_id)
     ));
 }
 
@@ -1641,7 +1733,8 @@ function muop_ajax_update_story_handler() {
         'message'     => $msg,
         'story_id'    => $story_id,
         'post_status' => $post_status,
-        'title'       => $title
+        'title'       => $title,
+        'updated'     => muop_get_story_last_updated($story_id)
     ));
 }
 
@@ -1707,7 +1800,8 @@ function muop_ajax_update_chapter_handler() {
         'chapter_id'     => $chapter_id,
         'chapter_number' => $chapter_num,
         'chapter_title'  => $clean_title,
-        'post_status'    => $post_status
+        'post_status'    => $post_status,
+        'updated'        => $story_id ? muop_get_story_last_updated($story_id) : null
     ));
 }
 
@@ -1861,7 +1955,8 @@ function muop_ajax_update_story_cover_handler() {
 
     wp_send_json_success(array(
         'message'   => 'Đã thay đổi ảnh bìa truyện thành công!',
-        'cover_url' => $new_cover_url
+        'cover_url' => $new_cover_url,
+        'updated'   => muop_get_story_last_updated($story_id)
     ));
 }
 
@@ -1902,7 +1997,8 @@ function muop_ajax_update_story_title_handler() {
 
     wp_send_json_success(array(
         'message' => 'Đã đổi tên truyện thành công!',
-        'title'   => $new_title
+        'title'   => $new_title,
+        'updated' => muop_get_story_last_updated($story_id)
     ));
 }
 

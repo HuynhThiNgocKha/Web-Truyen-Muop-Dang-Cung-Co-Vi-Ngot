@@ -11,7 +11,8 @@ $views    = muop_get_story_views($story_id);
 $status   = get_post_meta($story_id, '_truyen_status', true);
 $author   = get_post_meta($story_id, '_truyen_author_name', true);
 $team     = get_post_meta($story_id, '_truyen_team', true);
-$updated  = get_the_modified_date('d/m/Y H:i');
+$updated_data = muop_get_story_last_updated($story_id);
+$updated      = $updated_data['display'];
 
 // Taxonomies
 $terms_the_loai = get_the_terms($story_id, 'the_loai');
@@ -154,7 +155,7 @@ if (!$thumb_url) {
 
                     <div class="meta-item">
                         <span class="meta-label"><i class="fa-solid fa-clock"></i> Cập nhật:</span>
-                        <span class="meta-value"><?php echo esc_html($updated); ?></span>
+                        <span class="meta-value" id="storyUpdatedMeta" title="<?php echo esc_attr($updated_data['formatted']); ?>"><?php echo esc_html($updated); ?></span>
                     </div>
                 </div>
 

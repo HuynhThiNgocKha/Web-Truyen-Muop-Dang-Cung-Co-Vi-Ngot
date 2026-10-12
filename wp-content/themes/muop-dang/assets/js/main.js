@@ -2221,6 +2221,10 @@
               $wrap.find('.status-dropdown-item').removeClass('active');
               $item.addClass('active');
 
+              if (res.data && res.data.updated && res.data.updated.display) {
+                $('#storyUpdatedMeta').text(res.data.updated.display).attr('title', res.data.updated.formatted);
+              }
+
               alert(getAjaxMsg(res, 'Đã cập nhật trạng thái truyện thành công!'));
             } else {
               alert(getAjaxMsg(res, 'Lỗi cập nhật trạng thái!'));
@@ -2970,6 +2974,9 @@
                 $('#mainStoryCoverImg').attr('src', newUrl);
                 $('#editStoryCoverPreview').attr('src', newUrl).show();
               }
+              if (res.data && res.data.updated && res.data.updated.display) {
+                $('#storyUpdatedMeta').text(res.data.updated.display).attr('title', res.data.updated.formatted);
+              }
               $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Thay đổi ảnh bìa thành công!')).fadeIn();
               setTimeout(() => {
                 $('#modalChangeCoverDirect').hide();
@@ -3031,6 +3038,10 @@
               $('#breadcrumbStoryTitle').text(newTitle);
               $('#modalStoryTitleText').text(newTitle);
               $('#editStoryTitle').val(newTitle);
+
+              if (res.data && res.data.updated && res.data.updated.display) {
+                $('#storyUpdatedMeta').text(res.data.updated.display).attr('title', res.data.updated.formatted);
+              }
 
               $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(res, 'Đổi tên truyện thành công!')).fadeIn();
               setTimeout(() => {

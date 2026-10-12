@@ -31,7 +31,8 @@ if (!empty($chapters)) {
 $is_new_updated = (!empty($args) && !empty($args['show_latest_chapter'])) || is_page('truyen-moi');
 
 // Thời gian cập nhật gần nhất
-$time_diff = muop_time_ago(get_post_modified_time('U', false, $story_id));
+$story_update_data = muop_get_story_last_updated($story_id);
+$time_diff         = $story_update_data['time_ago'] ?: 'Mới';
 
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
 if (!$thumb_url) {
@@ -86,7 +87,7 @@ if (!$thumb_url) {
                     Chương: <?php echo $chap_count; ?>
                 <?php endif; ?>
             </span>
-            <span class="story-sub-time">
+            <span class="story-sub-time" title="<?php echo esc_attr($story_update_data['formatted']); ?>">
                 <?php echo esc_html($time_diff); ?>
             </span>
         </div>
