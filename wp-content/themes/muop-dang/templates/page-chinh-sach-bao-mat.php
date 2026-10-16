@@ -22,45 +22,54 @@ get_header();
             <h1 style="font-size: 26px; font-weight: 800; color: var(--primary-green); margin-bottom: 8px;">
                 Chính Sách Bảo Mật Thông Tin
             </h1>
+            <?php
+            $custom_privacy = get_option('muop_page_privacy', '');
+            $privacy_updated = get_option('muop_page_privacy_updated', '');
+            $updated_text = !empty($privacy_updated) ? 'Cập nhật lần cuối: ' . date_i18n('d/m/Y', strtotime($privacy_updated)) . ' • Bảo vệ quyền riêng tư người dùng tại Mướp Đắng' : 'Bảo vệ quyền riêng tư và dữ liệu cá nhân của người dùng tại Mướp Đắng';
+            ?>
             <p style="font-size: 14px; color: var(--text-muted);">
-                Bảo vệ quyền riêng tư và dữ liệu cá nhân của người dùng tại Mướp Đắng
+                <?php echo esc_html($updated_text); ?>
             </p>
         </div>
 
         <div class="story-summary-box" style="font-size: 15px; line-height: 1.8;">
-            <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
-                1. Thông Tin Chúng Tôi Thu Thập
-            </h3>
-            <p style="margin-bottom: 16px;">
-                Khi bạn đăng ký tài khoản hoặc sử dụng website, chúng tôi có thể thu thập các thông tin sau:<br>
-                - <strong>Thông tin tài khoản:</strong> Tên hiển thị, địa chỉ email, mật khẩu (được mã hóa bảo mật chuẩn WordPress MD5/Bcrypt).<br>
-                - <strong>Dữ liệu hoạt động đọc:</strong> Lịch sử các chương đã đọc, danh sách truyện trong Tủ truyện, các bình luận bạn đã gửi.<br>
-                - <strong>Dữ liệu kỹ thuật:</strong> Địa chỉ IP, loại trình duyệt nhằm mục đích bảo mật chống spam và thống kê mở khóa tiếp thị.
-            </p>
+            <?php if (!empty(trim($custom_privacy))) : ?>
+                <?php echo wp_kses_post(wpautop($custom_privacy)); ?>
+            <?php else : ?>
+                <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
+                    1. Thông Tin Chúng Tôi Thu Thập
+                </h3>
+                <p style="margin-bottom: 16px;">
+                    Khi bạn đăng ký tài khoản hoặc sử dụng website, chúng tôi có thể thu thập các thông tin sau:<br>
+                    - <strong>Thông tin tài khoản:</strong> Tên hiển thị, địa chỉ email, mật khẩu (được mã hóa bảo mật chuẩn WordPress MD5/Bcrypt).<br>
+                    - <strong>Dữ liệu hoạt động đọc:</strong> Lịch sử các chương đã đọc, danh sách truyện trong Tủ truyện, các bình luận bạn đã gửi.<br>
+                    - <strong>Dữ liệu kỹ thuật:</strong> Địa chỉ IP, loại trình duyệt nhằm mục đích bảo mật chống spam và thống kê mở khóa tiếp thị.
+                </p>
 
-            <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
-                2. Mục Đích Sử Dụng Dữ Liệu
-            </h3>
-            <p style="margin-bottom: 16px;">
-                - Cung cấp trải nghiệm đọc truyện cá nhân hóa (tiếp tục đọc từ chương đã dừng lại, lưu truyện yêu thích).<br>
-                - Hỗ trợ dịch giả tính toán lượt xem và quyết toán nhuận bút minh bạch.<br>
-                - Duy trì an ninh, ngăn chặn các hành vi gian lận, phá hoại hệ thống hoặc spam bình luận.
-            </p>
+                <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
+                    2. Mục Đích Sử Dụng Dữ Liệu
+                </h3>
+                <p style="margin-bottom: 16px;">
+                    - Cung cấp trải nghiệm đọc truyện cá nhân hóa (tiếp tục đọc từ chương đã dừng lại, lưu truyện yêu thích).<br>
+                    - Hỗ trợ dịch giả tính toán lượt xem và quyết toán nhuận bút minh bạch.<br>
+                    - Duy trì an ninh, ngăn chặn các hành vi gian lận, phá hoại hệ thống hoặc spam bình luận.
+                </p>
 
-            <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
-                3. Cam Kết Bảo Mật & Chia Sẻ Thông Tin
-            </h3>
-            <p style="margin-bottom: 16px;">
-                - Chúng tôi <strong>không bao giờ</strong> bán, trao đổi hoặc cho thuê thông tin cá nhân của bạn cho bất kỳ bên thứ ba nào vì mục đích thương mại.<br>
-                - Toàn bộ dữ liệu mật khẩu được băm và bảo vệ an toàn trong cơ sở dữ liệu MySQL, không ai (kể cả ban quản trị) có thể xem được mật khẩu dạng văn bản gốc của bạn.
-            </p>
+                <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
+                    3. Cam Kết Bảo Mật & Chia Sẻ Thông Tin
+                </h3>
+                <p style="margin-bottom: 16px;">
+                    - Chúng tôi <strong>không bao giờ</strong> bán, trao đổi hoặc cho thuê thông tin cá nhân của bạn cho bất kỳ bên thứ ba nào vì mục đích thương mại.<br>
+                    - Toàn bộ dữ liệu mật khẩu được băm và bảo vệ an toàn trong cơ sở dữ liệu MySQL, không ai (kể cả ban quản trị) có thể xem được mật khẩu dạng văn bản gốc của bạn.
+                </p>
 
-            <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
-                4. Sử Dụng Cookie & Bộ Nhớ Cục Bộ (LocalStorage)
-            </h3>
-            <p>
-                Website sử dụng Cookie và LocalStorage để lưu trữ tùy chọn giao diện Sáng / Tối, trạng thái đăng nhập và trạng thái mở khóa chương truyện để bạn có trải nghiệm đọc mượt mà nhất.
-            </p>
+                <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 10px;">
+                    4. Sử Dụng Cookie & Bộ Nhớ Cục Bộ (LocalStorage)
+                </h3>
+                <p>
+                    Website sử dụng Cookie và LocalStorage để lưu trữ tùy chọn giao diện Sáng / Tối, trạng thái đăng nhập và trạng thái mở khóa chương truyện để bạn có trải nghiệm đọc mượt mà nhất.
+                </p>
+            <?php endif; ?>
         </div>
 
         <div style="text-align: center; margin-top: 24px;">

@@ -6,6 +6,7 @@ if (!defined('ABSPATH')) exit;
 ?>
 </main><!-- .site-main -->
 
+<?php if (!is_page_template('templates/page-quan-ly-admin.php')) : ?>
 <footer class="site-footer">
     <div class="container">
         <div class="footer-content">
@@ -26,6 +27,7 @@ if (!defined('ABSPATH')) exit;
         </div>
     </div>
 </footer>
+<?php endif; ?>
 
 <!-- Modal Xem Ảnh Bill Chuyển Khoản Nhuận Bút -->
 <div class="modal-backdrop" id="billPreviewModal" style="display: none;" aria-hidden="true">
@@ -199,6 +201,90 @@ if (!defined('ABSPATH')) exit;
                         </div>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+<!-- MODAL DUYỆT & RÀ SOÁT TỪ NHẠY CẢM TRONG TRUYỆN -->
+<div class="modal-backdrop" id="modalSensitiveWordReview" style="display: none; z-index: 999999999;" aria-hidden="true">
+    <div class="modal-content sensitive-review-modal-content" style="max-width: 720px; width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 0; border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.35);">
+        <!-- Modal Header -->
+        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--pastel-green); border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-green); margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-shield-halved" style="color: var(--primary-green);"></i> Duyệt & Xử Lý Nội Dung
+                </h3>
+                <span id="sensitiveCountBadge" class="badge badge-hot" style="font-size: 12px; padding: 3px 8px;">0 từ</span>
+            </div>
+            <button type="button" class="btn-close-modal" id="btnCloseSensitiveReviewModal" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted); line-height: 1;" aria-label="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Controls Bar: Chọn ký tự thay thế tự động -->
+        <div style="padding: 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">
+                    <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary-green);"></i> Ký tự phân cách:
+                </span>
+                <div class="sensitive-delimiter-pills" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button type="button" class="delimiter-pill active" data-delim=".">Dấu chấm (.) ví dụ: c.h.ế.t</button>
+                    <button type="button" class="delimiter-pill" data-delim="*">Dấu sao (*) ví dụ: c*h*ế*t</button>
+                    <button type="button" class="delimiter-pill" data-delim="/">Dấu gạch (/) ví dụ: c/h/ế/t</button>
+                    <button type="button" class="delimiter-pill" data-delim="-">Dấu gạch (-) ví dụ: c-h-ế-t</button>
+                </div>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted);">
+                <i class="fa-solid fa-pencil"></i> Có thể tự chỉnh sửa từng từ ở bảng dưới
+            </div>
+        </div>
+
+        <!-- Modal Body (Danh sách các từ nhạy cảm phát hiện được) -->
+        <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px;">
+            <!-- Thông báo kết quả sau khi duyệt xong -->
+            <div id="sensitiveScanResultNotice" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-sm); padding: 9px 14px; font-size: 13px; color: #991b1b; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 16px;"></i>
+                <span><strong>Đã duyệt xong!</strong> Hệ thống phát hiện <strong id="detectedWordsCountText" style="color: #dc2626;">0</strong> từ nhạy cảm. Bạn có thể chọn cách tự động thay thế bằng ký tự hoặc tự sửa từng từ bên dưới:</span>
+            </div>
+
+            <!-- Message if no words found -->
+            <div id="sensitiveNoneFound" style="display: none; text-align: center; padding: 36px 20px; color: var(--text-muted);">
+                <i class="fa-solid fa-circle-check" style="font-size: 42px; color: var(--primary-green); display: block; margin-bottom: 12px;"></i>
+                <h4 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">Nội dung an toàn, không có từ nhạy cảm!</h4>
+                <p style="margin: 0; font-size: 13.5px;">Hệ thống không tìm thấy từ ngữ nhạy cảm, thô tục hay bộ phận sinh dục nào trong văn bản này.</p>
+            </div>
+
+            <!-- Table list of found words -->
+            <div id="sensitiveTableWrapper" style="overflow-x: auto;">
+                <table class="sensitive-review-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border-color); text-align: left; background: var(--soft-green);">
+                            <th style="padding: 10px 12px; width: 40px; text-align: center;">
+                                <input type="checkbox" id="checkAllSensitiveWords" checked title="Chọn tất cả" />
+                            </th>
+                            <th style="padding: 10px 12px;">Từ phát hiện</th>
+                            <th style="padding: 10px 12px; width: 80px; text-align: center;">Số lần</th>
+                            <th style="padding: 10px 12px; min-width: 220px;">Từ thay thế (bấm vào để tự sửa)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sensitiveWordsListBody">
+                        <!-- Đổ tự động bằng JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer" style="padding: 14px 20px; background: var(--soft-green); border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <span style="font-size: 12.5px; color: var(--text-muted);">
+                <i class="fa-solid fa-circle-info"></i> Bấm <strong>"OK - Thay Thế Toàn Bộ"</strong> để cập nhật trực tiếp vào văn bản.
+            </span>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-secondary" id="btnDismissSensitiveModal" style="padding: 8px 18px; font-size: 13.5px;">
+                    Hủy
+                </button>
+                <button type="button" class="btn btn-primary" id="btnApplySensitiveReplacements" style="padding: 8px 22px; font-size: 13.5px;">
+                    <i class="fa-solid fa-check"></i> OK - Thay Thế Toàn Bộ
+                </button>
             </div>
         </div>
     </div>

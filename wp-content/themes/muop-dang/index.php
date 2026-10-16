@@ -13,7 +13,7 @@ get_header();
     <div class="welcome-banner">
         <div class="banner-content">
             <h2>Chào Mừng Đến Với Mướp Đắng Cũng Có Vị Ngọt <i class="fa-solid fa-seedling" style="color: var(--avocado-green);"></i></h2>
-            <p>Nơi quy tụ những bộ truyện Zhihu dịch chuẩn, chọn lọc tinh tế, ngọt sủng, ngược tâm và drama cuốn hút mỗi ngày.</p>
+            <p>Một góc nhỏ dành cho những ai đam mê đọc truyện, đến rồi hãy ở lại ghé thăm góc nhỏ này của Mướp nha, chúc các bạn đọc truyện vui vẻ.</p>
         </div>
         <div class="banner-actions">
             <a href="<?php echo esc_url(home_url('/truyen-hot/')); ?>" class="btn btn-primary">

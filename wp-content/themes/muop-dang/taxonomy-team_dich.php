@@ -100,13 +100,16 @@ if ($first_author_id) {
 $team_fav_count = $team_id > 0 ? (int) get_term_meta($team_id, '_team_favorite_count', true) : 0;
 if ($team_fav_count < 0) $team_fav_count = 0;
 
-// Trạng thái đã yêu thích của người dùng hiện tại
+// Trạng thái đã yêu thích & theo dõi của người dùng hiện tại
 $is_favorited = false;
+$is_following_team = false;
 if (is_user_logged_in() && $team_id > 0) {
-    $user_fav_teams = get_user_meta(get_current_user_id(), '_muop_favorite_teams', true);
+    $current_uid = get_current_user_id();
+    $user_fav_teams = get_user_meta($current_uid, '_muop_favorite_teams', true);
     if (is_array($user_fav_teams) && in_array($team_id, $user_fav_teams)) {
         $is_favorited = true;
     }
+    $is_following_team = muop_is_user_following_team($current_uid, $team_id);
 }
 
 // 2. Query phân trang cho danh sách tất cả truyện của team
@@ -149,13 +152,11 @@ if (empty($team_bio)) {
     $team_bio = 'Chào mừng bạn đến với trang tác phẩm của ' . $team_name . '. Chúc các bạn độc giả có những giây phút đọc truyện ngọt ngào và thư giãn nhất!';
 }
 
-// Quyền quản lý và chỉnh sửa Team Dịch
+// Quyền quản lý và chỉnh sửa Team Dịch: Chỉ chính tác giả/dịch giả của team đó mới có quyền sửa trên frontend
 $can_edit_team = false;
 if (is_user_logged_in() && $team_id > 0) {
-    if (current_user_can('administrator')) {
-        $can_edit_team = true;
-    } elseif (current_user_can('dich_gia')) {
-        $current_uid = get_current_user_id();
+    $current_uid = get_current_user_id();
+    if (muop_user_is_translator($current_uid)) {
         foreach ($all_team_stories as $st) {
             if ((int)$st->post_author === $current_uid) {
                 $can_edit_team = true;
@@ -230,6 +231,11 @@ if (is_user_logged_in() && $team_id > 0) {
                     <button type="button" class="btn <?php echo $is_favorited ? 'btn-primary' : 'btn-secondary'; ?> btn-favorite-team" id="btnToggleFavoriteTeam" data-team-id="<?php echo esc_attr($team_id); ?>" data-team-name="<?php echo esc_attr($team_name); ?>">
                         <i class="fa-<?php echo $is_favorited ? 'solid' : 'regular'; ?> fa-heart" id="favTeamHeartIcon"></i>
                         <span id="favTeamBtnText"><?php echo $is_favorited ? 'Đã Yêu Thích Team' : 'Yêu Thích Team'; ?></span>
+                    </button>
+
+                    <button type="button" class="btn <?php echo $is_following_team ? 'btn-primary' : 'btn-secondary'; ?> btn-follow-team" id="btnToggleFollowTeam" data-team-id="<?php echo esc_attr($team_id); ?>" data-team-name="<?php echo esc_attr($team_name); ?>" title="<?php echo $is_following_team ? 'Đang theo dõi team dịch này (Bấm để hủy)' : 'Theo dõi team dịch để nhận thông báo truyện mới'; ?>">
+                        <i class="fa-<?php echo $is_following_team ? 'solid' : 'regular'; ?> fa-bell" id="followTeamBellIcon"></i>
+                        <span id="followTeamBtnText"><?php echo $is_following_team ? 'Đang Theo Dõi Team' : 'Theo Dõi Team'; ?></span>
                     </button>
                 </div>
             </div>
@@ -331,7 +337,7 @@ if (is_user_logged_in() && $team_id > 0) {
                                     </h2>
                                     <div class="team-spotlight-meta">
                                         <span><i class="fa-solid fa-pen-nib"></i> <?php echo esc_html($item_author); ?></span>
-                                        <span><i class="fa-solid fa-book-open"></i> <?php echo $item_chap_cnt; ?> chương</span>
+                                        <span><i class="fa-solid fa-book-open"></i> <?php echo $item_chap_cnt; ?> Chương</span>
                                         <span style="color: var(--primary-green); font-weight: 700;"><i class="fa-solid fa-eye"></i> <?php echo number_format($item_views); ?> lượt đọc</span>
                                         <span class="badge <?php echo ($item_status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?>">
                                             <?php echo ($item_status === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra'; ?>
@@ -380,7 +386,7 @@ if (is_user_logged_in() && $team_id > 0) {
 
         <!-- PHÂN TRANG -->
         <?php if ($team_query->max_num_pages > 1) : ?>
-            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 36px;">
+            <div class="pagination-wrapper">
                 <?php
                 echo paginate_links(array(
                     'total'        => $team_query->max_num_pages,

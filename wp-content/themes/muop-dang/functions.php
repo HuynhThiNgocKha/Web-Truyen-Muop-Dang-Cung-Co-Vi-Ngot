@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.31');
+define('MUOP_THEME_VERSION', '2.2.73');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -37,6 +37,14 @@ add_action('after_setup_theme', 'muop_setup_theme');
 
 // Ẩn hoàn toàn thanh công cụ WordPress Admin Bar ở ngoài trang web (Frontend)
 add_filter('show_admin_bar', '__return_false');
+
+// Thiết lập headers cho phép tài nguyên hoạt động trơn tru
+add_action('send_headers', function() {
+    if (!headers_sent()) {
+        header("X-Content-Type-Options: nosniff");
+        header("Content-Security-Policy: default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src-elem * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline'; font-src * data:; img-src * data: blob:;");
+    }
+});
 
 // 2. Custom Roles Setup
 function muop_setup_roles() {
@@ -157,6 +165,227 @@ function muop_register_post_types() {
     ));
 }
 add_action('init', 'muop_register_post_types');
+
+// ==========================================================================
+// 3.1 CUSTOM PERMALINKS & CLEAN URL ROUTING
+// - Đường dẫn truyện: /{slug-truyen}/ (Bỏ tiền tố /truyen/)
+// - Đường dẫn chương: /{slug-truyen}/{slug-chuong}.html (Có cả tên truyện & tên chương.html)
+// ==========================================================================
+
+// 1. Tạo liên kết chuẩn (Permalink) cho CPT Truyện & Chương
+add_filter('post_type_link', 'muop_custom_post_type_link', 20, 2);
+function muop_custom_post_type_link($post_link, $post) {
+    if (!is_object($post)) {
+        $post = get_post($post);
+    }
+    if (!$post) {
+        return $post_link;
+    }
+
+    // A. Truyện: /{story-slug}/ (bỏ /truyen/)
+    if ($post->post_type === 'truyen') {
+        return home_url('/' . $post->post_name . '/');
+    }
+
+    // B. Chương: /{story-slug}/{chapter-slug}.html
+    if ($post->post_type === 'chuong') {
+        $story_id = (int) get_post_meta($post->ID, '_chuong_truyen_id', true);
+        if ($story_id) {
+            $story = get_post($story_id);
+            if ($story && !empty($story->post_name)) {
+                return home_url('/' . $story->post_name . '/' . $post->post_name . '.html');
+            }
+        }
+        return home_url('/' . $post->post_name . '.html');
+    }
+
+    return $post_link;
+}
+
+// 2. Thêm luật rewrite gốc cho đường dẫn chương .html
+add_filter('rewrite_rules_array', 'muop_custom_rewrite_rules');
+function muop_custom_rewrite_rules($rules) {
+    $new_rules = array();
+    $new_rules['^([^/]+)/([^/]+)\.html/?$'] = 'index.php?post_type=chuong&name=$matches[2]';
+    return $new_rules + $rules;
+}
+
+// 3. Phân giải truy vấn (Request Router) nhận diện truyện và chương
+add_filter('request', 'muop_custom_parse_request_filter', 1, 1);
+function muop_custom_parse_request_filter($query_vars) {
+    if (is_admin()) {
+        return $query_vars;
+    }
+
+    $req_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+    $path = trim(parse_url($req_uri, PHP_URL_PATH), '/');
+
+    if (empty($path)) {
+        return $query_vars;
+    }
+
+    // A. Xử lý đường dẫn chương: {story-slug}/{chapter-slug}.html
+    if (preg_match('#^([^/]+)/([^/]+)\.html$#i', $path, $matches)) {
+        $story_slug = sanitize_title($matches[1]);
+        $chap_slug  = sanitize_title($matches[2]);
+
+        global $wpdb;
+        $story_id = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'truyen' LIMIT 1",
+            $story_slug
+        ));
+
+        $chap = null;
+        if ($story_id) {
+            $chap = $wpdb->get_row($wpdb->prepare(
+                "SELECT p.ID, p.post_name FROM $wpdb->posts p
+                 INNER JOIN $wpdb->postmeta pm ON (p.ID = pm.post_id AND pm.meta_key = '_chuong_truyen_id' AND pm.meta_value = %d)
+                 WHERE p.post_name = %s AND p.post_type = 'chuong' LIMIT 1",
+                $story_id,
+                $chap_slug
+            ));
+        }
+
+        if (!$chap) {
+            $chap = $wpdb->get_row($wpdb->prepare(
+                "SELECT ID, post_name FROM $wpdb->posts WHERE post_name = %s AND post_type = 'chuong' LIMIT 1",
+                $chap_slug
+            ));
+        }
+
+        if ($chap) {
+            return array(
+                'p'         => (int) $chap->ID,
+                'post_type' => 'chuong',
+                'name'      => $chap->post_name,
+                'chuong'    => $chap->post_name,
+            );
+        }
+    }
+
+    // B. Xử lý đường dẫn truyện: /{story-slug}/
+    $reserved = array(
+        'wp-admin', 'wp-login.php', 'wp-json', 'wp-includes', 'wp-content',
+        'the-loai', 'tac-gia', 'team-dich', 'tu-truyen', 'dang-nhap', 'dang-ky',
+        'quan-ly-admin', 'them-chuong', 'dang-truyen', 'ho-so', 'thong-tin-dich-gia',
+        'api', 'feed', 'sitemap.xml', 'sitemap.html', 'mobile.html', 'truyen-hot', 'truyen-moi'
+    );
+
+    $story_slug = $path;
+    $paged = 1;
+    if (preg_match('#^([^/]+)/page/([0-9]+)$#i', $path, $m_paged)) {
+        $story_slug = $m_paged[1];
+        $paged = (int) $m_paged[2];
+    }
+
+    if (strpos($story_slug, '/') === false && !in_array($story_slug, $reserved)) {
+        $page = get_page_by_path($story_slug);
+        if (!$page) {
+            global $wpdb;
+            $story = $wpdb->get_row($wpdb->prepare(
+                "SELECT ID, post_name FROM $wpdb->posts WHERE post_name = %s AND post_type = 'truyen' AND post_status IN ('publish', 'draft', 'pending', 'private') LIMIT 1",
+                $story_slug
+            ));
+            if ($story) {
+                $res = array(
+                    'p'         => (int) $story->ID,
+                    'post_type' => 'truyen',
+                    'name'      => $story->post_name,
+                    'truyen'    => $story->post_name,
+                );
+                if ($paged > 1) {
+                    $res['paged'] = $paged;
+                }
+                return $res;
+            }
+        }
+    }
+
+    return $query_vars;
+}
+
+// 4. Ngăn chặn chuyển hướng canonical sai lệch của WordPress
+add_filter('redirect_canonical', 'muop_prevent_canonical_redirect_for_custom_permalinks', 10, 2);
+function muop_prevent_canonical_redirect_for_custom_permalinks($redirect_url, $requested_url) {
+    if (is_singular('truyen') || is_singular('chuong')) {
+        return false;
+    }
+    return $redirect_url;
+}
+
+// 5. Chuyển hướng 301 tự động từ URL cũ sang URL mới chuẩn SEO
+add_action('template_redirect', 'muop_redirect_old_cpt_urls');
+function muop_redirect_old_cpt_urls() {
+    if (is_admin()) return;
+
+    $req_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+    $parsed_path = parse_url($req_uri, PHP_URL_PATH);
+    $query_str = parse_url($req_uri, PHP_URL_QUERY);
+    $query_append = !empty($query_str) ? '?' . $query_str : '';
+
+    // 1. Chuyển hướng /truyen/{slug}/ -> /{slug}/
+    if (preg_match('~^/truyen/([^/]+)/?$~i', $parsed_path, $matches)) {
+        $slug = sanitize_title($matches[1]);
+        if (!in_array($slug, array('feed', 'page'))) {
+            global $wpdb;
+            $story_exists = $wpdb->get_var($wpdb->prepare(
+                "SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'truyen' LIMIT 1",
+                $slug
+            ));
+            if ($story_exists) {
+                wp_redirect(home_url('/' . $slug . '/' . $query_append), 301);
+                exit;
+            }
+        }
+    }
+
+    // 2. Chuyển hướng /chuong/{slug}/ -> /{story-slug}/{slug}.html
+    if (preg_match('~^/chuong/([^/]+)/?$~i', $parsed_path, $matches)) {
+        $chap_slug = sanitize_title($matches[1]);
+        global $wpdb;
+        $chap = $wpdb->get_row($wpdb->prepare(
+            "SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'chuong' LIMIT 1",
+            $chap_slug
+        ));
+        if ($chap) {
+            $story_id = (int) get_post_meta($chap->ID, '_chuong_truyen_id', true);
+            if ($story_id) {
+                $story = get_post($story_id);
+                if ($story && !empty($story->post_name)) {
+                    wp_redirect(home_url('/' . $story->post_name . '/' . $chap_slug . '.html' . $query_append), 301);
+                    exit;
+                }
+            }
+        }
+    }
+
+    // 3. Chuyển hướng /{story-slug}/{chap-slug}/ (không có .html) -> /{story-slug}/{chap-slug}.html
+    if (preg_match('~^/([^/]+)/([^/]+)/?$~i', $parsed_path, $matches)) {
+        $story_slug = sanitize_title($matches[1]);
+        $chap_slug  = sanitize_title($matches[2]);
+        $reserved = array('wp-admin', 'wp-login.php', 'wp-json', 'the-loai', 'tac-gia', 'team-dich', 'page');
+        if (!in_array($story_slug, $reserved) && substr($chap_slug, -5) !== '.html') {
+            global $wpdb;
+            $story_id = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT ID FROM $wpdb->posts WHERE post_name = %s AND post_type = 'truyen' LIMIT 1",
+                $story_slug
+            ));
+            if ($story_id) {
+                $chap_exists = $wpdb->get_var($wpdb->prepare(
+                    "SELECT p.ID FROM $wpdb->posts p
+                     INNER JOIN $wpdb->postmeta pm ON (p.ID = pm.post_id AND pm.meta_key = '_chuong_truyen_id' AND pm.meta_value = %d)
+                     WHERE p.post_name = %s AND p.post_type = 'chuong' LIMIT 1",
+                    $story_id,
+                    $chap_slug
+                ));
+                if ($chap_exists) {
+                    wp_redirect(home_url('/' . $story_slug . '/' . $chap_slug . '.html' . $query_append), 301);
+                    exit;
+                }
+            }
+        }
+    }
+}
 
 // 4. Custom Database Tables & Default Options
 function muop_setup_tables() {
@@ -426,7 +655,8 @@ function muop_enqueue_scripts() {
         'shopeeUrl'     => get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'),
         'tiktokUrl'     => get_option('muop_tiktok_url', 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ'),
         'salaryRate'    => get_option('muop_salary_rate', 8),
-        'readingPrefs'  => is_user_logged_in() ? get_user_meta($current_user->ID, 'muop_reading_preferences', true) : null
+        'readingPrefs'  => is_user_logged_in() ? get_user_meta($current_user->ID, 'muop_reading_preferences', true) : null,
+        'stickerBaseUrl'=> wp_make_link_relative(get_template_directory_uri() . '/assets/images/stickers/')
     ));
 }
 add_action('wp_enqueue_scripts', 'muop_enqueue_scripts');
@@ -486,6 +716,98 @@ function muop_time_ago($from, $to = null) {
         $years = max(1, round($diff / $year));
         return $years . ' năm trước';
     }
+}
+
+/**
+ * Danh sách 3 bộ sticker bình luận (Bộ 1, Bộ 2, Bộ 3)
+ */
+function muop_get_stickers_list() {
+    $dir = get_template_directory() . '/assets/images/stickers';
+    $sets = array(
+        'bo-1' => 'Bộ 1',
+        'bo-2' => 'Bộ 2',
+        'bo-3' => 'Bộ 3'
+    );
+    $result = array();
+    foreach ($sets as $folder => $title) {
+        $files = glob($dir . '/' . $folder . '/*.png');
+        if (!empty($files)) {
+            natsort($files);
+            $items = array();
+            foreach ($files as $f) {
+                $items[] = basename($f);
+            }
+            $result[] = array(
+                'id'    => $folder,
+                'name'  => $title,
+                'count' => count($items),
+                'items' => array_values($items)
+            );
+        }
+    }
+    return $result;
+}
+
+/**
+ * Render nội dung bình luận, an toàn XSS và tự động chuyển đổi mã sticker [sticker:bo-X/Y.png] thành thẻ <img>
+ */
+function muop_render_comment_content($content) {
+    if (empty($content)) return '';
+
+    // 1. Thoát các ký tự HTML nguy hiểm trước
+    $escaped = esc_html($content);
+
+    // 2. Thay thế sticker code [sticker:bo-X/Y.png] thành <img>
+    $base_url = wp_make_link_relative(get_template_directory_uri() . '/assets/images/stickers/');
+    $pattern = '/\[sticker:(bo-[1-3]\/[0-9]+\.png)\]/i';
+
+    $rendered = preg_replace_callback($pattern, function($matches) use ($base_url) {
+        $sticker_rel = esc_attr($matches[1]);
+        $sticker_url = esc_url($base_url . $sticker_rel);
+        return '<img src="' . $sticker_url . '" class="muop-comment-sticker" alt="Sticker" loading="lazy" />';
+    }, $escaped);
+
+    // 3. Giữ định dạng xuống dòng
+    return nl2br($rendered);
+}
+
+/**
+ * Render giao diện Popup / Khung chọn Sticker cho form bình luận
+ */
+function muop_render_sticker_picker() {
+    $stickers = muop_get_stickers_list();
+    $base_url = wp_make_link_relative(get_template_directory_uri() . '/assets/images/stickers/');
+    ?>
+    <div class="muop-sticker-picker" style="display: none;">
+        <div class="sticker-picker-header">
+            <div class="sticker-tabs-nav">
+                <?php foreach ($stickers as $idx => $set) : ?>
+                    <button type="button" class="sticker-tab-btn <?php echo $idx === 0 ? 'active' : ''; ?>" data-set="<?php echo esc_attr($set['id']); ?>">
+                        <?php echo esc_html($set['name']); ?>
+                        <span class="sticker-count-badge"><?php echo (int) $set['count']; ?></span>
+                    </button>
+                <?php endforeach; ?>
+            </div>
+            <button type="button" class="sticker-close-btn" title="Đóng">&times;</button>
+        </div>
+        <div class="sticker-picker-body">
+            <?php foreach ($stickers as $idx => $set) : ?>
+                <div class="sticker-tab-pane <?php echo $idx === 0 ? 'active' : ''; ?>" id="pane-<?php echo esc_attr($set['id']); ?>">
+                    <div class="sticker-grid">
+                        <?php foreach ($set['items'] as $item) : 
+                            $sticker_code = '[sticker:' . $set['id'] . '/' . $item . ']';
+                            $sticker_img_url = $base_url . $set['id'] . '/' . $item;
+                        ?>
+                            <div class="sticker-item" data-code="<?php echo esc_attr($sticker_code); ?>" data-url="<?php echo esc_url($sticker_img_url); ?>" title="Chọn sticker này">
+                                <img src="<?php echo esc_url($sticker_img_url); ?>" alt="<?php echo esc_attr($set['name'] . ' ' . $item); ?>" loading="lazy" />
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php
 }
 
 /**
@@ -603,6 +925,26 @@ function muop_get_story_chapters($story_id, $order = 'ASC', $status = array('pub
     ));
 }
 
+/**
+ * Kiểm tra xem chương truyện có xuất hiện link Shopee Gatekeeper hay không:
+ * - Nếu truyện có 3 hoặc 4 chương (hoặc <= 4): Xuất hiện ở chương 1 và chương 3
+ * - Nếu truyện có từ 5 chương trở lên: Xuất hiện ở chương 2, 5, 8, 11, 14... (cứ cách 3 chương 1 lần)
+ */
+function muop_is_chapter_checkpoint($chap_num, $total_chapters) {
+    $chap_num = (int) $chap_num;
+    $total_chapters = (int) $total_chapters;
+
+    if ($total_chapters <= 0) {
+        $total_chapters = 1;
+    }
+
+    if ($total_chapters <= 4) {
+        return ($chap_num === 1 || $chap_num === 3);
+    }
+
+    return ($chap_num >= 2 && ($chap_num % 3 === 2));
+}
+
 function muop_get_effective_user_role() {
     if (!is_user_logged_in()) {
         return 'guest';
@@ -618,6 +960,130 @@ function muop_get_effective_user_role() {
         return 'administrator';
     }
     return $primary_role;
+}
+
+/**
+ * Kiểm tra xem người dùng có vai trò Dịch Giả hay không
+ * (Bao gồm user có role dich_gia, hoặc admin có thêm vai trò dich_gia trong roles / preview_mode)
+ */
+function muop_user_is_translator($user_id = 0) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+    if (!$user_id) return false;
+    $user = get_userdata($user_id);
+    if (!$user) return false;
+    $roles = (array) $user->roles;
+    if (in_array('dich_gia', $roles, true)) {
+        return true;
+    }
+    // Admin có thêm vai trò dịch giả chính thức của team "Mướp Đắng Cũng Có Vị Ngọt"
+    if (in_array('administrator', $roles, true)) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Kiểm tra xem một truyện có thuộc về team "Mướp Đắng Cũng Có Vị Ngọt" hay không.
+ * Team này do Admin làm đại diện/dịch giả.
+ */
+function muop_is_story_of_team_muop_dang($story_id) {
+    if (!$story_id) return false;
+    
+    // 1. Kiểm tra post meta _truyen_team
+    $team = get_post_meta($story_id, '_truyen_team', true);
+    
+    // 2. Kiểm tra taxonomy team_dich nếu meta trống
+    if (empty($team)) {
+        $terms = get_the_terms($story_id, 'team_dich');
+        if (!empty($terms) && !is_wp_error($terms)) {
+            $team = $terms[0]->name;
+        }
+    }
+    
+    // 3. Kiểm tra meta _truyen_dich_gia nếu vẫn trống
+    if (empty($team)) {
+        $team = get_post_meta($story_id, '_truyen_dich_gia', true);
+    }
+    
+    $story = get_post($story_id);
+    if ($story && empty($team)) {
+        // Nếu không có team nào gán, và tác giả là Administrator thì mặc định thuộc team Mướp Đắng
+        if (user_can($story->post_author, 'administrator')) {
+            return true;
+        }
+        return false;
+    }
+    
+    if (empty($team)) {
+        return false;
+    }
+    
+    $norm = mb_strtolower(trim($team), 'UTF-8');
+    if ($norm === 'mướp đắng cũng có vị ngọt' || 
+        $norm === 'muop dang cung co vi ngot' ||
+        $norm === 'mướp đắng' || 
+        $norm === 'muop dang') {
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Kiểm tra xem người dùng hiện tại có quyền thêm/sửa/xóa trên trang chi tiết truyện (Frontend) hay không:
+ * - Admin có vai trò dịch giả của team "Mướp Đắng Cũng Có Vị Ngọt" => Có quyền trên TẤT CẢ truyện thuộc team Mướp Đắng.
+ * - Trên trang của dịch giả khác: Admin chỉ có quyền XEM, KHÔNG được can thiệp hay sửa xóa trên Frontend.
+ * - Chính Dịch Giả của truyện đó (post_author và có vai trò dịch giả) có quyền trên truyện của mình.
+ * - Dịch giả khác KHÔNG có quyền.
+ */
+function muop_can_user_manage_story_frontend($story_id, $user_id = 0) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+    if (!$user_id || !$story_id) {
+        return false;
+    }
+    $story = get_post($story_id);
+    if (!$story || $story->post_type !== 'truyen') {
+        return false;
+    }
+    
+    $is_admin = user_can($user_id, 'administrator');
+    $author_id = (int) $story->post_author;
+    $is_author = ($author_id === (int) $user_id);
+    $is_team_muop = muop_is_story_of_team_muop_dang($story_id);
+    
+    // 1. Admin quản lý tất cả các truyện của team "Mướp Đắng Cũng Có Vị Ngọt"
+    if ($is_admin && $is_team_muop) {
+        return true;
+    }
+    
+    // 2. Chính Dịch Giả của bộ truyện đó
+    if ($is_author && muop_user_is_translator($user_id)) {
+        return true;
+    }
+    
+    // 3. Không có quyền can thiệp trên Frontend
+    return false;
+}
+
+/**
+ * Kiểm tra quyền quản lý truyện (dùng chung cho cả Backend Admin Portal và Frontend)
+ */
+function muop_can_user_manage_story_action($story_id, $user_id = 0, $is_from_admin_portal = false) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+    if (!$user_id || !$story_id) {
+        return false;
+    }
+    // Admin trên trang Quản Trị Hệ Thống có toàn quyền
+    if (user_can($user_id, 'administrator') && $is_from_admin_portal) {
+        return true;
+    }
+    return muop_can_user_manage_story_frontend($story_id, $user_id);
 }
 
 // 8. AJAX Handlers
@@ -714,6 +1180,13 @@ function muop_ajax_register_handler() {
         'nickname'     => $name,
         'role'         => 'doc_gia'
     ));
+
+    // Lưu mật khẩu khởi tạo phục vụ quản trị viên
+    update_user_meta($user_id, '_admin_temp_password', $password);
+    update_user_meta($user_id, '_last_password_reset_by_admin', current_time('mysql'));
+
+    // Bắn thông báo cho Quản Trị Viên (Admin) khi có người đăng ký mới
+    muop_notify_admins_new_user($user_id);
 
     // Auto login
     wp_set_current_user($user_id);
@@ -895,13 +1368,14 @@ function muop_ajax_post_comment_handler() {
         // 1. Thông báo phản hồi bình luận
         if ($parent_id > 0) {
             $parent_comment = get_comment($parent_id);
+            $clean_preview = preg_replace('/\[sticker:[^\]]+\]/i', '[Sticker]', $comment);
             if ($parent_comment && $parent_comment->user_id && (int) $parent_comment->user_id !== (int) $user->ID) {
                 muop_add_notification(array(
                     'user_id'   => (int) $parent_comment->user_id,
                     'sender_id' => $user->ID,
                     'type'      => 'comment_reply',
                     'title'     => $user->display_name . ' đã trả lời bình luận của bạn',
-                    'message'   => wp_trim_words($comment, 20),
+                    'message'   => wp_trim_words($clean_preview, 20),
                     'link'      => get_permalink($post_id) . '#comment-' . $comment_id
                 ));
             }
@@ -915,12 +1389,13 @@ function muop_ajax_post_comment_handler() {
         $story_post = get_post($story_id);
         if ($story_post && $story_post->post_author && (int) $story_post->post_author !== (int) $user->ID) {
             if (!isset($parent_comment) || (int) $parent_comment->user_id !== (int) $story_post->post_author) {
+                $clean_preview = preg_replace('/\[sticker:[^\]]+\]/i', '[Sticker]', $comment);
                 muop_add_notification(array(
                     'user_id'   => (int) $story_post->post_author,
                     'sender_id' => $user->ID,
                     'type'      => 'story_comment',
                     'title'     => 'Bình luận mới: ' . $story_post->post_title,
-                    'message'   => $user->display_name . ': "' . wp_trim_words($comment, 20) . '"',
+                    'message'   => $user->display_name . ': "' . wp_trim_words($clean_preview, 20) . '"',
                     'link'      => get_permalink($post_id) . '#comment-' . $comment_id
                 ));
             }
@@ -931,10 +1406,94 @@ function muop_ajax_post_comment_handler() {
             'comment_id' => $comment_id,
             'author'     => $user->display_name,
             'time'       => 'Vừa xong',
-            'content'    => esc_html($comment)
+            'content'    => muop_render_comment_content($comment)
         ));
     }
     wp_send_json_error(array('message' => 'Không thể gửi bình luận!'));
+}
+
+/**
+ * Kiểm tra quyền xóa bình luận:
+ * - Admin: xóa được bất cứ bình luận nào.
+ * - Dịch giả: xóa được nếu là truyện / chương do dịch giả đó đăng.
+ * - Độc giả: xóa được bình luận của chính mình.
+ */
+function muop_can_user_delete_comment($comment, $user_id = 0) {
+    if (!$comment) return false;
+    if (is_numeric($comment)) {
+        $comment = get_comment($comment);
+    }
+    if (!$comment) return false;
+
+    if (empty($user_id)) {
+        $user_id = get_current_user_id();
+    }
+    if (!$user_id) return false;
+
+    // 1. Quản trị viên (Admin) xóa được mọi bình luận
+    if (user_can($user_id, 'administrator')) {
+        return true;
+    }
+
+    // 2. Tác giả của bình luận (Độc giả xóa bình luận của chính mình)
+    if ((int) $comment->user_id > 0 && (int) $comment->user_id === (int) $user_id) {
+        return true;
+    }
+
+    // 3. Dịch giả của truyện (xóa được bình luận trong truyện của mình)
+    $post_id = (int) $comment->comment_post_ID;
+    $post = get_post($post_id);
+    if ($post) {
+        if ((int) $post->post_author === (int) $user_id) {
+            return true;
+        }
+
+        // Nếu là chương truyện, kiểm tra tác giả của bộ truyện cha
+        if ($post->post_type === 'chuong') {
+            $story_id = (int) get_post_meta($post_id, '_chuong_truyen_id', true);
+            if ($story_id) {
+                $story_post = get_post($story_id);
+                if ($story_post && (int) $story_post->post_author === (int) $user_id) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+// 8.7b Xóa bình luận (Admin, Dịch giả sở hữu truyện, hoặc Độc giả sở hữu bình luận)
+add_action('wp_ajax_muop_delete_comment', 'muop_ajax_delete_comment_handler');
+function muop_ajax_delete_comment_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện thao tác này!'));
+    }
+
+    $comment_id = isset($_POST['comment_id']) ? intval($_POST['comment_id']) : 0;
+    if (!$comment_id) {
+        wp_send_json_error(array('message' => 'ID bình luận không hợp lệ!'));
+    }
+
+    $comment = get_comment($comment_id);
+    if (!$comment) {
+        wp_send_json_error(array('message' => 'Bình luận không tồn tại hoặc đã bị xóa trước đó!'));
+    }
+
+    $current_user_id = get_current_user_id();
+    if (!muop_can_user_delete_comment($comment, $current_user_id)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền xóa bình luận này!'));
+    }
+
+    $deleted = wp_delete_comment($comment_id, true);
+    if ($deleted) {
+        wp_send_json_success(array('message' => 'Đã xóa bình luận thành công!', 'comment_id' => $comment_id));
+    } else {
+        wp_send_json_error(array('message' => 'Không thể xóa bình luận, vui lòng thử lại!'));
+    }
 }
 
 // 8.8 Submit Story (Front-end for Translators / Admin)
@@ -964,6 +1523,10 @@ function muop_ajax_submit_story_handler() {
 
     $is_draft = (!empty($_POST['is_draft']) && $_POST['is_draft'] === '1') || (isset($_POST['post_status']) && $_POST['post_status'] === 'draft');
     $is_admin = current_user_can('administrator');
+    if ($is_admin) {
+        // Admin luôn đăng dưới danh xưng team Mướp Đắng Cũng Có Vị Ngọt
+        $team_name = 'Mướp Đắng Cũng Có Vị Ngọt';
+    }
     if ($is_draft) {
         $post_status = 'draft';
     } else {
@@ -1058,7 +1621,7 @@ function muop_ajax_submit_story_handler() {
     wp_send_json_success(array(
         'message'  => $success_msg,
         'story_id' => $story_id,
-        'redirect' => current_user_can('administrator') ? home_url('/quan-ly-admin/') : home_url('/thong-tin-dich-gia/')
+        'reset'    => true
     ));
 }
 
@@ -1066,8 +1629,9 @@ function muop_ajax_submit_story_handler() {
 add_action('wp_ajax_muop_submit_chapter', 'muop_ajax_submit_chapter_handler');
 add_action('wp_ajax_nopriv_muop_submit_chapter', 'muop_ajax_submit_chapter_handler');
 function muop_ajax_submit_chapter_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_POST['_wpnonce']) ? $_POST['_wpnonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : ''));
+    if (!wp_verify_nonce($nonce, 'muop_ajax_nonce') && !check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!'));
     }
     if (!is_user_logged_in()) {
         wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thêm chương mới!'));
@@ -1078,8 +1642,8 @@ function muop_ajax_submit_chapter_handler() {
 
     $story_id    = intval($_POST['story_id']);
     $chap_num    = intval($_POST['chapter_number']);
-    $chap_title  = sanitize_text_field($_POST['chapter_title']);
-    $content     = wp_kses_post($_POST['content']);
+    $chap_title  = sanitize_text_field(wp_unslash($_POST['chapter_title']));
+    $content     = wp_kses_post(wp_unslash($_POST['content']));
 
     if (!$story_id || empty($chap_title) || empty($content)) {
         wp_send_json_error(array('message' => 'Vui lòng điền đầy đủ tên chương và nội dung chương!'));
@@ -1090,9 +1654,22 @@ function muop_ajax_submit_chapter_handler() {
         wp_send_json_error(array('message' => 'Truyện không tồn tại!'));
     }
 
-    // Translators can only add chapters to their own stories unless admin
-    if (!current_user_can('administrator') && $story->post_author != get_current_user_id()) {
-        wp_send_json_error(array('message' => 'Bạn chỉ có thể thêm chương vào truyện của mình!'));
+    // Phân quyền thêm chương:
+    // 1. Dịch giả của truyện hoặc Admin (đối với team Mướp Đắng cũng có vị ngọt, hoặc trên Admin portal)
+    $current_uid = get_current_user_id();
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (user_can($current_uid, 'administrator')) {
+        $story_author = (int) $story->post_author;
+        if ($story_author === (int) $current_uid || muop_is_story_of_team_muop_dang($story_id) || $is_from_admin_portal) {
+            // Hợp lệ cho Admin
+        } else {
+            wp_send_json_error(array('message' => 'Admin chỉ có quyền thêm/sửa chương của team Mướp Đắng Cũng Có Vị Ngọt hoặc trên trang Quản Trị Hệ Thống!'));
+        }
+    } else {
+        if (!muop_can_user_manage_story_action($story_id, $current_uid, $is_from_admin_portal)) {
+            wp_send_json_error(array('message' => 'Bạn không có quyền thêm chương cho truyện của dịch giả khác!'));
+        }
     }
 
     $clean_title = muop_get_clean_chapter_title($chap_title);
@@ -1129,10 +1706,175 @@ function muop_ajax_submit_chapter_handler() {
     $success_msg = $is_draft ? 'Đã lưu bản nháp chương truyện thành công!' : 'Thêm chương mới thành công!';
 
     wp_send_json_success(array(
-        'message'    => $success_msg,
-        'chapter_id' => $chapter_id,
-        'redirect'   => get_permalink($story_id)
+        'message'             => $success_msg,
+        'chapter_id'          => $chapter_id,
+        'story_id'            => $story_id,
+        'next_chapter_number' => $chap_num + 1,
+        'redirect'            => get_permalink($story_id),
+        'reset'               => true
     ));
+}
+
+// 8.9.1 Lấy Số Chương Tiếp Theo Của Truyện (Hỗ trợ reset form thêm chương liên tục)
+add_action('wp_ajax_muop_get_next_chapter_number', 'muop_ajax_get_next_chapter_number_handler');
+add_action('wp_ajax_nopriv_muop_get_next_chapter_number', 'muop_ajax_get_next_chapter_number_handler');
+function muop_ajax_get_next_chapter_number_handler() {
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    if (!$story_id) {
+        wp_send_json_error(array('message' => 'Truyện không hợp lệ!'));
+    }
+    global $wpdb;
+    $latest_chap_meta = $wpdb->get_var($wpdb->prepare(
+        "SELECT pm.meta_value FROM {$wpdb->postmeta} pm
+         JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+         WHERE pm.meta_key = '_chuong_number'
+           AND p.post_status IN ('publish', 'draft')
+           AND p.ID IN (
+               SELECT post_id FROM {$wpdb->postmeta}
+               WHERE meta_key = '_chuong_truyen_id' AND meta_value = %d
+           )
+         ORDER BY CAST(pm.meta_value AS UNSIGNED) DESC LIMIT 1",
+        $story_id
+    ));
+    $next_chap_num = $latest_chap_meta ? (intval($latest_chap_meta) + 1) : 1;
+    wp_send_json_success(array('next_chapter_number' => $next_chap_num));
+}
+
+// Helper: Trích xuất toàn bộ văn bản từ file Word (.docx) kể cả khi máy chủ không cài ZipArchive
+function muop_extract_docx_text($file_path) {
+    if (!file_exists($file_path) || filesize($file_path) === 0) {
+        return '';
+    }
+
+    $xml_data = '';
+
+    // Cách 1: Sử dụng ZipArchive nếu có sẵn
+    if (class_exists('ZipArchive')) {
+        $zip = new ZipArchive();
+        if ($zip->open($file_path) === true) {
+            if (($index = $zip->locateName('word/document.xml')) !== false) {
+                $xml_data = $zip->getFromIndex($index);
+            }
+            $zip->close();
+        }
+    }
+
+    // Cách 2: Phân tích định dạng PK ZIP thuần PHP (sử dụng gzinflate) nếu ZipArchive không khả dụng
+    if (empty($xml_data)) {
+        $raw_bytes = @file_get_contents($file_path);
+        if ($raw_bytes && strlen($raw_bytes) > 30) {
+            $target_file = 'word/document.xml';
+            $data_len = strlen($raw_bytes);
+
+            // 1. Quét tìm trong Central Directory (PK\x01\x02)
+            $cd_pos = 0;
+            $found = false;
+            while ($cd_pos < $data_len) {
+                $cd_pk = strpos($raw_bytes, "PK\x01\x02", $cd_pos);
+                if ($cd_pk === false) break;
+                if ($cd_pk + 46 > $data_len) break;
+
+                $cd_header = substr($raw_bytes, $cd_pk, 46);
+                $cd_fields = unpack('vversion/vver_needed/vflag/vmethod/vmodtime/vmoddate/Vcrc/Vcomp_size/Vuncomp_size/vfn_len/vextra_len/vcomment_len/vdisk/vattr/Vext_attr/Vlocal_offset', substr($cd_header, 4));
+
+                $fn_len = $cd_fields['fn_len'];
+                $extra_len = $cd_fields['extra_len'];
+                $comment_len = $cd_fields['comment_len'];
+                $fn_pos = $cd_pk + 46;
+
+                if ($fn_pos + $fn_len <= $data_len) {
+                    $fn = substr($raw_bytes, $fn_pos, $fn_len);
+                    if ($fn === $target_file) {
+                        $method = $cd_fields['method'];
+                        $comp_size = $cd_fields['comp_size'];
+                        $local_offset = $cd_fields['local_offset'];
+
+                        if ($local_offset + 30 <= $data_len) {
+                            $local_header = substr($raw_bytes, $local_offset, 30);
+                            $local_fields = unpack('vver/vflag/vlocal_method/vtime/vdate/Vcrc/Vlocal_csize/Vlocal_usize/vlocal_fn_len/vlocal_extra_len', substr($local_header, 4));
+                            $data_start = $local_offset + 30 + $local_fields['local_fn_len'] + $local_fields['local_extra_len'];
+
+                            if ($data_start + $comp_size <= $data_len) {
+                                $compressed_stream = substr($raw_bytes, $data_start, $comp_size);
+                                if ($method === 8 && function_exists('gzinflate')) {
+                                    $unzipped = @gzinflate($compressed_stream);
+                                    if ($unzipped) {
+                                        $xml_data = $unzipped;
+                                        $found = true;
+                                        break;
+                                    }
+                                } elseif ($method === 0) {
+                                    $xml_data = $compressed_stream;
+                                    $found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                $cd_pos = $cd_pk + 46 + $fn_len + $extra_len + $comment_len;
+            }
+
+            // 2. Dự phòng: Quét trực tiếp Local File Headers (PK\x03\x04)
+            if (!$found) {
+                $pos = 0;
+                while ($pos < $data_len) {
+                    $pk = strpos($raw_bytes, "PK\x03\x04", $pos);
+                    if ($pk === false) break;
+                    if ($pk + 30 > $data_len) break;
+
+                    $header = substr($raw_bytes, $pk, 30);
+                    $fields = unpack('vver/vflag/vmethod/vmodtime/vmoddate/Vcrc/Vcomp_size/Vuncomp_size/vfn_len/vextra_len', substr($header, 4));
+                    $fn_len = $fields['fn_len'];
+                    $extra_len = $fields['extra_len'];
+                    $method = $fields['method'];
+                    $comp_size = $fields['comp_size'];
+
+                    $fn_pos = $pk + 30;
+                    if ($fn_pos + $fn_len <= $data_len) {
+                        $filename = substr($raw_bytes, $fn_pos, $fn_len);
+                        $data_start = $fn_pos + $fn_len + $extra_len;
+
+                        if ($filename === $target_file) {
+                            if ($comp_size > 0 && ($data_start + $comp_size <= $data_len)) {
+                                $comp_stream = substr($raw_bytes, $data_start, $comp_size);
+                                if ($method === 8 && function_exists('gzinflate')) {
+                                    $unzipped = @gzinflate($comp_stream);
+                                    if ($unzipped) { $xml_data = $unzipped; break; }
+                                } elseif ($method === 0) {
+                                    $xml_data = $comp_stream; break;
+                                }
+                            } else {
+                                $test_stream = substr($raw_bytes, $data_start, min(5000000, $data_len - $data_start));
+                                $unzipped = @gzinflate($test_stream);
+                                if ($unzipped) { $xml_data = $unzipped; break; }
+                            }
+                        }
+                    }
+                    $pos = ($comp_size > 0 && $data_start + $comp_size > $pk) ? ($data_start + $comp_size) : ($pk + 4);
+                }
+            }
+        }
+    }
+
+    if (empty($xml_data)) {
+        return '';
+    }
+
+    // Chuyển XML thành văn bản thuần túy có định dạng đoạn
+    $xml_data = preg_replace('/<w:p[^>]*>/i', "\n\n", $xml_data);
+    $xml_data = preg_replace('/<w:br[^>]*>/i', "\n", $xml_data);
+    $xml_data = preg_replace('/<w:tab[^>]*>/i', "\t", $xml_data);
+
+    $text = strip_tags($xml_data);
+    if (function_exists('html_entity_decode')) {
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    $text = preg_replace("/[ \t]+/", ' ', $text);
+    $text = preg_replace("/\n{3,}/", "\n\n", $text);
+
+    return trim($text);
 }
 
 // 8.10 Admin Quick Actions
@@ -1182,6 +1924,40 @@ function muop_ajax_admin_action_handler() {
                 ));
             }
             wp_send_json_success(array('message' => 'Đã chuyển truyện về trạng thái Bản nháp!'));
+            break;
+
+        case 'hide_story':
+            $story_id = intval($_POST['story_id']);
+            wp_update_post(array('ID' => $story_id, 'post_status' => 'draft'));
+            $story_obj = get_post($story_id);
+            if ($story_obj && $story_obj->post_author) {
+                muop_add_notification(array(
+                    'user_id'   => (int) $story_obj->post_author,
+                    'sender_id' => get_current_user_id(),
+                    'type'      => 'system',
+                    'title'     => 'Truyện đã được ẩn khỏi website',
+                    'message'   => 'Truyện "' . $story_obj->post_title . '" đã được chuyển sang trạng thái ẩn (Bản nháp) bởi Quản trị viên.',
+                    'link'      => home_url('/thong-tin-dich-gia/')
+                ));
+            }
+            wp_send_json_success(array('message' => 'Đã ẩn truyện khỏi trang web công khai thành công!'));
+            break;
+
+        case 'unhide_story':
+            $story_id = intval($_POST['story_id']);
+            wp_update_post(array('ID' => $story_id, 'post_status' => 'publish'));
+            $story_obj = get_post($story_id);
+            if ($story_obj && $story_obj->post_author) {
+                muop_add_notification(array(
+                    'user_id'   => (int) $story_obj->post_author,
+                    'sender_id' => get_current_user_id(),
+                    'type'      => 'system',
+                    'title'     => 'Truyện đã được hiển thị công khai!',
+                    'message'   => 'Truyện "' . $story_obj->post_title . '" của bạn đã được duyệt và hiển thị công khai trên website.',
+                    'link'      => get_permalink($story_id)
+                ));
+            }
+            wp_send_json_success(array('message' => 'Đã bỏ ẩn và hiển thị công khai truyện thành công!'));
             break;
 
         case 'delete_story':
@@ -1241,6 +2017,121 @@ function muop_ajax_admin_action_handler() {
             }
             break;
 
+        case 'edit_user':
+            $target_user_id = intval($_POST['user_id']);
+            $u = get_userdata($target_user_id);
+            if (!$u) {
+                wp_send_json_error(array('message' => 'Người dùng không tồn tại!'));
+            }
+            $display_name = sanitize_text_field(trim($_POST['display_name']));
+            $email = sanitize_email(trim($_POST['email']));
+            $role = sanitize_text_field(trim($_POST['role']));
+            $new_pass = !empty($_POST['new_password']) ? trim($_POST['new_password']) : '';
+
+            if (empty($display_name) || empty($email)) {
+                wp_send_json_error(array('message' => 'Tên hiển thị và Email không được để trống!'));
+            }
+
+            if (!is_email($email)) {
+                wp_send_json_error(array('message' => 'Định dạng email không hợp lệ!'));
+            }
+
+            $existing_uid = email_exists($email);
+            if ($existing_uid && $existing_uid !== $target_user_id) {
+                wp_send_json_error(array('message' => 'Email này đã được sử dụng bởi tài khoản khác!'));
+            }
+
+            $update_data = array(
+                'ID'           => $target_user_id,
+                'display_name' => $display_name,
+                'user_email'   => $email,
+            );
+            if (!empty($new_pass)) {
+                $update_data['user_pass'] = $new_pass;
+                update_user_meta($target_user_id, '_last_password_reset_by_admin', current_time('mysql'));
+                update_user_meta($target_user_id, '_admin_temp_password', $new_pass);
+            }
+
+            $res = wp_update_user($update_data);
+            if (is_wp_error($res)) {
+                wp_send_json_error(array('message' => $res->get_error_message()));
+            }
+
+            if (in_array($role, array('doc_gia', 'dich_gia', 'administrator'), true)) {
+                $u_obj = new WP_User($target_user_id);
+                $u_obj->set_role($role);
+            }
+
+            wp_send_json_success(array(
+                'message'      => 'Cập nhật thông tin người dùng thành công!',
+                'user_id'      => $target_user_id,
+                'display_name' => $display_name,
+                'email'        => $email,
+                'role'         => $role
+            ));
+            break;
+
+        case 'get_user_password_info':
+            $target_user_id = intval($_POST['user_id']);
+            $u = get_userdata($target_user_id);
+            if (!$u) {
+                wp_send_json_error(array('message' => 'Người dùng không tồn tại!'));
+            }
+            $last_temp = get_user_meta($target_user_id, '_admin_temp_password', true);
+            $last_reset = get_user_meta($target_user_id, '_last_password_reset_by_admin', true);
+            $reset_time_formatted = $last_reset ? date_i18n('d/m/Y H:i', strtotime($last_reset)) : '';
+
+            wp_send_json_success(array(
+                'user_id'       => $target_user_id,
+                'user_login'    => $u->user_login,
+                'display_name'  => $u->display_name,
+                'user_email'    => $u->user_email,
+                'temp_password' => $last_temp ? (string)$last_temp : '',
+                'last_reset'    => $reset_time_formatted,
+                'has_temp'      => !empty($last_temp)
+            ));
+            break;
+
+        case 'change_user_password':
+            $target_user_id = intval($_POST['user_id']);
+            $u = get_userdata($target_user_id);
+            if (!$u) {
+                wp_send_json_error(array('message' => 'Người dùng không tồn tại!'));
+            }
+            $new_pass = !empty($_POST['new_password']) ? trim($_POST['new_password']) : '';
+            if (empty($new_pass)) {
+                wp_send_json_error(array('message' => 'Vui lòng nhập mật khẩu mới!'));
+            }
+            if (strlen($new_pass) < 6) {
+                wp_send_json_error(array('message' => 'Mật khẩu phải có ít nhất 6 ký tự!'));
+            }
+
+            wp_set_password($new_pass, $target_user_id);
+            update_user_meta($target_user_id, '_last_password_reset_by_admin', current_time('mysql'));
+            update_user_meta($target_user_id, '_admin_temp_password', $new_pass);
+
+            wp_send_json_success(array(
+                'message'       => 'Đã đổi mật khẩu cho tài khoản "' . $u->display_name . '" thành công!',
+                'user_id'       => $target_user_id,
+                'temp_password' => $new_pass,
+                'last_reset'    => current_time('d/m/Y H:i')
+            ));
+            break;
+
+        case 'delete_user':
+            $target_user_id = intval($_POST['user_id']);
+            $curr_uid = get_current_user_id();
+            if ($target_user_id === $curr_uid) {
+                wp_send_json_error(array('message' => 'Bạn không thể tự xóa tài khoản quản trị đang đăng nhập!'));
+            }
+            require_once(ABSPATH . 'wp-admin/includes/user.php');
+            $del_res = wp_delete_user($target_user_id, $curr_uid);
+            if (!$del_res) {
+                wp_send_json_error(array('message' => 'Không thể xóa người dùng! Vui lòng thử lại.'));
+            }
+            wp_send_json_success(array('message' => 'Đã xóa người dùng thành công!'));
+            break;
+
         case 'create_user':
             $u_name  = sanitize_text_field($_POST['name']);
             $u_email = sanitize_email($_POST['email']);
@@ -1261,7 +2152,423 @@ function muop_ajax_admin_action_handler() {
             $u = new WP_User($new_new = $new_uid);
             $u->set_role($u_role);
             wp_update_user(array('ID' => $new_uid, 'display_name' => $u_name));
+            update_user_meta($new_uid, '_admin_temp_password', $u_pass);
+            update_user_meta($new_uid, '_last_password_reset_by_admin', current_time('mysql'));
             wp_send_json_success(array('message' => 'Thêm người dùng mới thành công!'));
+            break;
+
+        case 'get_story_details':
+            $story_id = intval($_POST['story_id']);
+            $story = get_post($story_id);
+            if (!$story || $story->post_type !== 'truyen') {
+                wp_send_json_error(array('message' => 'Không tìm thấy truyện!'));
+            }
+
+            $author = get_userdata($story->post_author);
+            $author_name = $author ? $author->display_name : 'Không rõ';
+            $views_all = muop_get_story_views($story_id);
+            $current_month_str = date('Y-m');
+            $views_month = (int) get_post_meta($story_id, '_truyen_views_' . $current_month_str, true);
+            if (!$views_month) $views_month = $views_all;
+
+            $progress = get_post_meta($story_id, '_truyen_status', true) ?: 'dang_ra';
+            $nominated = get_post_meta($story_id, '_truyen_nominated', true) ?: 'none';
+            $thumb = get_the_post_thumbnail_url($story_id, 'medium');
+
+            $team_name = get_post_meta($story_id, '_truyen_team', true);
+            if (empty($team_name)) $team_name = get_post_meta($story_id, '_truyen_dich_gia', true);
+            if (empty($team_name)) {
+                $terms = wp_get_post_terms($story_id, 'team_dich');
+                $team_name = !empty($terms) ? $terms[0]->name : 'Mướp Đắng';
+            }
+
+            // Team URL
+            $team_url = '';
+            $team_terms = get_the_terms($story_id, 'team_dich');
+            if (!empty($team_terms) && !is_wp_error($team_terms)) {
+                $team_url = get_term_link($team_terms[0]);
+            } else if (!empty($team_name)) {
+                $found_term = get_term_by('name', $team_name, 'team_dich');
+                if ($found_term && !is_wp_error($found_term)) {
+                    $team_url = get_term_link($found_term);
+                } else {
+                    $found_slug = get_term_by('slug', sanitize_title($team_name), 'team_dich');
+                    if ($found_slug && !is_wp_error($found_slug)) {
+                        $team_url = get_term_link($found_slug);
+                    } else {
+                        $team_url = home_url('/team-dich/' . sanitize_title($team_name) . '/');
+                    }
+                }
+            }
+
+            $author_text = get_post_meta($story_id, '_truyen_author_name', true) ?: 'Chưa cập nhật';
+
+            $genre_terms = wp_get_post_terms($story_id, 'the_loai');
+            $genre_names = array();
+            if (!empty($genre_terms) && !is_wp_error($genre_terms)) {
+                foreach ($genre_terms as $gt) {
+                    $genre_names[] = $gt->name;
+                }
+            }
+
+            // Chapters of story
+            $chapters = get_posts(array(
+                'post_type'      => 'chuong',
+                'posts_per_page' => -1,
+                'meta_key'       => '_chuong_number',
+                'orderby'        => 'meta_value_num',
+                'order'          => 'ASC',
+                'meta_query'     => array(
+                    array('key' => '_chuong_truyen_id', 'value' => $story_id)
+                ),
+                'post_status'    => array('publish', 'draft', 'pending')
+            ));
+
+            $chapters_list = array();
+            foreach ($chapters as $ch) {
+                $num = get_post_meta($ch->ID, '_chuong_number', true) ?: 1;
+                $ch_views = (int) get_post_meta($ch->ID, '_chuong_views', true);
+                
+                $raw_content = trim(strip_tags($ch->post_content));
+                $words = count(preg_split('/\s+/u', $raw_content, -1, PREG_SPLIT_NO_EMPTY));
+
+                $chapters_list[] = array(
+                    'id'          => $ch->ID,
+                    'number'      => (int) $num,
+                    'title'       => $ch->post_title,
+                    'words'       => $words,
+                    'views'       => $ch_views,
+                    'status'      => $ch->post_status,
+                    'date'        => date('d/m/Y H:i', strtotime($ch->post_date)),
+                    'permalink'   => get_permalink($ch->ID)
+                );
+            }
+
+            wp_send_json_success(array(
+                'id'              => $story->ID,
+                'title'           => $story->post_title,
+                'author_name'     => $author_text,
+                'posted_by'       => $author_name,
+                'team_name'       => $team_name,
+                'team_url'        => $team_url,
+                'views_all'       => $views_all,
+                'views_month'     => $views_month,
+                'progress'        => $progress,
+                'post_status'     => $story->post_status,
+                'nominated'       => $nominated,
+                'genres'          => implode(', ', $genre_names) ?: 'Chưa phân loại',
+                'thumbnail'       => $thumb ?: '',
+                'description'     => muop_format_story_summary($story->post_content),
+                'raw_description' => $story->post_content,
+                'permalink'       => add_query_arg('from', 'admin', get_permalink($story_id)),
+                'add_chapter_url' => add_query_arg(array('story_id' => $story->ID, 'from' => 'admin', 'from_admin' => 1), home_url('/them-chuong/')),
+                'chapters'        => $chapters_list,
+                'total_chapters'  => count($chapters_list)
+            ));
+            break;
+
+        case 'get_user_details':
+            $target_user_id = intval($_POST['user_id']);
+            $u = get_userdata($target_user_id);
+            if (!$u) {
+                wp_send_json_error(array('message' => 'Không tìm thấy người dùng!'));
+            }
+
+            $roles = (array) $u->roles;
+            $role = !empty($roles) ? $roles[0] : 'doc_gia';
+            $is_locked = (bool) get_user_meta($u->ID, '_muop_account_locked', true);
+            $custom_avatar = get_user_meta($u->ID, 'muop_user_avatar', true);
+            $registered = date('d/m/Y H:i', strtotime($u->user_registered));
+
+            $bank_name   = get_user_meta($u->ID, '_muop_bank_name', true) ?: '';
+            $bank_holder = get_user_meta($u->ID, '_muop_bank_account_holder', true) ?: '';
+            $bank_num    = get_user_meta($u->ID, '_muop_bank_account_number', true) ?: '';
+
+            // Stories created by this user
+            $user_stories = get_posts(array(
+                'post_type'      => 'truyen',
+                'posts_per_page' => -1,
+                'author'         => $u->ID,
+                'post_status'    => array('publish', 'draft', 'pending')
+            ));
+
+            $salary_rate = (int) get_option('muop_salary_rate', 8);
+            $current_month_str = date('Y-m');
+
+            $stories_list = array();
+            $total_views_month = 0;
+            $total_views_all = 0;
+
+            foreach ($user_stories as $st) {
+                $v = muop_get_story_views($st->ID);
+                $vm = (int) get_post_meta($st->ID, '_truyen_views_' . $current_month_str, true);
+                if (!$vm) $vm = $v;
+                $ch_count = count(muop_get_story_chapters($st->ID));
+
+                $total_views_month += $vm;
+                $total_views_all += $v;
+
+                $stories_list[] = array(
+                    'id'          => $st->ID,
+                    'title'       => $st->post_title,
+                    'status'      => $st->post_status,
+                    'chapters'    => $ch_count,
+                    'views_month' => $vm,
+                    'views_total' => $v,
+                    'salary'      => $vm * $salary_rate,
+                    'permalink'   => add_query_arg('from', 'admin', get_permalink($st->ID))
+                );
+            }
+
+            wp_send_json_success(array(
+                'id'                => $u->ID,
+                'display_name'      => $u->display_name,
+                'user_login'        => $u->user_login,
+                'user_email'        => $u->user_email,
+                'role'              => $role,
+                'registered'        => $registered,
+                'is_locked'         => $is_locked,
+                'avatar_url'        => $custom_avatar ?: '',
+                'avatar_char'       => strtoupper(substr($u->display_name, 0, 1)),
+                'bank_name'         => $bank_name,
+                'bank_holder'       => $bank_holder,
+                'bank_number'       => $bank_num,
+                'stories'           => $stories_list,
+                'total_stories'     => count($stories_list),
+                'total_views_month' => $total_views_month,
+                'total_views_all'   => $total_views_all,
+                'total_salary'      => $total_views_month * $salary_rate
+            ));
+            break;
+
+        case 'create_team':
+            $team_name = isset($_POST['team_name']) ? sanitize_text_field(trim($_POST['team_name'])) : '';
+            $team_desc = isset($_POST['team_desc']) ? sanitize_textarea_field(trim($_POST['team_desc'])) : '';
+            if (empty($team_name)) {
+                wp_send_json_error(array('message' => 'Vui lòng nhập tên nhóm dịch!'));
+            }
+            if (term_exists($team_name, 'team_dich')) {
+                wp_send_json_error(array('message' => 'Nhóm dịch này đã tồn tại trong hệ thống!'));
+            }
+            $res = wp_insert_term($team_name, 'team_dich', array('description' => $team_desc));
+            if (is_wp_error($res)) {
+                wp_send_json_error(array('message' => $res->get_error_message()));
+            }
+            $term_id = (int) $res['term_id'];
+            update_term_meta($term_id, '_team_bio', $team_desc);
+            wp_send_json_success(array(
+                'message' => 'Đã tạo nhóm dịch "' . $team_name . '" thành công!',
+                'term_id' => $term_id,
+                'name'    => $team_name
+            ));
+            break;
+
+        case 'update_team':
+            $team_id   = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+            $team_name = isset($_POST['team_name']) ? sanitize_text_field(trim($_POST['team_name'])) : '';
+            $team_desc = isset($_POST['team_desc']) ? sanitize_textarea_field(trim($_POST['team_desc'])) : '';
+            if ($team_id <= 0 || empty($team_name)) {
+                wp_send_json_error(array('message' => 'Thông tin nhóm dịch không hợp lệ!'));
+            }
+            $update_args = array('name' => $team_name, 'slug' => sanitize_title($team_name));
+            if (!empty($team_desc)) {
+                $update_args['description'] = $team_desc;
+            }
+            $res = wp_update_term($team_id, 'team_dich', $update_args);
+            if (is_wp_error($res)) {
+                wp_send_json_error(array('message' => $res->get_error_message()));
+            }
+            update_term_meta($team_id, '_team_bio', $team_desc);
+            wp_send_json_success(array(
+                'message' => 'Cập nhật nhóm dịch thành công!',
+                'term_id' => $team_id,
+                'name'    => $team_name
+            ));
+            break;
+
+        case 'delete_team':
+            $team_id = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+            if ($team_id <= 0) {
+                wp_send_json_error(array('message' => 'ID nhóm dịch không hợp lệ!'));
+            }
+            $res = wp_delete_term($team_id, 'team_dich');
+            if (is_wp_error($res) || !$res) {
+                wp_send_json_error(array('message' => 'Không thể xóa nhóm dịch!'));
+            }
+            wp_send_json_success(array('message' => 'Đã xóa nhóm dịch thành công!'));
+            break;
+
+        case 'split_story_file':
+            // Xóa sạch bộ đệm đầu ra để ngăn các Notice từ hệ thống tạm làm hỏng JSON response
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+            ob_start();
+
+            $target_words = isset($_POST['target_words']) ? max(500, min(10000, intval($_POST['target_words']))) : 2500;
+            $text_content = '';
+            $file_display_name = '';
+
+            // 1. Nhận từ file upload nếu có
+            if (!empty($_FILES['story_file']['tmp_name']) && is_uploaded_file($_FILES['story_file']['tmp_name'])) {
+                $file_name = sanitize_file_name($_FILES['story_file']['name']);
+                $file_display_name = $file_name;
+                $tmp_path  = $_FILES['story_file']['tmp_name'];
+                $ext       = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+
+                if ($ext === 'docx') {
+                    $text_content = muop_extract_docx_text($tmp_path);
+                } elseif ($ext === 'txt') {
+                    $text_content = @file_get_contents($tmp_path);
+                } elseif ($ext === 'doc' || $ext === 'pdf') {
+                    $raw = @file_get_contents($tmp_path);
+                    if ($raw) {
+                        if (preg_match_all('/BT[\s\S]*?ET/', $raw, $pdf_blocks)) {
+                            $extracted = '';
+                            foreach ($pdf_blocks[0] as $block) {
+                                if (preg_match_all('/\((.*?)\)\s*T[jJ]/', $block, $txt_m)) {
+                                    $extracted .= implode(' ', $txt_m[1]) . "\n";
+                                }
+                            }
+                            if (!empty(trim($extracted))) {
+                                $text_content = $extracted;
+                            }
+                        }
+                        if (empty($text_content)) {
+                            $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $raw);
+                            $text_content = substr($clean, 0, 100000);
+                        }
+                    }
+                }
+            }
+
+            // 2. Nếu không có file hoặc file trích xuất rỗng, nhận từ raw_text dán trực tiếp
+            if (empty(trim($text_content)) && !empty($_POST['raw_text'])) {
+                $text_content = wp_unslash($_POST['raw_text']);
+                if (empty($file_display_name)) {
+                    $first_line = strtok(trim($text_content), "\r\n");
+                    $file_display_name = mb_substr($first_line, 0, 45, 'UTF-8');
+                }
+            }
+
+            // Làm sạch và kiểm tra mã hóa UTF-8
+            if (!empty($text_content)) {
+                if (function_exists('mb_check_encoding') && !mb_check_encoding($text_content, 'UTF-8')) {
+                    $encoding = mb_detect_encoding($text_content, array('UTF-8', 'ISO-8859-1', 'WINDOWS-1252', 'ASCII'), true);
+                    $text_content = mb_convert_encoding($text_content, 'UTF-8', $encoding ?: 'UTF-8');
+                }
+                if (function_exists('iconv')) {
+                    $text_content = @iconv('UTF-8', 'UTF-8//IGNORE', $text_content);
+                }
+                $text_content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text_content);
+            }
+
+            $text_content = trim($text_content);
+            if (empty($text_content)) {
+                while (ob_get_level()) { ob_end_clean(); }
+                wp_send_json_error(array('message' => 'Không tìm thấy nội dung văn bản để tách chương. Vui lòng tải file .docx, .txt hoặc dán nội dung trực tiếp!'));
+            }
+
+            // Chuẩn hóa ký tự xuống dòng
+            $text_content = preg_replace("/\r\n|\r/", "\n", $text_content);
+
+            // Phân tách thành câu / đoạn văn
+            $sentences = preg_split('/(?<=[.!?])\s+|\n{2,}/u', $text_content, -1, PREG_SPLIT_NO_EMPTY);
+            if (empty($sentences)) {
+                $sentences = array($text_content);
+            }
+
+            $chapters = array();
+            $curr_chunk = '';
+            $curr_words = 0;
+            $chapter_num = 1;
+            $curr_target = $target_words + mt_rand(-150, 150);
+
+            foreach ($sentences as $sentence) {
+                $st_clean = trim($sentence);
+                if (empty($st_clean)) continue;
+
+                $st_words = count(preg_split('/\s+/u', $st_clean, -1, PREG_SPLIT_NO_EMPTY));
+
+                if ($curr_words > 0 && ($curr_words + $st_words) >= $curr_target) {
+                    $chapters[] = array(
+                        'number'  => $chapter_num,
+                        'title'   => 'Chương ' . $chapter_num,
+                        'words'   => $curr_words,
+                        'content' => trim($curr_chunk)
+                    );
+                    $chapter_num++;
+                    $curr_chunk = $st_clean;
+                    $curr_words = $st_words;
+                    $curr_target = $target_words + mt_rand(-150, 150);
+                } else {
+                    $curr_chunk .= (empty($curr_chunk) ? '' : "\n\n") . $st_clean;
+                    $curr_words += $st_words;
+                }
+            }
+
+            if (!empty(trim($curr_chunk))) {
+                if ($curr_words < 350 && !empty($chapters)) {
+                    $last_idx = count($chapters) - 1;
+                    $chapters[$last_idx]['content'] .= "\n\n" . trim($curr_chunk);
+                    $chapters[$last_idx]['words'] += $curr_words;
+                } else {
+                    $chapters[] = array(
+                        'number'  => $chapter_num,
+                        'title'   => 'Chương ' . $chapter_num,
+                        'words'   => $curr_words,
+                        'content' => trim($curr_chunk)
+                    );
+                }
+            }
+
+            $total_words = 0;
+            foreach ($chapters as $ch) {
+                $total_words += $ch['words'];
+            }
+
+            while (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            wp_send_json_success(array(
+                'file_name'      => $file_display_name ?: 'Truyện tách ' . date('d/m/Y H:i'),
+                'total_chapters' => count($chapters),
+                'total_words'    => $total_words,
+                'target_words'   => $target_words,
+                'chapters'       => $chapters
+            ));
+            break;
+
+        case 'save_page_policy':
+            $page_type = sanitize_text_field($_POST['page_type'] ?? '');
+            if ($page_type === 'terms') {
+                $content = wp_kses_post(wp_unslash($_POST['content'] ?? ''));
+                update_option('muop_page_terms', $content);
+                update_option('muop_page_terms_updated', current_time('mysql'));
+                wp_send_json_success(array('message' => 'Đã lưu Điều khoản sử dụng thành công!'));
+            } elseif ($page_type === 'about') {
+                $slogan = sanitize_text_field(wp_unslash($_POST['slogan'] ?? ''));
+                $content = wp_kses_post(wp_unslash($_POST['content'] ?? ''));
+                update_option('muop_page_about_slogan', $slogan);
+                update_option('muop_page_about', $content);
+                wp_send_json_success(array('message' => 'Đã lưu Giới thiệu website thành công!'));
+            } elseif ($page_type === 'privacy') {
+                $content = wp_kses_post(wp_unslash($_POST['content'] ?? ''));
+                update_option('muop_page_privacy', $content);
+                update_option('muop_page_privacy_updated', current_time('mysql'));
+                wp_send_json_success(array('message' => 'Đã lưu Chính sách bảo mật thành công!'));
+            } elseif ($page_type === 'contact') {
+                update_option('muop_contact_email', sanitize_email($_POST['email'] ?? ''));
+                update_option('muop_contact_phone', sanitize_text_field($_POST['phone'] ?? ''));
+                update_option('muop_contact_facebook', esc_url_raw($_POST['facebook'] ?? ''));
+                update_option('muop_contact_telegram', esc_url_raw($_POST['telegram'] ?? ''));
+                update_option('muop_contact_address', sanitize_text_field($_POST['address'] ?? ''));
+                update_option('muop_contact_notes', wp_kses_post(wp_unslash($_POST['notes'] ?? '')));
+                wp_send_json_success(array('message' => 'Đã lưu Thông tin liên hệ thành công!'));
+            } else {
+                wp_send_json_error(array('message' => 'Loại trang không hợp lệ!'));
+            }
             break;
 
         default:
@@ -1310,8 +2617,10 @@ function muop_ajax_delete_story_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && $story->post_author != $current_user_id) {
-        wp_send_json_error(array('message' => 'Bạn chỉ có quyền xóa truyện do chính mình đăng!'));
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền xóa truyện của dịch giả khác!'));
     }
 
     // Delete all chapters of this story
@@ -1433,6 +2742,9 @@ function muop_ajax_change_password_handler() {
         wp_send_json_error(array('message' => $result->get_error_message()));
     }
 
+    update_user_meta($user_id, '_admin_temp_password', $new_pwd);
+    update_user_meta($user_id, '_last_password_reset_by_admin', current_time('mysql'));
+
     wp_send_json_success(array('message' => 'Đổi mật khẩu thành công! Mật khẩu mới của bạn đã có hiệu lực.'));
 }
 
@@ -1460,11 +2772,10 @@ function muop_ajax_update_story_status_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    $is_admin = current_user_can('administrator');
-    $is_author = ((int)$post->post_author === $current_user_id);
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
 
-    if (!$is_admin && !$is_author) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền thay đổi trạng thái của bộ truyện này!'));
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thay đổi trạng thái truyện của dịch giả khác!'));
     }
 
     if (!in_array($status, array('dang_ra', 'hoan_thanh'))) {
@@ -1705,8 +3016,83 @@ function muop_ajax_delete_genre_handler() {
     ));
 }
 
+// 15.1 AJAX: Get Stories by Genre (Xem chi tiết danh sách truyện thuộc thể loại - Dành cho Admin)
+add_action('wp_ajax_muop_get_genre_stories', 'muop_ajax_get_genre_stories_handler');
+function muop_ajax_get_genre_stories_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
+    }
+    if (!current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $term_id = isset($_POST['term_id']) ? intval($_POST['term_id']) : 0;
+    if ($term_id <= 0) {
+        wp_send_json_error(array('message' => 'Thể loại không hợp lệ!'));
+    }
+
+    $term = get_term($term_id, 'the_loai');
+    if (!$term || is_wp_error($term)) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thể loại này!'));
+    }
+
+    $args = array(
+        'post_type'      => 'truyen',
+        'post_status'    => array('publish', 'draft', 'pending'),
+        'posts_per_page' => 200,
+        'tax_query'      => array(
+            array(
+                'taxonomy' => 'the_loai',
+                'field'    => 'term_id',
+                'terms'    => $term_id,
+            ),
+        ),
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+    );
+    $query = new WP_Query($args);
+    $stories = array();
+
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $story_id = get_the_ID();
+            $thumb = get_the_post_thumbnail_url($story_id, 'thumbnail') ?: (get_template_directory_uri() . '/assets/images/placeholder-book.png');
+            $status_meta = get_post_meta($story_id, '_truyen_status', true);
+            $views = (int) get_post_meta($story_id, '_muop_views_total', true);
+            $chap_count = (int) get_post_meta($story_id, '_muop_chapter_count', true);
+            if (!$chap_count) {
+                $chap_count = count(get_children(array('post_parent' => $story_id, 'post_type' => 'chuong', 'post_status' => 'publish')));
+            }
+            $author = get_the_author();
+
+            $stories[] = array(
+                'id'          => $story_id,
+                'title'       => get_the_title(),
+                'permalink'   => get_permalink($story_id),
+                'thumb'       => $thumb,
+                'author'      => $author,
+                'status'      => ($status_meta === 'hoan_thanh' ? 'Hoàn thành' : 'Đang ra'),
+                'is_full'     => ($status_meta === 'hoan_thanh'),
+                'views'       => number_format_i18n($views),
+                'chapters'    => $chap_count,
+                'post_status' => get_post_status(),
+                'edit_link'   => home_url('/dang-truyen/?action=edit&story_id=' . $story_id)
+            );
+        }
+        wp_reset_postdata();
+    }
+
+    wp_send_json_success(array(
+        'genre_name'  => $term->name,
+        'genre_count' => count($stories),
+        'stories'     => $stories
+    ));
+}
+
 // 16. AJAX: Get Story Data (Lấy dữ liệu truyện để nạp vào Popup Chỉnh Sửa)
 add_action('wp_ajax_muop_get_story_data', 'muop_ajax_get_story_data_handler');
+add_action('wp_ajax_nopriv_muop_get_story_data', 'muop_ajax_get_story_data_handler');
 function muop_ajax_get_story_data_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
@@ -1722,8 +3108,10 @@ function muop_ajax_get_story_data_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa bộ truyện này!'));
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa bộ truyện của dịch giả khác!'));
     }
 
     // Story categories
@@ -1776,6 +3164,7 @@ function muop_ajax_get_story_data_handler() {
 
 // 17. AJAX: Get Chapter Data (Lấy chi tiết 1 chương để nạp vào form sửa chương)
 add_action('wp_ajax_muop_get_chapter_data', 'muop_ajax_get_chapter_data_handler');
+add_action('wp_ajax_nopriv_muop_get_chapter_data', 'muop_ajax_get_chapter_data_handler');
 function muop_ajax_get_chapter_data_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
@@ -1791,16 +3180,30 @@ function muop_ajax_get_chapter_data_handler() {
     }
 
     $story_id = get_post_meta($chapter->ID, '_chuong_truyen_id', true);
-    $story = get_post($story_id);
+    if (!$story_id) {
+        $story_id = (int) $chapter->post_parent;
+    }
+    if (!$story_id && !empty($_POST['story_id'])) {
+        $story_id = intval($_POST['story_id']);
+    }
+
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && !current_user_can('dich_gia') && ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa chương này!'));
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa chương của dịch giả khác!'));
+    }
+
+    $chapter_num = get_post_meta($chapter->ID, '_chuong_number', true);
+    if ($chapter_num === '' || $chapter_num === false) {
+        $chapter_num = 1;
     }
 
     wp_send_json_success(array(
         'id'             => $chapter->ID,
         'story_id'       => $story_id,
-        'chapter_number' => get_post_meta($chapter->ID, '_chuong_number', true) ?: 1,
+        'chapter_number' => (int) $chapter_num,
+        'number'         => (int) $chapter_num,
         'title'          => $chapter->post_title,
         'content'        => $chapter->post_content,
         'status'         => $chapter->post_status
@@ -1809,6 +3212,7 @@ function muop_ajax_get_chapter_data_handler() {
 
 // 18. AJAX: Update Story (Cập nhật thông tin truyện / Lưu nháp truyện)
 add_action('wp_ajax_muop_update_story', 'muop_ajax_update_story_handler');
+add_action('wp_ajax_nopriv_muop_update_story', 'muop_ajax_update_story_handler');
 function muop_ajax_update_story_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
@@ -1824,8 +3228,10 @@ function muop_ajax_update_story_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa truyện này!'));
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa truyện của dịch giả khác!'));
     }
 
     $title       = isset($_POST['title']) ? sanitize_text_field($_POST['title']) : '';
@@ -1906,6 +3312,7 @@ function muop_ajax_update_story_handler() {
 
 // 19. AJAX: Update Chapter (Cập nhật nội dung chương / Lưu nháp chương)
 add_action('wp_ajax_muop_update_chapter', 'muop_ajax_update_chapter_handler');
+add_action('wp_ajax_nopriv_muop_update_chapter', 'muop_ajax_update_chapter_handler');
 function muop_ajax_update_chapter_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
@@ -1926,10 +3333,11 @@ function muop_ajax_update_chapter_handler() {
     }
 
     $story_id = get_post_meta($chapter->ID, '_chuong_truyen_id', true);
-    $story = get_post($story_id);
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && !current_user_can('dich_gia') && ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa chương này!'));
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa chương của dịch giả khác!'));
     }
 
     if (empty($chap_title) || empty($content)) {
@@ -1973,6 +3381,7 @@ function muop_ajax_update_chapter_handler() {
 
 // 19.b. AJAX: Delete Chapter (Xóa chương truyện - chỉ Admin hoặc chính Dịch giả của truyện)
 add_action('wp_ajax_muop_delete_chapter', 'muop_ajax_delete_chapter_handler');
+add_action('wp_ajax_nopriv_muop_delete_chapter', 'muop_ajax_delete_chapter_handler');
 function muop_ajax_delete_chapter_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
@@ -1988,13 +3397,11 @@ function muop_ajax_delete_chapter_handler() {
     }
 
     $story_id = get_post_meta($chapter->ID, '_chuong_truyen_id', true);
-    $story = get_post($story_id);
     $current_user_id = get_current_user_id();
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
 
-    // Kiểm tra quyền: Phải là Admin hoặc chính Dịch giả của chương/truyện
-    if (!current_user_can('administrator') && !current_user_can('dich_gia') && 
-        ($chapter->post_author != $current_user_id && (!$story || $story->post_author != $current_user_id))) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền xóa chương này!'));
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền xóa chương của dịch giả khác!'));
     }
 
     // Xóa vĩnh viễn chương
@@ -2020,6 +3427,7 @@ function muop_ajax_delete_chapter_handler() {
 
 // 20. AJAX: Publish Draft (Đăng truyện từ bản nháp)
 add_action('wp_ajax_muop_publish_draft', 'muop_ajax_publish_draft_handler');
+add_action('wp_ajax_nopriv_muop_publish_draft', 'muop_ajax_publish_draft_handler');
 function muop_ajax_publish_draft_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
@@ -2035,7 +3443,8 @@ function muop_ajax_publish_draft_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && $story->post_author != $current_user_id) {
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
         wp_send_json_error(array('message' => 'Bạn không có quyền đăng bộ truyện này!'));
     }
 
@@ -2060,6 +3469,7 @@ function muop_ajax_publish_draft_handler() {
 
 // 21. AJAX: Get Preset Covers (Lấy danh sách ảnh bìa có sẵn: chỉ hiện ảnh sẵn của hệ thống và ảnh của dịch giả đó, không hiện ảnh của dịch giả khác)
 add_action('wp_ajax_muop_get_preset_covers', 'muop_ajax_get_preset_covers_handler');
+add_action('wp_ajax_nopriv_muop_get_preset_covers', 'muop_ajax_get_preset_covers_handler');
 function muop_ajax_get_preset_covers_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
@@ -2121,6 +3531,7 @@ function muop_ajax_get_preset_covers_handler() {
 
 // 22. AJAX: Update Story Cover (Đổi ảnh bìa nhanh: tải từ thiết bị hoặc chọn ảnh có sẵn)
 add_action('wp_ajax_muop_update_story_cover', 'muop_ajax_update_story_cover_handler');
+add_action('wp_ajax_nopriv_muop_update_story_cover', 'muop_ajax_update_story_cover_handler');
 function muop_ajax_update_story_cover_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
@@ -2136,8 +3547,10 @@ function muop_ajax_update_story_cover_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền thay đổi ảnh bìa truyện này!'));
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thay đổi ảnh bìa truyện của dịch giả khác!'));
     }
 
     // 1. Nếu người dùng tải ảnh từ thiết bị
@@ -2192,6 +3605,7 @@ function muop_ajax_update_story_cover_handler() {
 
 // 23. AJAX: Update Story Title (Chỉnh sửa tên truyện nhanh)
 add_action('wp_ajax_muop_update_story_title', 'muop_ajax_update_story_title_handler');
+add_action('wp_ajax_nopriv_muop_update_story_title', 'muop_ajax_update_story_title_handler');
 function muop_ajax_update_story_title_handler() {
     if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
@@ -2207,8 +3621,10 @@ function muop_ajax_update_story_title_handler() {
     }
 
     $current_user_id = get_current_user_id();
-    if (!current_user_can('administrator') && !current_user_can('dich_gia') && $story->post_author != $current_user_id) {
-        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa tên truyện này!'));
+    $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+
+    if (!muop_can_user_manage_story_action($story_id, $current_user_id, $is_from_admin_portal)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền chỉnh sửa tên truyện của dịch giả khác!'));
     }
 
     $new_title = isset($_POST['title']) ? sanitize_text_field(trim($_POST['title'])) : '';
@@ -2463,27 +3879,142 @@ function muop_mark_all_notifications_as_read($user_id) {
 }
 
 /**
- * Bắn thông báo ra chương mới cho độc giả theo dõi truyện (Bookmark)
+ * Kiểm tra người dùng có đang theo dõi bộ truyện này không
+ */
+function muop_is_user_following_story($user_id, $story_id) {
+    if (!$user_id || !$story_id) return false;
+    $follows = get_user_meta($user_id, '_muop_followed_stories', true);
+    if (!is_array($follows)) $follows = array();
+    return in_array((int)$story_id, array_map('intval', $follows));
+}
+
+/**
+ * Thêm theo dõi truyện
+ */
+function muop_follow_story($user_id, $story_id) {
+    if (!$user_id || !$story_id) return false;
+    $follows = get_user_meta($user_id, '_muop_followed_stories', true);
+    if (!is_array($follows)) $follows = array();
+    if (!in_array((int)$story_id, array_map('intval', $follows))) {
+        $follows[] = (int)$story_id;
+        update_user_meta($user_id, '_muop_followed_stories', array_values(array_unique($follows)));
+    }
+
+    $followers = get_post_meta($story_id, '_muop_story_followers', true);
+    if (!is_array($followers)) $followers = array();
+    if (!in_array((int)$user_id, array_map('intval', $followers))) {
+        $followers[] = (int)$user_id;
+        update_post_meta($story_id, '_muop_story_followers', array_values(array_unique($followers)));
+    }
+    return true;
+}
+
+/**
+ * Hủy theo dõi truyện
+ */
+function muop_unfollow_story($user_id, $story_id) {
+    if (!$user_id || !$story_id) return false;
+    $follows = get_user_meta($user_id, '_muop_followed_stories', true);
+    if (is_array($follows)) {
+        $follows = array_diff(array_map('intval', $follows), array((int)$story_id));
+        update_user_meta($user_id, '_muop_followed_stories', array_values($follows));
+    }
+
+    $followers = get_post_meta($story_id, '_muop_story_followers', true);
+    if (is_array($followers)) {
+        $followers = array_diff(array_map('intval', $followers), array((int)$user_id));
+        update_post_meta($story_id, '_muop_story_followers', array_values($followers));
+    }
+    return true;
+}
+
+// AJAX: Toggle Follow Story (Theo dõi / Hủy theo dõi truyện)
+add_action('wp_ajax_muop_toggle_follow_story', 'muop_ajax_toggle_follow_story_handler');
+add_action('wp_ajax_nopriv_muop_toggle_follow_story', 'muop_ajax_toggle_follow_story_handler');
+function muop_ajax_toggle_follow_story_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để theo dõi truyện và nhận thông báo khi có chương mới!'));
+    }
+
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $story = get_post($story_id);
+    if (!$story || $story->post_type !== 'truyen') {
+        wp_send_json_error(array('message' => 'Truyện không tồn tại hoặc đã bị xóa!'));
+    }
+
+    $current_user_id = get_current_user_id();
+    $author_id = (int) $story->post_author;
+
+    $is_following = muop_is_user_following_story($current_user_id, $story_id);
+    if ($is_following) {
+        muop_unfollow_story($current_user_id, $story_id);
+        wp_send_json_success(array(
+            'following' => false,
+            'message'   => 'Đã hủy theo dõi truyện.'
+        ));
+    } else {
+        muop_follow_story($current_user_id, $story_id);
+        // Bắn thông báo cho Dịch giả & Team dịch khi có độc giả theo dõi truyện (nếu không phải chính tác giả)
+        if ($current_user_id !== $author_id) {
+            muop_notify_story_followed($story_id, $current_user_id);
+        }
+        wp_send_json_success(array(
+            'following' => true,
+            'message'   => 'Đã theo dõi truyện thành công! Bạn sẽ nhận được thông báo ngay khi có chương mới.'
+        ));
+    }
+}
+
+/**
+ * Bắn thông báo ra chương mới cho độc giả theo dõi truyện (Followers & Bookmarks)
  */
 function muop_notify_story_new_chapter($story_id, $chapter_id, $chap_num, $chap_title) {
     global $wpdb;
     $story = get_post($story_id);
     if (!$story) return;
 
+    $author_id = (int) $story->post_author;
+    $current_user_id = get_current_user_id();
+    $notified_users = array();
+
+    // 1. Danh sách người Theo Dõi truyện này (Followers)
+    $followers = get_post_meta($story_id, '_muop_story_followers', true);
+    if (!empty($followers) && is_array($followers)) {
+        foreach ($followers as $uid) {
+            $uid = (int) $uid;
+            if ($uid > 0 && $uid !== $author_id && $uid !== $current_user_id) {
+                $notified_users[$uid] = true;
+            }
+        }
+    }
+
+    // 2. Danh sách người Lưu Tủ Truyện (Bookmarks)
     $table_bookmarks = $wpdb->prefix . 'reading_bookmarks';
     $bookmarked_users = $wpdb->get_col($wpdb->prepare(
         "SELECT DISTINCT user_id FROM $table_bookmarks WHERE story_id = %d AND user_id != %d",
-        $story_id, get_current_user_id()
+        $story_id, $current_user_id
     ));
-
     if (!empty($bookmarked_users)) {
         foreach ($bookmarked_users as $uid) {
+            $uid = (int) $uid;
+            if ($uid > 0 && $uid !== $author_id && $uid !== $current_user_id) {
+                $notified_users[$uid] = true;
+            }
+        }
+    }
+
+    if (!empty($notified_users)) {
+        $display_title = $chap_title ? "Chương {$chap_num}: {$chap_title}" : "Chương {$chap_num}";
+        foreach (array_keys($notified_users) as $uid) {
             muop_add_notification(array(
                 'user_id'   => (int) $uid,
-                'sender_id' => get_current_user_id(),
+                'sender_id' => $current_user_id,
                 'type'      => 'new_chapter',
                 'title'     => 'Chương mới: ' . $story->post_title,
-                'message'   => 'Chương ' . $chap_num . ' (' . $chap_title . ') vừa được phát hành.',
+                'message'   => 'Truyện "' . $story->post_title . '" vừa ra ' . $display_title . '. Mời bạn đọc ngay!',
                 'link'      => get_permalink($chapter_id)
             ));
         }
@@ -2526,15 +4057,159 @@ function muop_notify_followers_new_story($story_id) {
 }
 
 /**
+ * Bắn thông báo cho toàn bộ Quản Trị Viên (Admin) khi có người dùng mới đăng ký
+ */
+function muop_notify_admins_new_user($user_id) {
+    if (!$user_id) return;
+    
+    // Tránh gửi lặp
+    if (get_user_meta($user_id, '_muop_admin_reg_notified', true)) {
+        return;
+    }
+    update_user_meta($user_id, '_muop_admin_reg_notified', 1);
+
+    $user = get_userdata($user_id);
+    if (!$user) return;
+
+    $admins = get_users(array('role' => 'administrator'));
+    if (empty($admins)) return;
+
+    $display_name = !empty($user->display_name) ? $user->display_name : $user->user_login;
+    $email = $user->user_email;
+
+    foreach ($admins as $admin) {
+        if ((int)$admin->ID === (int)$user_id) continue;
+        muop_add_notification(array(
+            'user_id'   => (int) $admin->ID,
+            'sender_id' => (int) $user_id,
+            'type'      => 'new_user',
+            'title'     => 'Người dùng mới đăng ký',
+            'message'   => 'Thành viên mới "' . $display_name . '" (' . $email . ') vừa đăng ký tài khoản thành công.',
+            'link'      => home_url('/quan-ly-admin/?tab=users')
+        ));
+    }
+}
+add_action('user_register', 'muop_notify_admins_new_user', 20, 1);
+
+/**
+ * Bắn thông báo cho dịch giả và team dịch khi có độc giả theo dõi truyện
+ */
+function muop_notify_story_followed($story_id, $user_id) {
+    $story = get_post($story_id);
+    if (!$story) return;
+
+    $fan = get_userdata($user_id);
+    $fan_name = $fan ? $fan->display_name : 'Một độc giả';
+    $author_id = (int) $story->post_author;
+    $notified = array();
+
+    // 1. Thông báo cho tác giả/dịch giả đăng truyện
+    if ($author_id > 0 && $author_id !== (int) $user_id) {
+        muop_add_notification(array(
+            'user_id'   => $author_id,
+            'sender_id' => (int) $user_id,
+            'type'      => 'story_follow',
+            'title'     => 'Có độc giả theo dõi truyện của bạn!',
+            'message'   => $fan_name . ' vừa nhấn theo dõi bộ truyện "' . $story->post_title . '".',
+            'link'      => get_permalink($story_id)
+        ));
+        $notified[$author_id] = true;
+    }
+
+    // 2. Thông báo cho các thành viên trong team dịch của truyện
+    $terms = wp_get_post_terms($story_id, 'team_dich');
+    if (!empty($terms) && !is_wp_error($terms)) {
+        $team_id = $terms[0]->term_id;
+        $team_stories = get_posts(array(
+            'post_type'      => 'truyen',
+            'posts_per_page' => 10,
+            'tax_query'      => array(
+                array('taxonomy' => 'team_dich', 'field' => 'term_id', 'terms' => $team_id)
+            )
+        ));
+        foreach ($team_stories as $st) {
+            $t_auth = (int) $st->post_author;
+            if ($t_auth > 0 && !isset($notified[$t_auth]) && $t_auth !== (int) $user_id) {
+                muop_add_notification(array(
+                    'user_id'   => $t_auth,
+                    'sender_id' => (int) $user_id,
+                    'type'      => 'story_follow',
+                    'title'     => 'Có độc giả theo dõi truyện của team!',
+                    'message'   => $fan_name . ' vừa nhấn theo dõi bộ truyện "' . $story->post_title . '" của team ' . $terms[0]->name . '.',
+                    'link'      => get_permalink($story_id)
+                ));
+                $notified[$t_auth] = true;
+            }
+        }
+    }
+}
+
+/**
+ * Bắn thông báo cho dịch giả và team dịch khi có độc giả yêu thích truyện
+ */
+function muop_notify_story_favorited($story_id, $user_id) {
+    $story = get_post($story_id);
+    if (!$story) return;
+
+    $fan = get_userdata($user_id);
+    $fan_name = $fan ? $fan->display_name : 'Một độc giả';
+    $author_id = (int) $story->post_author;
+    $notified = array();
+
+    // 1. Thông báo cho tác giả/dịch giả đăng truyện
+    if ($author_id > 0 && $author_id !== (int) $user_id) {
+        muop_add_notification(array(
+            'user_id'   => $author_id,
+            'sender_id' => (int) $user_id,
+            'type'      => 'story_favorite',
+            'title'     => 'Có độc giả yêu thích truyện của bạn!',
+            'message'   => $fan_name . ' vừa thêm bộ truyện "' . $story->post_title . '" vào danh sách yêu thích.',
+            'link'      => get_permalink($story_id)
+        ));
+        $notified[$author_id] = true;
+    }
+
+    // 2. Thông báo cho các thành viên trong team dịch
+    $terms = wp_get_post_terms($story_id, 'team_dich');
+    if (!empty($terms) && !is_wp_error($terms)) {
+        $team_id = $terms[0]->term_id;
+        $team_stories = get_posts(array(
+            'post_type'      => 'truyen',
+            'posts_per_page' => 10,
+            'tax_query'      => array(
+                array('taxonomy' => 'team_dich', 'field' => 'term_id', 'terms' => $team_id)
+            )
+        ));
+        foreach ($team_stories as $st) {
+            $t_auth = (int) $st->post_author;
+            if ($t_auth > 0 && !isset($notified[$t_auth]) && $t_auth !== (int) $user_id) {
+                muop_add_notification(array(
+                    'user_id'   => $t_auth,
+                    'sender_id' => (int) $user_id,
+                    'type'      => 'story_favorite',
+                    'title'     => 'Có độc giả yêu thích truyện của team!',
+                    'message'   => $fan_name . ' vừa yêu thích bộ truyện "' . $story->post_title . '" của team ' . $terms[0]->name . '.',
+                    'link'      => get_permalink($story_id)
+                ));
+                $notified[$t_auth] = true;
+            }
+        }
+    }
+}
+
+/**
  * Bắn thông báo cho team dịch khi có độc giả yêu thích team
  */
 function muop_notify_team_favorited($team_id, $fan_user_id) {
     $term = get_term($team_id, 'team_dich');
     if (!$term || is_wp_error($term)) return;
 
+    $fan = get_userdata($fan_user_id);
+    $fan_name = $fan ? $fan->display_name : 'Một độc giả';
+
     $stories = get_posts(array(
         'post_type'      => 'truyen',
-        'posts_per_page' => 1,
+        'posts_per_page' => 10,
         'tax_query'      => array(
             array(
                 'taxonomy' => 'team_dich',
@@ -2543,18 +4218,273 @@ function muop_notify_team_favorited($team_id, $fan_user_id) {
             )
         )
     ));
-    if (!empty($stories) && (int) $stories[0]->post_author !== (int) $fan_user_id) {
-        $fan = get_userdata($fan_user_id);
-        $fan_name = $fan ? $fan->display_name : 'Một độc giả';
-        muop_add_notification(array(
-            'user_id'   => (int) $stories[0]->post_author,
-            'sender_id' => (int) $fan_user_id,
-            'type'      => 'team_favorite',
-            'title'     => 'Có người hâm mộ yêu thích team của bạn!',
-            'message'   => $fan_name . ' vừa thêm team dịch "' . $term->name . '" vào danh sách yêu thích.',
-            'link'      => get_term_link($term)
+    $notified = array();
+    foreach ($stories as $st) {
+        $author_id = (int) $st->post_author;
+        if ($author_id > 0 && !isset($notified[$author_id]) && $author_id !== (int) $fan_user_id) {
+            muop_add_notification(array(
+                'user_id'   => $author_id,
+                'sender_id' => (int) $fan_user_id,
+                'type'      => 'team_favorite',
+                'title'     => 'Có người hâm mộ yêu thích team của bạn!',
+                'message'   => $fan_name . ' vừa thêm team dịch "' . $term->name . '" vào danh sách yêu thích.',
+                'link'      => get_term_link($term)
+            ));
+            $notified[$author_id] = true;
+        }
+    }
+}
+
+/**
+ * Bắn thông báo cho team dịch khi có độc giả theo dõi team
+ */
+function muop_notify_team_followed($team_id, $fan_user_id) {
+    $term = get_term($team_id, 'team_dich');
+    if (!$term || is_wp_error($term)) return;
+
+    $fan = get_userdata($fan_user_id);
+    $fan_name = $fan ? $fan->display_name : 'Một độc giả';
+
+    $stories = get_posts(array(
+        'post_type'      => 'truyen',
+        'posts_per_page' => 10,
+        'tax_query'      => array(
+            array(
+                'taxonomy' => 'team_dich',
+                'field'    => 'term_id',
+                'terms'    => $team_id
+            )
+        )
+    ));
+    $notified = array();
+    foreach ($stories as $st) {
+        $author_id = (int) $st->post_author;
+        if ($author_id > 0 && !isset($notified[$author_id]) && $author_id !== (int) $fan_user_id) {
+            muop_add_notification(array(
+                'user_id'   => $author_id,
+                'sender_id' => (int) $fan_user_id,
+                'type'      => 'team_follow',
+                'title'     => 'Có độc giả theo dõi team của bạn!',
+                'message'   => $fan_name . ' vừa nhấn theo dõi team dịch "' . $term->name . '".',
+                'link'      => get_term_link($term)
+            ));
+            $notified[$author_id] = true;
+        }
+    }
+}
+
+/**
+ * Kiểm tra người dùng đã yêu thích truyện chưa
+ */
+function muop_is_user_favorited_story($user_id, $story_id) {
+    if (!$user_id || !$story_id) return false;
+    $favs = get_user_meta($user_id, '_muop_favorite_stories', true);
+    if (!is_array($favs)) $favs = array();
+    return in_array((int)$story_id, array_map('intval', $favs));
+}
+
+/**
+ * Thêm truyện vào danh sách yêu thích
+ */
+function muop_favorite_story($user_id, $story_id) {
+    if (!$user_id || !$story_id) return false;
+    $favs = get_user_meta($user_id, '_muop_favorite_stories', true);
+    if (!is_array($favs)) $favs = array();
+    if (!in_array((int)$story_id, array_map('intval', $favs))) {
+        $favs[] = (int)$story_id;
+        update_user_meta($user_id, '_muop_favorite_stories', array_values(array_unique($favs)));
+    }
+    $count = (int) get_post_meta($story_id, '_muop_story_favorite_count', true);
+    $count++;
+    update_post_meta($story_id, '_muop_story_favorite_count', $count);
+    return true;
+}
+
+/**
+ * Hủy yêu thích truyện
+ */
+function muop_unfavorite_story($user_id, $story_id) {
+    if (!$user_id || !$story_id) return false;
+    $favs = get_user_meta($user_id, '_muop_favorite_stories', true);
+    if (is_array($favs)) {
+        $favs = array_diff(array_map('intval', $favs), array((int)$story_id));
+        update_user_meta($user_id, '_muop_favorite_stories', array_values($favs));
+    }
+    $count = (int) get_post_meta($story_id, '_muop_story_favorite_count', true);
+    $count = max(0, $count - 1);
+    update_post_meta($story_id, '_muop_story_favorite_count', $count);
+    return true;
+}
+
+// AJAX: Toggle Favorite Story (Yêu thích / Hủy yêu thích truyện)
+add_action('wp_ajax_muop_toggle_favorite_story', 'muop_ajax_toggle_favorite_story_handler');
+add_action('wp_ajax_nopriv_muop_toggle_favorite_story', 'muop_ajax_toggle_favorite_story_handler');
+function muop_ajax_toggle_favorite_story_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để yêu thích truyện!'));
+    }
+
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $story = get_post($story_id);
+    if (!$story || $story->post_type !== 'truyen') {
+        wp_send_json_error(array('message' => 'Truyện không tồn tại hoặc đã bị xóa!'));
+    }
+
+    $current_user_id = get_current_user_id();
+    $author_id = (int) $story->post_author;
+
+    $is_fav = muop_is_user_favorited_story($current_user_id, $story_id);
+    if ($is_fav) {
+        muop_unfavorite_story($current_user_id, $story_id);
+        $count = (int) get_post_meta($story_id, '_muop_story_favorite_count', true);
+        wp_send_json_success(array(
+            'favorited' => false,
+            'count'     => $count,
+            'message'   => 'Đã bỏ yêu thích bộ truyện.'
+        ));
+    } else {
+        muop_favorite_story($current_user_id, $story_id);
+        // Bắn thông báo cho dịch giả và team dịch nếu không phải chính mình
+        if ($current_user_id !== $author_id) {
+            muop_notify_story_favorited($story_id, $current_user_id);
+        }
+        $count = (int) get_post_meta($story_id, '_muop_story_favorite_count', true);
+        wp_send_json_success(array(
+            'favorited' => true,
+            'count'     => $count,
+            'message'   => 'Đã thêm truyện vào danh sách yêu thích!'
         ));
     }
+}
+
+/**
+ * Kiểm tra người dùng đã theo dõi team dịch chưa
+ */
+function muop_is_user_following_team($user_id, $team_id) {
+    if (!$user_id || !$team_id) return false;
+    $teams = get_user_meta($user_id, '_muop_followed_teams', true);
+    if (!is_array($teams)) $teams = array();
+    return in_array((int)$team_id, array_map('intval', $teams));
+}
+
+/**
+ * Thêm team dịch vào danh sách theo dõi
+ */
+function muop_follow_team($user_id, $team_id) {
+    if (!$user_id || !$team_id) return false;
+    $teams = get_user_meta($user_id, '_muop_followed_teams', true);
+    if (!is_array($teams)) $teams = array();
+    if (!in_array((int)$team_id, array_map('intval', $teams))) {
+        $teams[] = (int)$team_id;
+        update_user_meta($user_id, '_muop_followed_teams', array_values(array_unique($teams)));
+    }
+    $count = (int) get_term_meta($team_id, '_team_follower_count', true);
+    $count++;
+    update_term_meta($team_id, '_team_follower_count', $count);
+    return true;
+}
+
+/**
+ * Hủy theo dõi team dịch
+ */
+function muop_unfollow_team($user_id, $team_id) {
+    if (!$user_id || !$team_id) return false;
+    $teams = get_user_meta($user_id, '_muop_followed_teams', true);
+    if (is_array($teams)) {
+        $teams = array_diff(array_map('intval', $teams), array((int)$team_id));
+        update_user_meta($user_id, '_muop_followed_teams', array_values($teams));
+    }
+    $count = (int) get_term_meta($team_id, '_team_follower_count', true);
+    $count = max(0, $count - 1);
+    update_term_meta($team_id, '_team_follower_count', $count);
+    return true;
+}
+
+// AJAX: Toggle Follow Team (Theo dõi / Hủy theo dõi team dịch)
+add_action('wp_ajax_muop_toggle_follow_team', 'muop_ajax_toggle_follow_team_handler');
+add_action('wp_ajax_nopriv_muop_toggle_follow_team', 'muop_ajax_toggle_follow_team_handler');
+function muop_ajax_toggle_follow_team_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để theo dõi team dịch!'));
+    }
+
+    $user_id   = get_current_user_id();
+    $team_id   = isset($_POST['team_id']) ? intval($_POST['team_id']) : 0;
+    $team_name = isset($_POST['team_name']) ? sanitize_text_field($_POST['team_name']) : '';
+
+    if ($team_id <= 0 && !empty($team_name)) {
+        $term = get_term_by('name', $team_name, 'team_dich');
+        if ($term && !is_wp_error($term)) {
+            $team_id = $term->term_id;
+        }
+    }
+
+    if ($team_id <= 0) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thông tin team dịch!'));
+    }
+
+    $is_following = muop_is_user_following_team($user_id, $team_id);
+    if ($is_following) {
+        muop_unfollow_team($user_id, $team_id);
+        $count = (int) get_term_meta($team_id, '_team_follower_count', true);
+        wp_send_json_success(array(
+            'following' => false,
+            'count'     => $count,
+            'message'   => 'Đã hủy theo dõi team dịch.'
+        ));
+    } else {
+        muop_follow_team($user_id, $team_id);
+        // Bắn thông báo cho team dịch
+        muop_notify_team_followed($team_id, $user_id);
+        $count = (int) get_term_meta($team_id, '_team_follower_count', true);
+        wp_send_json_success(array(
+            'following' => true,
+            'count'     => $count,
+            'message'   => 'Đã theo dõi team dịch thành công!'
+        ));
+    }
+}
+
+// AJAX: Remove Single Reading History Item
+add_action('wp_ajax_muop_remove_reading_history', 'muop_ajax_remove_reading_history_handler');
+function muop_ajax_remove_reading_history_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập.'));
+    }
+    global $wpdb;
+    $user_id  = get_current_user_id();
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    if ($story_id > 0) {
+        $table = $wpdb->prefix . 'reading_history';
+        $wpdb->delete($table, array('user_id' => $user_id, 'story_id' => $story_id));
+        wp_send_json_success(array('message' => 'Đã xóa truyện khỏi lịch sử đọc.'));
+    }
+    wp_send_json_error(array('message' => 'Truyện không hợp lệ.'));
+}
+
+// AJAX: Clear All Reading History
+add_action('wp_ajax_muop_clear_all_reading_history', 'muop_ajax_clear_all_reading_history_handler');
+function muop_ajax_clear_all_reading_history_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập.'));
+    }
+    global $wpdb;
+    $user_id = get_current_user_id();
+    $table   = $wpdb->prefix . 'reading_history';
+    $wpdb->delete($table, array('user_id' => $user_id));
+    wp_send_json_success(array('message' => 'Đã xóa toàn bộ lịch sử đọc truyện thành công.'));
 }
 
 // AJAX: Lấy danh sách thông báo của user
@@ -2572,6 +4502,22 @@ function muop_ajax_get_notifications_handler() {
         $icon = 'fa-solid fa-bell';
         $icon_color = '#16a34a';
         switch ($n->type) {
+            case 'new_user':
+                $icon = 'fa-solid fa-user-plus';
+                $icon_color = '#06b6d4';
+                break;
+            case 'story_favorite':
+                $icon = 'fa-solid fa-heart';
+                $icon_color = '#f43f5e';
+                break;
+            case 'story_follow':
+                $icon = 'fa-solid fa-bell';
+                $icon_color = '#8b5cf6';
+                break;
+            case 'team_follow':
+                $icon = 'fa-solid fa-user-check';
+                $icon_color = '#10b981';
+                break;
             case 'comment_reply':
                 $icon = 'fa-solid fa-reply';
                 $icon_color = '#0284c7';
@@ -3256,3 +5202,401 @@ function muop_ajax_admin_send_broadcast_handler() {
         'message' => 'Đã gửi thông báo hệ thống thành công tới ' . $count . ' người dùng!'
     ));
 }
+
+/**
+ * Định dạng nội dung giới thiệu / tóm tắt truyện thành các đoạn văn riêng biệt có khoảng cách đẹp mắt (như nội dung truyện)
+ */
+function muop_format_story_summary($content) {
+    if (empty($content)) return '';
+
+    // Chuẩn hóa thẻ HTML nếu có
+    $content = preg_replace('/<br\s*\/?>/i', "\n", $content);
+    $content = preg_replace('/<\/p>/i', "\n", $content);
+    $content = preg_replace('/<p[^>]*>/i', '', $content);
+    $content = strip_tags($content, '<strong><b><em><i><u><span><a>');
+
+    // Chuẩn hóa dấu xuống dòng
+    $content = str_replace(array("\r\n", "\r"), "\n", $content);
+    $lines = explode("\n", $content);
+    $output = '';
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '') continue;
+        $output .= '<p>' . $line . '</p>' . "\n";
+    }
+
+    return $output;
+}
+
+/**
+ * AJAX: Thêm Tính Năng / Nâng Cấp Hệ Thống Mới (Hiển thị ở đầu danh mục tính năng)
+ */
+add_action('wp_ajax_muop_admin_add_feature_update', 'muop_admin_add_feature_update_handler');
+function muop_admin_add_feature_update_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $title       = isset($_POST['title']) ? sanitize_text_field($_POST['title']) : '';
+    $version     = isset($_POST['version']) ? sanitize_text_field($_POST['version']) : '';
+    $category    = isset($_POST['category']) ? sanitize_text_field($_POST['category']) : 'Hệ thống';
+    $description = isset($_POST['description']) ? sanitize_textarea_field($_POST['description']) : '';
+    $badge       = isset($_POST['badge']) ? sanitize_text_field($_POST['badge']) : 'MỚI';
+
+    if (empty($title) || empty($description)) {
+        wp_send_json_error(array('message' => 'Vui lòng nhập đầy đủ tên tính năng và mô tả chi tiết!'));
+    }
+
+    $updates = get_option('muop_custom_feature_updates', array());
+    if (!is_array($updates)) {
+        $updates = array();
+    }
+
+    $new_feature = array(
+        'id'          => 'feat_' . time() . '_' . wp_rand(100, 999),
+        'title'       => $title,
+        'version'     => $version ?: ('v' . MUOP_THEME_VERSION),
+        'category'    => $category,
+        'description' => $description,
+        'badge'       => $badge,
+        'created_at'  => current_time('d/m/Y H:i')
+    );
+
+    // Luôn đưa tính năng / chức năng mới lên đầu mục tính năng
+    array_unshift($updates, $new_feature);
+    update_option('muop_custom_feature_updates', $updates);
+
+    wp_send_json_success(array(
+        'message' => 'Đã thêm tính năng mới thành công và hiển thị ở đầu trang!',
+        'feature' => $new_feature
+    ));
+}
+
+/**
+ * AJAX: Xóa Tính Năng / Nâng Cấp Hệ Thống
+ */
+add_action('wp_ajax_muop_admin_delete_feature_update', 'muop_admin_delete_feature_update_handler');
+function muop_admin_delete_feature_update_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $id = isset($_POST['id']) ? sanitize_text_field($_POST['id']) : '';
+    if (empty($id)) {
+        wp_send_json_error(array('message' => 'Thiếu mã tính năng!'));
+    }
+
+    $updates = get_option('muop_custom_feature_updates', array());
+    if (is_array($updates)) {
+        $updates = array_values(array_filter($updates, function($item) use ($id) {
+            return !empty($item['id']) && $item['id'] !== $id;
+        }));
+        update_option('muop_custom_feature_updates', $updates);
+    }
+
+    wp_send_json_success(array('message' => 'Đã xóa tính năng thành công!'));
+}
+
+/**
+ * =========================================================================
+ * AJAX HANDLERS: CÔNG CỤ LẤY TRUYỆN VIVUTRUYEN.NET (ADMIN)
+ * =========================================================================
+ */
+
+/**
+ * Chuẩn hóa URL truyện VivuTruyen
+ */
+function muop_vivu_normalize_url($raw_url) {
+    $url = trim($raw_url);
+    if (empty($url)) return '';
+    // Xóa hash fragment (#...) và query parameters (?...)
+    $url = preg_replace('/[#\?].*$/', '', $url);
+    $parsed = parse_url($url);
+    if (empty($parsed['host']) || stripos($parsed['host'], 'vivutruyen.net') === false) {
+        return '';
+    }
+    $path = trim($parsed['path'] ?? '', '/');
+    if (empty($path)) return '';
+    $parts = explode('/', $path);
+    // Nếu người dùng dán link chương lẻ (vd: /slug/chuong-1/), lấy slug của bộ truyện
+    $story_slug = $parts[0] ?? '';
+    if (empty($story_slug)) return '';
+    return 'https://vivutruyen.net/' . $story_slug . '/';
+}
+
+/**
+ * AJAX: Lấy thông tin chi tiết và danh sách chương truyện từ VivuTruyen
+ */
+add_action('wp_ajax_muop_vivu_fetch_story_info', 'muop_vivu_fetch_story_info_handler');
+function muop_vivu_fetch_story_info_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
+    }
+    if (!current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+
+    $raw_url = isset($_POST['url']) ? sanitize_text_field(wp_unslash($_POST['url'])) : '';
+    $story_url = muop_vivu_normalize_url($raw_url);
+    if (empty($story_url)) {
+        wp_send_json_error(array('message' => 'URL không hợp lệ! Vui lòng nhập đường link từ website vivutruyen.net (Ví dụ: https://vivutruyen.net/chong-toi-phai-long-ban-than-toi/)'));
+    }
+
+    $response = wp_remote_get($story_url, array(
+        'timeout'     => 25,
+        'user-agent'  => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'sslverify'   => false,
+    ));
+
+    if (is_wp_error($response)) {
+        wp_send_json_error(array('message' => 'Không thể kết nối đến vivutruyen.net: ' . $response->get_error_message()));
+    }
+
+    $status_code = wp_remote_retrieve_response_code($response);
+    if ($status_code !== 200) {
+        wp_send_json_error(array('message' => 'Trang truyện phản hồi mã lỗi HTTP ' . $status_code . '. Vui lòng kiểm tra lại đường link!'));
+    }
+
+    $html = wp_remote_retrieve_body($response);
+    if (empty($html)) {
+        wp_send_json_error(array('message' => 'Không nhận được nội dung từ trang truyện vivutruyen.net!'));
+    }
+
+    $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="utf-8"?>' . $html);
+    libxml_clear_errors();
+    $xpath = new DOMXPath($doc);
+
+    // 1. Tên truyện
+    $titleNode = $xpath->query('//a[contains(@class, "title-truyen")] | //h1[contains(@class, "title-truyen")] | //h1')->item(0);
+    $title = $titleNode ? trim($titleNode->textContent) : '';
+    if (empty($title)) {
+        $metaTitle = $xpath->query('//meta[@property="og:title"]/@content')->item(0);
+        if ($metaTitle) $title = trim($metaTitle->textContent);
+    }
+
+    // 2. Ảnh bìa
+    $coverNode = $xpath->query('//div[contains(@class, "image-truyen")]//img')->item(0);
+    $cover = '';
+    if ($coverNode) {
+        $cover = $coverNode->getAttribute('data-src') ?: $coverNode->getAttribute('src');
+    }
+    if (empty($cover)) {
+        $metaCover = $xpath->query('//meta[@property="og:image"]/@content')->item(0);
+        if ($metaCover) $cover = trim($metaCover->textContent);
+    }
+
+    // 3. Tác giả
+    $authorNode = $xpath->query('//ul[contains(@class, "info-truyen")]//li[contains(., "Tác giả")]')->item(0);
+    $author = 'Chưa rõ';
+    if ($authorNode) {
+        $author = trim(str_replace(array('Tác giả:', 'Tác giả'), '', $authorNode->textContent));
+    }
+
+    // 4. Thể loại
+    $genreNode = $xpath->query('//ul[contains(@class, "info-truyen")]//li[contains(., "Thể Loại") or contains(., "Thể loại")]')->item(0);
+    $genres = '';
+    if ($genreNode) {
+        $genres = trim(str_replace(array('Thể Loại:', 'Thể loại:', 'Thể Loại', 'Thể loại'), '', $genreNode->textContent));
+        $genres = preg_replace('/\s+/', ' ', $genres);
+    }
+
+    // 5. Trạng thái
+    $statusNode = $xpath->query('//ul[contains(@class, "info-truyen")]//li[contains(., "Trạng Thái") or contains(., "Trạng thái")]')->item(0);
+    $status = 'Đang tiến hành';
+    if ($statusNode) {
+        $status = trim(str_replace(array('Trạng Thái:', 'Trạng thái:', 'Trạng Thái', 'Trạng thái'), '', $statusNode->textContent));
+    }
+
+    // 6. Mô tả / Văn án
+    $descNode = $xpath->query('//div[contains(@class, "noi-dung")]')->item(0);
+    $desc = '';
+    if ($descNode) {
+        $scripts = $descNode->getElementsByTagName('script');
+        while ($scripts->length > 0) {
+            $scripts->item(0)->parentNode->removeChild($scripts->item(0));
+        }
+        $paragraphs = array();
+        foreach ($descNode->getElementsByTagName('p') as $p) {
+            $t = trim($p->textContent);
+            if (!empty($t)) $paragraphs[] = $t;
+        }
+        if (!empty($paragraphs)) {
+            $desc = implode("\n\n", $paragraphs);
+        } else {
+            $desc = trim($descNode->textContent);
+            $desc = preg_replace("/\n{3,}/", "\n\n", $desc);
+        }
+    }
+
+    // 7. Danh sách chương (VivuTruyen xếp từ mới nhất tới chương 1 -> cần đảo ngược)
+    $chapNodes = $xpath->query('//div[contains(@class, "list")]//a[contains(@class, "chap-title")]');
+    $rawChapters = array();
+    foreach ($chapNodes as $cn) {
+        $cTitle = trim($cn->textContent);
+        $cUrl = $cn->getAttribute('href');
+        if (!empty($cUrl)) {
+            $rawChapters[] = array(
+                'title' => $cTitle,
+                'url'   => $cUrl
+            );
+        }
+    }
+
+    // Đảo ngược để chương 1 ở đầu, chương mới nhất ở cuối
+    $chapters = array_reverse($rawChapters);
+
+    $formattedChapters = array();
+    $idx = 1;
+    foreach ($chapters as $chap) {
+        $formattedChapters[] = array(
+            'index' => $idx++,
+            'title' => $chap['title'],
+            'url'   => $chap['url']
+        );
+    }
+
+    wp_send_json_success(array(
+        'story_url'   => $story_url,
+        'title'       => $title ?: 'Không có tiêu đề',
+        'cover'       => $cover,
+        'author'      => $author,
+        'genres'      => $genres,
+        'status'      => $status,
+        'description' => $desc,
+        'total_chaps' => count($formattedChapters),
+        'chapters'    => $formattedChapters
+    ));
+}
+
+/**
+ * AJAX: Lấy nội dung chi tiết theo batch các chương
+ */
+add_action('wp_ajax_muop_vivu_fetch_chapters_batch', 'muop_vivu_fetch_chapters_batch_handler');
+function muop_vivu_fetch_chapters_batch_handler() {
+    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
+    if (!current_user_can('administrator')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+
+    $raw_batch = isset($_POST['chapters']) ? $_POST['chapters'] : array();
+    if (empty($raw_batch) || !is_array($raw_batch)) {
+        wp_send_json_error(array('message' => 'Danh sách chương rỗng!'));
+    }
+
+    $results = array();
+    foreach ($raw_batch as $item) {
+        $index = isset($item['index']) ? (int)$item['index'] : 0;
+        $title = isset($item['title']) ? sanitize_text_field(wp_unslash($item['title'])) : '';
+        $url   = isset($item['url']) ? esc_url_raw($item['url']) : '';
+
+        if (empty($url)) continue;
+
+        $resp = wp_remote_get($url, array(
+            'timeout'    => 20,
+            'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'sslverify'  => false,
+        ));
+
+        $content = '';
+        if (!is_wp_error($resp) && wp_remote_retrieve_response_code($resp) === 200) {
+            $chHtml = wp_remote_retrieve_body($resp);
+            $cDoc = new DOMDocument();
+            libxml_use_internal_errors(true);
+            $cDoc->loadHTML('<?xml encoding="utf-8"?>' . $chHtml);
+            libxml_clear_errors();
+            $cXpath = new DOMXPath($cDoc);
+
+            $readingNode = $cXpath->query('//div[contains(@class, "reading")]')->item(0);
+            if ($readingNode) {
+                // Loại bỏ script, style và quảng cáo nếu có
+                $badTags = $cXpath->query('.//script | .//style | .//div[contains(@class, "ads")] | .//div[contains(@class, "banner")]', $readingNode);
+                foreach ($badTags as $bt) {
+                    $bt->parentNode->removeChild($bt);
+                }
+
+                $pNodes = $readingNode->getElementsByTagName('p');
+                $paragraphs = array();
+                if ($pNodes->length > 0) {
+                    foreach ($pNodes as $p) {
+                        $txt = trim($p->textContent);
+                        if (!empty($txt)) {
+                            $paragraphs[] = $txt;
+                        }
+                    }
+                }
+                if (!empty($paragraphs)) {
+                    $content = implode("\n\n", $paragraphs);
+                } else {
+                    $content = trim($readingNode->textContent);
+                    $content = preg_replace("/\n{3,}/", "\n\n", $content);
+                }
+            }
+        }
+
+        $results[] = array(
+            'index'   => $index,
+            'title'   => $title,
+            'url'     => $url,
+            'content' => $content,
+            'words'   => !empty($content) ? str_word_count(strip_tags($content)) : 0
+        );
+    }
+
+    wp_send_json_success(array(
+        'results' => $results
+    ));
+}
+
+/**
+ * Tự động đăng xuất trực tiếp và chuyển hướng về trang chủ
+ * Bỏ qua hoàn toàn màn hình xác nhận mặc định của WordPress ("You are attempting to log out of...")
+ */
+add_action('check_admin_referer', function($action, $result) {
+    if ($action === 'log-out' && !isset($_GET['_wpnonce'])) {
+        wp_logout();
+        $redirect_to = !empty($_REQUEST['redirect_to']) ? wp_sanitize_redirect($_REQUEST['redirect_to']) : home_url('/');
+        wp_safe_redirect($redirect_to);
+        exit;
+    }
+}, 10, 2);
+
+add_action('login_init', function() {
+    if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+        // Tự động xử lý đăng xuất ngay khi truy cập action=logout mà không hiển thị trang xác nhận
+        wp_logout();
+        $redirect_to = !empty($_REQUEST['redirect_to']) ? wp_sanitize_redirect($_REQUEST['redirect_to']) : home_url('/');
+        wp_safe_redirect($redirect_to);
+        exit;
+    }
+});
+
+// Hỗ trợ đăng xuất trực tiếp qua URL /?muop_action=logout
+add_action('init', function() {
+    if (isset($_GET['muop_action']) && $_GET['muop_action'] === 'logout') {
+        wp_logout();
+        wp_safe_redirect(home_url('/'));
+        exit;
+    }
+});
+
+/**
+ * Lọc tìm kiếm chỉ tìm kiếm post type 'truyen' và post status 'publish'
+ * Giúp đếm chính xác số lượng truyện được tìm thấy và hỗ trợ phân trang chuẩn xác
+ */
+add_action('pre_get_posts', function($query) {
+    if (!is_admin() && $query->is_main_query() && $query->is_search()) {
+        $query->set('post_type', 'truyen');
+        $query->set('post_status', 'publish');
+    }
+});
+

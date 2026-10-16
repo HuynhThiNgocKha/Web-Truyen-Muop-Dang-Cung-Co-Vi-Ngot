@@ -31,9 +31,6 @@ $query = new WP_Query(array(
             <h1 class="section-title">
                 <i class="fa-solid fa-fire-flame-curved"></i> Truyện Hot
             </h1>
-            <span style="font-size: 13.5px; color: var(--text-muted);">
-                Sắp xếp theo số lượt xem thực tế
-            </span>
         </div>
 
         <div class="story-grid">
@@ -48,19 +45,22 @@ $query = new WP_Query(array(
             ?>
         </div>
 
-        <!-- Phân trang 20 truyện / trang -->
-        <div style="display: flex; justify-content: center; gap: 8px; margin-top: 36px;">
-            <?php
-            echo paginate_links(array(
-                'total'        => $query->max_num_pages,
-                'current'      => $paged,
-                'prev_text'    => '<i class="fa-solid fa-chevron-left"></i> Trước',
-                'next_text'    => 'Sau <i class="fa-solid fa-chevron-right"></i>',
-                'type'         => 'plain'
-            ));
-            wp_reset_postdata();
-            ?>
-        </div>
+        <!-- Phân trang 20 truyện / trang (Chỉ hiển thị khi có từ 2 trang trở lên) -->
+        <?php if ($query->max_num_pages > 1) : ?>
+            <div class="pagination-wrapper">
+                <?php
+                echo paginate_links(array(
+                    'total'        => $query->max_num_pages,
+                    'current'      => $paged,
+                    'prev_text'    => '<i class="fa-solid fa-chevron-left"></i> Trước',
+                    'next_text'    => 'Sau <i class="fa-solid fa-chevron-right"></i>',
+                    'type'         => 'plain'
+                ));
+                ?>
+            </div>
+        <?php endif; 
+        wp_reset_postdata();
+        ?>
     </div>
 </div>
 

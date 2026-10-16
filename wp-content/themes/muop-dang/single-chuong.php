@@ -30,16 +30,21 @@ foreach ($all_chapters as $idx => $c) {
         }
         if (isset($all_chapters[$idx + 1])) {
             $next_chap_url = get_permalink($all_chapters[$idx + 1]->ID);
+            $next_chap_id  = $all_chapters[$idx + 1]->ID;
         }
         break;
     }
 }
 
-$total_chapters = count($all_chapters);
-$chap_order     = ($total_chapters > 0) ? ($current_index + 1) : $chap_num;
+$total_chapters     = count($all_chapters);
+$chap_order         = ($total_chapters > 0) ? ($current_index + 1) : $chap_num;
+$next_chap_order    = $chap_order + 1;
+$next_is_checkpoint = muop_is_chapter_checkpoint($next_chap_order, $total_chapters);
 
-// Bất kỳ chương nào không phải chương 1 (từ chương 2 trở đi) đều xuất hiện popup link Shopee để mở khóa
-$is_checkpoint  = ($chap_order > 1 || $chap_num > 1);
+// Quy tắc hiển thị link Shopee Gatekeeper:
+// - Truyện có 3 hoặc 4 chương: Xuất hiện ở chương 1 và chương 3
+// - Truyện >= 5 chương: Xuất hiện ở chương 2, 5, 8, 11... (cứ cách 3 chương 1 lần)
+$is_checkpoint  = muop_is_chapter_checkpoint($chap_order, $total_chapters);
 $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
 ?>
 
@@ -79,7 +84,12 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 </button>
 
                 <?php if ($next_chap_url) : ?>
-                    <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter btn-chap-next">
+                    <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter btn-chap-next"
+                       data-story-id="<?php echo esc_attr($story_id); ?>"
+                       data-chapter-id="<?php echo esc_attr(!empty($next_chap_id) ? $next_chap_id : 0); ?>"
+                       data-chapter-num="<?php echo esc_attr($next_chap_order); ?>"
+                       data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
+                       data-is-checkpoint="<?php echo $next_is_checkpoint ? '1' : '0'; ?>">
                         Chương Sau <i class="fa-solid fa-arrow-right"></i>
                     </a>
                 <?php else : ?>
@@ -123,11 +133,11 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
         <!-- TOOLBAR ĐIỀU HƯỚNG DƯỚI -->
         <div class="reading-toolbar-bottom">
             <?php if ($prev_chap_url) : ?>
-                <a href="<?php echo esc_url($prev_chap_url); ?>" class="btn btn-secondary">
+                <a href="<?php echo esc_url($prev_chap_url); ?>" class="btn btn-secondary btn-chap-prev">
                     <i class="fa-solid fa-arrow-left"></i> Chương Trước
                 </a>
             <?php else : ?>
-                <button class="btn btn-secondary" disabled style="opacity: 0.5;">
+                <button class="btn btn-secondary btn-chap-prev" disabled style="opacity: 0.5;">
                     <i class="fa-solid fa-arrow-left"></i> Chương Trước
                 </button>
             <?php endif; ?>
@@ -137,11 +147,16 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
             </button>
 
             <?php if ($next_chap_url) : ?>
-                <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter" data-story-id="<?php echo esc_attr($story_id); ?>" data-chapter-num="<?php echo esc_attr($chap_order + 1); ?>" data-is-chap1="0">
+                <a href="<?php echo esc_url($next_chap_url); ?>" class="btn btn-primary btn-next-chapter btn-chap-next" 
+                   data-story-id="<?php echo esc_attr($story_id); ?>" 
+                   data-chapter-id="<?php echo esc_attr(!empty($next_chap_id) ? $next_chap_id : 0); ?>"
+                   data-chapter-num="<?php echo esc_attr($next_chap_order); ?>"
+                   data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
+                   data-is-checkpoint="<?php echo $next_is_checkpoint ? '1' : '0'; ?>">
                     Chương Sau <i class="fa-solid fa-arrow-right"></i>
                 </a>
             <?php else : ?>
-                <button class="btn btn-primary" disabled style="opacity: 0.5;">
+                <button class="btn btn-primary btn-chap-next" disabled style="opacity: 0.5;">
                     Chương Sau <i class="fa-solid fa-arrow-right"></i>
                 </button>
             <?php endif; ?>
@@ -157,12 +172,19 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 <?php if (is_user_logged_in()) : ?>
                     <form id="formPostComment">
                         <input type="hidden" name="post_id" value="<?php echo $chapter_id; ?>" />
-                        <textarea name="comment" class="comment-textarea" placeholder="Nội dung chương này thế nào, chia sẻ cùng Mướp nha..." required></textarea>
-                        <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+                        <div class="comment-input-wrap">
+                            <textarea name="comment" class="comment-textarea" placeholder="Nội dung chương này thế nào, chia sẻ cùng Mướp nha..." required></textarea>
+                            <div class="comment-stickers-preview" style="display: none;"></div>
+                        </div>
+                        <div class="comment-form-toolbar">
+                            <button type="button" class="btn-sticker-toggle" title="Thêm Sticker">
+                                <i class="fa-regular fa-face-smile"></i> <span>Sticker</span>
+                            </button>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fa-solid fa-paper-plane"></i> Gửi Bình Luận
                             </button>
                         </div>
+                        <?php muop_render_sticker_picker(); ?>
                     </form>
                 <?php else : ?>
                     <div style="background: var(--pastel-green); padding: 14px 18px; border-radius: var(--radius-md); font-size: 13.5px; display: flex; align-items: center; justify-content: space-between;">
@@ -178,14 +200,23 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 if (!empty($chap_comments)) :
                     foreach ($chap_comments as $cmt) :
                 ?>
-                    <li class="comment-item">
+                    <li class="comment-item" id="comment-<?php echo $cmt->comment_ID; ?>">
                         <div class="comment-avatar">
                             <?php echo esc_html(strtoupper(substr($cmt->comment_author, 0, 1))); ?>
                         </div>
                         <div class="comment-body">
-                            <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
-                            <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
-                            <div class="comment-text"><?php echo esc_html($cmt->comment_content); ?></div>
+                            <div class="comment-header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                <div>
+                                    <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
+                                    <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
+                                </div>
+                                <?php if (muop_can_user_delete_comment($cmt)) : ?>
+                                    <button type="button" class="btn-delete-comment" data-comment-id="<?php echo (int) $cmt->comment_ID; ?>" title="Xóa bình luận">
+                                        <i class="fa-solid fa-trash-can"></i> Xóa
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            <div class="comment-text"><?php echo muop_render_comment_content($cmt->comment_content); ?></div>
                         </div>
                     </li>
                 <?php 
@@ -236,15 +267,17 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
             <?php foreach ($all_chapters as $idx => $c) : 
                 $is_current = ($c->ID == $chapter_id);
                 $chap_clean_title = muop_get_clean_chapter_title($c->post_title);
-                $is_drawer_chap1 = ($idx === 0);
+                $drawer_chap_order = $idx + 1;
+                $drawer_is_checkpoint = muop_is_chapter_checkpoint($drawer_chap_order, $total_chapters);
             ?>
                 <li class="chapter-drawer-item <?php echo $is_current ? 'is-current-chapter' : ''; ?>" data-title="<?php echo esc_attr(mb_strtolower($chap_clean_title)); ?>">
                     <a href="<?php echo esc_url(get_permalink($c->ID)); ?>" 
                        class="chapter-drawer-link"
                        data-story-id="<?php echo esc_attr($story_id); ?>"
                        data-chapter-id="<?php echo esc_attr($c->ID); ?>"
-                       data-chapter-num="<?php echo esc_attr($idx + 1); ?>"
-                       data-is-chap1="<?php echo $is_drawer_chap1 ? '1' : '0'; ?>">
+                       data-chapter-num="<?php echo esc_attr($drawer_chap_order); ?>"
+                       data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
+                       data-is-checkpoint="<?php echo $drawer_is_checkpoint ? '1' : '0'; ?>">
                         <span class="chapter-drawer-name">
                             <?php if ($is_current) : ?>
                                 <i class="fa-solid fa-book-open current-icon"></i>

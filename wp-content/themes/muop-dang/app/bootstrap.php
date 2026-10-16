@@ -38,9 +38,9 @@ add_action('wp_enqueue_scripts', function() {
     );
 
     wp_localize_script('muop-api-client', 'muopConfig', array(
-        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'ajaxUrl' => '/wp-admin/admin-ajax.php',
         'restUrl' => esc_url_raw(rest_url('muop/v1/')),
-        'nonce'   => wp_create_nonce('wp_rest')
+        'nonce'   => wp_create_nonce('muop_ajax_nonce')
     ));
 }, 5);
 

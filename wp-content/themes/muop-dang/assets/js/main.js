@@ -10,6 +10,21 @@
 (function($) {
   'use strict';
 
+  // Chuẩn hóa AJAX URL luôn là relative path trên cùng origin để tránh mất cookie do domain/port mismatch
+  function getAjaxUrl() {
+    if (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) {
+      let u = muopConfig.ajaxUrl;
+      try {
+        if (u.indexOf('://') !== -1) {
+          const parsed = new URL(u);
+          return parsed.pathname;
+        }
+      } catch (e) {}
+      return u;
+    }
+    return '/wp-admin/admin-ajax.php';
+  }
+
   // Safe helper to extract message from AJAX response or error (prevents undefined reading 'message')
   function getAjaxMsg(res, defaultMsg) {
     if (!res) return defaultMsg || 'Có lỗi xảy ra!';
@@ -20,7 +35,7 @@
         clean = clean.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
       }
       if (clean === '-1') return 'Phiên bảo mật (nonce) đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
-      if (clean === '0' || clean.endsWith(' 0') || clean === '0') return 'Bạn cần đăng nhập để thực hiện chức năng này!';
+      if (clean === '0' || clean.endsWith(' 0') || clean === '0') return 'Phiên làm việc hoặc bảo mật đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
       try {
         const json = JSON.parse(clean);
         return getAjaxMsg(json, defaultMsg);
@@ -35,6 +50,252 @@
     if (res.message) return res.message;
     return defaultMsg || 'Có lỗi xảy ra!';
   }
+
+  // Helper tính số từ & số ký tự dùng chung toàn website
+  function countTextWordsAndChars(text) {
+    if (!text) return { words: 0, chars: 0 };
+    const clean = String(text).trim();
+    const words = clean ? clean.split(/\s+/).filter(w => w.length > 0).length : 0;
+    const chars = String(text).length;
+    return { words, chars };
+  }
+
+  function updateRealtimeWordCounter($textarea, $wordBadge, $charBadge) {
+    if (!$textarea || !$textarea.length) return;
+    try {
+      const val = $textarea.val() || '';
+      const stats = countTextWordsAndChars(val);
+      if ($wordBadge && $wordBadge.length) {
+        $wordBadge.text(stats.words.toLocaleString('vi-VN'));
+      }
+      if ($charBadge && $charBadge.length) {
+        $charBadge.text(stats.chars.toLocaleString('vi-VN'));
+      }
+    } catch (e) {
+      console.warn('Word counter error:', e);
+    }
+  }
+
+  window.muopCountWords = countTextWordsAndChars;
+  window.muopUpdateWordCounter = updateRealtimeWordCounter;
+
+  /* ==========================================================================
+     GLOBAL POPUP MODAL DIALOG MANAGER (Thay thế hoàn toàn alert / confirm)
+     ========================================================================== */
+  const PopupManager = {
+    $overlay: null,
+    currentResolve: null,
+    currentOptions: null,
+
+    ensureElements() {
+      if (this.$overlay && this.$overlay.length && $('#muopGlobalPopupModal').length) return;
+      let $el = $('#muopGlobalPopupModal');
+      if (!$el.length) {
+        const modalHtml = `
+          <div id="muopGlobalPopupModal" class="muop-popup-overlay" role="dialog" aria-modal="true">
+            <div class="muop-popup-card">
+              <button type="button" class="muop-popup-close-btn" id="muopPopupBtnClose" title="Đóng">&times;</button>
+              <div class="muop-popup-icon-container">
+                <div class="muop-popup-icon-circle muop-icon-success" id="muopPopupIconCircle">
+                  <i class="fa-solid fa-circle-check" id="muopPopupIcon"></i>
+                </div>
+              </div>
+              <h3 class="muop-popup-title" id="muopPopupTitle">Thông Báo</h3>
+              <div class="muop-popup-message" id="muopPopupMessage"></div>
+              <div class="muop-popup-footer">
+                <button type="button" class="muop-popup-btn muop-popup-btn-cancel" id="muopPopupBtnCancel" style="display: none;">Hủy bỏ</button>
+                <button type="button" class="muop-popup-btn muop-popup-btn-confirm" id="muopPopupBtnConfirm">Đã hiểu</button>
+              </div>
+            </div>
+          </div>
+        `;
+        if (document.body) {
+          $('body').append(modalHtml);
+        } else {
+          $(document).ready(() => $('body').append(modalHtml));
+        }
+        $el = $('#muopGlobalPopupModal');
+      }
+      this.$overlay = $el;
+
+      // Event handlers
+      $(document).off('click.muopPopupConfirm', '#muopPopupBtnConfirm').on('click.muopPopupConfirm', '#muopPopupBtnConfirm', () => {
+        this.close(true);
+      });
+
+      $(document).off('click.muopPopupCancel', '#muopPopupBtnCancel, #muopPopupBtnClose').on('click.muopPopupCancel', '#muopPopupBtnCancel, #muopPopupBtnClose', () => {
+        this.close(false);
+      });
+
+      $(document).off('click.muopPopupOverlay', '#muopGlobalPopupModal').on('click.muopPopupOverlay', '#muopGlobalPopupModal', (e) => {
+        if (e.target && e.target.id === 'muopGlobalPopupModal') {
+          this.close(false);
+        }
+      });
+
+      $(document).off('keydown.muopPopupKey').on('keydown.muopPopupKey', (e) => {
+        if (!this.$overlay || !this.$overlay.hasClass('is-active')) return;
+        if (e.key === 'Escape') {
+          this.close(false);
+        } else if (e.key === 'Enter') {
+          // If not focusing on cancel button, confirm
+          if (document.activeElement && $(document.activeElement).is('#muopPopupBtnCancel')) {
+            this.close(false);
+          } else {
+            this.close(true);
+          }
+        }
+      });
+    },
+
+    detectType(msg) {
+      if (!msg || typeof msg !== 'string') return 'info';
+      const m = msg.toLowerCase();
+      if (m.indexOf('thành công') !== -1 || m.indexOf('đã ẩn') !== -1 || m.indexOf('đã xóa') !== -1 || m.indexOf('đã lưu') !== -1 || m.indexOf('đã cập nhật') !== -1 || m.indexOf('đã duyệt') !== -1 || m.indexOf('đã gửi') !== -1 || m.indexOf('hoàn tất') !== -1) {
+        return 'success';
+      }
+      if (m.indexOf('lỗi') !== -1 || m.indexOf('thất bại') !== -1 || m.indexOf('không thể') !== -1 || m.indexOf('không tồn tại') !== -1 || m.indexOf('không có quyền') !== -1 || m.indexOf('hết hạn') !== -1 || m.indexOf('từ chối') !== -1) {
+        return 'error';
+      }
+      if (m.indexOf('chắc chắn') !== -1 || m.indexOf('xác nhận') !== -1 || m.indexOf('cảnh báo') !== -1 || m.indexOf('có muốn') !== -1) {
+        return 'warning';
+      }
+      return 'info';
+    },
+
+    open(options) {
+      this.ensureElements();
+      this.currentOptions = options;
+
+      const type = options.type || this.detectType(options.message);
+      const isConfirm = !!options.isConfirm;
+
+      // Icons & Colors
+      const $circle = $('#muopPopupIconCircle');
+      const $icon = $('#muopPopupIcon');
+      $circle.removeClass('muop-icon-success muop-icon-error muop-icon-warning muop-icon-info');
+
+      let iconClass = 'fa-circle-info';
+      let defaultTitle = 'Thông Báo';
+
+      if (options.isDanger) {
+        $circle.addClass('muop-icon-error');
+        iconClass = options.icon || 'fa-trash-can';
+        defaultTitle = 'Xác Nhận Xóa';
+      } else if (type === 'success') {
+        $circle.addClass('muop-icon-success');
+        iconClass = options.icon || 'fa-circle-check';
+        defaultTitle = 'Thành Công';
+      } else if (type === 'error') {
+        $circle.addClass('muop-icon-error');
+        iconClass = options.icon || 'fa-circle-xmark';
+        defaultTitle = 'Thông Báo Lỗi';
+      } else if (type === 'warning' || isConfirm) {
+        $circle.addClass('muop-icon-warning');
+        iconClass = options.icon || (isConfirm ? 'fa-circle-question' : 'fa-triangle-exclamation');
+        defaultTitle = isConfirm ? 'Xác Nhận Thao Tác' : 'Cảnh Báo';
+      } else {
+        $circle.addClass('muop-icon-info');
+        iconClass = options.icon || 'fa-circle-info';
+        defaultTitle = 'Thông Báo';
+      }
+
+      $icon.attr('class', 'fa-solid ' + iconClass);
+      $('#muopPopupTitle').text(options.title || defaultTitle);
+      $('#muopPopupMessage').html(options.message || '');
+
+      const $btnConfirm = $('#muopPopupBtnConfirm');
+      const $btnCancel = $('#muopPopupBtnCancel');
+
+      if (options.hideButtons) {
+        $btnConfirm.hide();
+        $btnCancel.hide();
+      } else {
+        $btnConfirm.show().text(options.confirmText || (isConfirm ? 'Xác Nhận' : 'Đã Hiểu'));
+        if (options.isDanger) {
+          $btnConfirm.addClass('btn-danger-confirm');
+        } else {
+          $btnConfirm.removeClass('btn-danger-confirm');
+        }
+
+        if (isConfirm) {
+          $btnCancel.show().text(options.cancelText || 'Hủy Bỏ');
+        } else {
+          $btnCancel.hide();
+        }
+      }
+
+      $('#muopPopupBtnClose').toggle(!options.hideCloseBtn);
+
+      this.$overlay.addClass('is-active');
+      setTimeout(() => {
+        $btnConfirm.focus();
+      }, 50);
+
+      return new Promise((resolve) => {
+        this.currentResolve = resolve;
+      });
+    },
+
+    close(result) {
+      if (!this.$overlay || !this.$overlay.hasClass('is-active')) return;
+      this.$overlay.removeClass('is-active');
+
+      const opts = this.currentOptions || {};
+      const resolve = this.currentResolve;
+      this.currentResolve = null;
+      this.currentOptions = null;
+
+      if (result) {
+        if (typeof opts.onConfirm === 'function') {
+          try { opts.onConfirm(); } catch (err) { console.error(err); }
+        }
+      } else {
+        if (typeof opts.onCancel === 'function') {
+          try { opts.onCancel(); } catch (err) { console.error(err); }
+        }
+      }
+
+      if (typeof resolve === 'function') {
+        resolve(result);
+      }
+    }
+  };
+
+  window.muopAlert = function(message, typeOrCallback, callback) {
+    let type = null;
+    let onOk = null;
+    if (typeof typeOrCallback === 'function') {
+      onOk = typeOrCallback;
+    } else if (typeof typeOrCallback === 'string') {
+      type = typeOrCallback;
+      if (typeof callback === 'function') onOk = callback;
+    } else if (typeof typeOrCallback === 'object' && typeOrCallback !== null) {
+      return PopupManager.open(Object.assign({ message: message }, typeOrCallback));
+    }
+    return PopupManager.open({
+      message: message,
+      type: type,
+      isConfirm: false,
+      onConfirm: onOk
+    });
+  };
+
+  window.muopConfirm = function(message, onConfirm, onCancel, options) {
+    const opts = Object.assign({
+      message: message,
+      isConfirm: true,
+      onConfirm: onConfirm,
+      onCancel: onCancel,
+      type: 'warning'
+    }, options || {});
+    return PopupManager.open(opts);
+  };
+
+  // Override window.alert để bất kỳ mã nguồn nào gọi alert() cũng hiển thị popup đồng bộ với theme
+  window.alert = function(msg, callback) {
+    return window.muopAlert(msg, callback);
+  };
 
   // 1. THEME TOGGLE (DARK / LIGHT MODE)
   const ThemeManager = {
@@ -85,48 +346,92 @@
   const AffiliateManager = {
     pendingUnlock: null,
 
+    // Kiểm tra xem chương này có phải là checkpoint có link Shopee hay không
+    // - Nếu truyện có 3 hoặc 4 chương (hoặc <= 4): Xuất hiện ở chương 1 và chương 3
+    // - Nếu truyện có từ 5 chương trở lên: Xuất hiện ở chương 2, 5, 8, 11... (cứ cách 3 chương 1 lần)
+    isCheckpoint(chapNum, totalChapters) {
+      chapNum = parseInt(chapNum, 10) || 1;
+      totalChapters = parseInt(totalChapters, 10) || 1;
+
+      if (totalChapters <= 4) {
+        return (chapNum === 1 || chapNum === 3);
+      }
+      return (chapNum >= 2 && (chapNum % 3 === 2));
+    },
+
+    // Kiểm tra xem chương đã được mở khóa trước đó chưa (trong localStorage hoặc sessionStorage)
+    // Đã nhấn 1 lần rồi thì không cần nhấn lần 2
+    isUnlocked(storyId, chapterId, chapNum) {
+      try {
+        if (chapterId) {
+          if (localStorage.getItem(`muop_unlocked_chap_${chapterId}`) || sessionStorage.getItem(`muop_unlocked_chap_${chapterId}`)) {
+            return true;
+          }
+        }
+        if (storyId && chapNum) {
+          if (localStorage.getItem(`muop_unlocked_s${storyId}_c${chapNum}`) || sessionStorage.getItem(`muop_unlocked_s${storyId}_c${chapNum}`)) {
+            return true;
+          }
+        }
+      } catch (e) {}
+      return false;
+    },
+
+    // Đánh dấu đã mở khóa vĩnh viễn (nhấn 1 lần, không hỏi lại lần 2)
+    markUnlocked(storyId, chapterId, chapNum) {
+      try {
+        if (chapterId) {
+          localStorage.setItem(`muop_unlocked_chap_${chapterId}`, 'true');
+          sessionStorage.setItem(`muop_unlocked_chap_${chapterId}`, 'true');
+        }
+        if (storyId && chapNum) {
+          localStorage.setItem(`muop_unlocked_s${storyId}_c${chapNum}`, 'true');
+          sessionStorage.setItem(`muop_unlocked_s${storyId}_c${chapNum}`, 'true');
+        }
+      } catch (e) {}
+    },
+
     init() {
       this.bindChapterListInterceptors();
       this.bindUnlockButton();
       this.checkChapterLock();
     },
 
-    // Chặn click vào bất kỳ chương nào không phải chương 1 nếu chưa mở khóa link Shopee
+    // Bắt sự kiện khi click vào link chương trên trang truyện hoặc thanh điều hướng
     bindChapterListInterceptors() {
-      // 1. Bắt sự kiện khi click vào link chương trên trang truyện hoặc thanh điều hướng
       $(document).on('click', '.chapter-item, .btn-read-latest, .chapter-drawer-link, .btn-next-chapter', function(e) {
         const $el = $(this);
         const href = $el.attr('href');
         if (!href || href === '#' || href.startsWith('javascript:')) return;
 
-        // Xác định xem có phải Chương 1 không
-        const isChap1Attr = $el.data('is-chap1');
-        const isChap1 = (isChap1Attr === 1 || isChap1Attr === '1');
         const storyId = parseInt($el.data('story-id'), 10) || 0;
         const chapterId = parseInt($el.data('chapter-id'), 10) || 0;
-        const chapNum = parseInt($el.data('chapter-num'), 10) || 0;
+        const chapNum = parseInt($el.data('chapter-num'), 10) || 1;
+        const totalChapters = parseInt($el.data('total-chapters'), 10) || 0;
+        const checkpointAttr = $el.data('is-checkpoint');
 
-        // Kiểm tra chữ trong tiêu đề nếu chưa có meta
-        const text = $el.text().toLowerCase().trim();
-        const isFirstChapter = isChap1 || (chapNum === 1) || 
-          (chapNum === 0 && text.includes('chương 1') && !text.match(/chương 1\d/));
+        // Xác định xem chương này có phải là checkpoint có link Shopee không:
+        // 1. Ưu tiên thuộc tính data-is-checkpoint từ server
+        // 2. Nếu không có, tự tính toán theo quy tắc
+        let isChk = false;
+        if (typeof checkpointAttr !== 'undefined' && checkpointAttr !== '') {
+          isChk = (checkpointAttr === 1 || checkpointAttr === '1');
+        } else {
+          isChk = AffiliateManager.isCheckpoint(chapNum, totalChapters);
+        }
 
-        // NẾU LÀ CHƯƠNG 1 -> ĐỌC MIỄN PHÍ TRỰC TIẾP, KHÔNG CHẶN
-        if (isFirstChapter) {
+        // NẾU KHÔNG PHẢI CHƯƠNG CHECKPOINT -> ĐỌC MIỄN PHÍ TRỰC TIẾP, KHÔNG CHẶN
+        if (!isChk) {
           return;
         }
 
-        // BẤT KỲ CHƯƠNG NÀO KHÔNG PHẢI CHƯƠNG 1 (CHƯƠNG 2, 3, 4, 5...):
-        // Kiểm tra xem chương này đã được mở khóa trong phiên chưa
-        const isUnlocked = (chapterId && sessionStorage.getItem(`muop_unlocked_chap_${chapterId}`)) ||
-                           (storyId && chapNum && sessionStorage.getItem(`muop_unlocked_s${storyId}_c${chapNum}`));
-
-        if (isUnlocked) {
-          // Đã mở khóa trước đó trong phiên này -> Cho phép mở đọc
+        // NẾU LÀ CHƯƠNG CHECKPOINT: Kiểm tra xem đã nhấn mở khóa chưa (chỉ cần nhấn 1 lần)
+        if (AffiliateManager.isUnlocked(storyId, chapterId, chapNum)) {
+          // Đã nhấn trước đó -> Cho phép vào đọc ngay lập tức, không hỏi lại
           return;
         }
 
-        // CHƯA MỞ KHÓA -> CHẶN LẠI VÀ HIỆN POPUP SHOPEE BẮT BUỘC
+        // CHƯA MỞ KHÓA -> CHẶN LẠI VÀ HIỆN POPUP SHOPEE
         e.preventDefault();
         e.stopPropagation();
 
@@ -146,14 +451,14 @@
         $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(250);
       });
 
-      // 3. Nút đóng modal Shopee (Nếu độc giả không bấm link Shopee thì không được vào đọc)
+      // 3. Nút đóng modal Shopee
       $(document).on('click', '#btnCloseShopeeModal', function(e) {
         e.preventDefault();
         $('#shopeeGatekeeperModal').fadeOut(200);
         AffiliateManager.pendingUnlock = null;
       });
 
-      // 4. Click ra nền mờ đóng modal (vẫn không đọc được nếu không click link)
+      // 4. Click ra nền mờ đóng modal
       $(document).on('click', '#shopeeGatekeeperModal', function(e) {
         if (e.target === this) {
           $(this).fadeOut(200);
@@ -162,14 +467,12 @@
       });
     },
 
-    // Xử lý khi độc giả bấm vào nút mở link Shopee để mở khóa
+    // Xử lý khi độc giả bấm vào nút mở link Shopee để mở khóa (chỉ cần nhấn 1 lần)
     bindUnlockButton() {
-      $(document).on('click', '#btnShopeeUnlock', (e) => {
-        e.preventDefault();
-        const shopeeUrl = $('#btnShopeeUnlock').attr('href') || muopConfig.shopeeUrl || 'https://s.shopee.vn/4qG9lQO2rp';
-
-        // 1. Mở link Shopee trong tab mới
-        window.open(shopeeUrl, '_blank');
+      $(document).on('click', '#btnShopeeUnlock', function(e) {
+        // KHÔNG gọi e.preventDefault() để trình duyệt mở link Shopee trong tab mới theo thuộc tính target="_blank" tự nhiên, không bao giờ bị popup blocker chặn
+        const $btn = $(this);
+        const shopeeUrl = $btn.attr('href') || (typeof muopConfig !== 'undefined' && muopConfig.shopeeUrl) || 'https://s.shopee.vn/5q8lDzjzRv';
 
         const pending = AffiliateManager.pendingUnlock;
         let storyId = 0;
@@ -189,31 +492,28 @@
           }
         }
 
-        // 2. Track click qua AJAX
-        this.trackClick('shopee', shopeeUrl, storyId, chapNum);
+        // 1. Ghi nhận lượt click Shopee qua AJAX
+        AffiliateManager.trackClick('shopee', shopeeUrl, storyId, chapNum);
 
-        // 3. Đánh dấu đã mở khóa trong sessionStorage
-        if (chapterId) {
-          sessionStorage.setItem(`muop_unlocked_chap_${chapterId}`, 'true');
-        }
-        if (storyId && chapNum) {
-          sessionStorage.setItem(`muop_unlocked_s${storyId}_c${chapNum}`, 'true');
-        }
+        // 2. Đánh dấu đã mở khóa vĩnh viễn (localStorage & sessionStorage) -> Chỉ cần nhấn 1 lần!
+        AffiliateManager.markUnlocked(storyId, chapterId, chapNum);
 
-        // 4. Nếu có targetUrl (độc giả vừa bấm từ danh sách chương):
-        // Đóng modal và chuyển hướng ngay tới chương đó để đọc!
+        // 3. Mở khóa nội dung trên trang đọc ngay lập tức (nếu đang ở trang đọc)
+        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
+
+        // 4. Nếu có targetUrl (độc giả vừa bấm từ danh sách chương): chuyển trang sau khi đã kích hoạt mở tab Shopee
         if (pending && pending.targetUrl) {
           $('#shopeeGatekeeperModal').fadeOut(200);
           const target = pending.targetUrl;
           AffiliateManager.pendingUnlock = null;
-          window.location.href = target;
+          setTimeout(() => {
+            window.location.href = target;
+          }, 350);
           return;
         }
 
         // 5. Nếu đang ở chính trang đọc chương này (single-chuong.php):
-        // Mở khóa nội dung chương ngay lập tức
         $('#shopeeGatekeeperModal').fadeOut(250);
-        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
       });
     },
 
@@ -225,33 +525,39 @@
       const storyId = parseInt($readingWrapper.data('story-id'), 10) || 0;
       const chapterId = parseInt($readingWrapper.data('chapter-id'), 10) || 0;
       const chapNum = parseInt($readingWrapper.data('chapter-num'), 10) || 1;
+      const totalChapters = parseInt($readingWrapper.data('total-chapters'), 10) || 0;
       const checkpointAttr = $readingWrapper.data('is-checkpoint');
 
-      // Nếu là Chương 1 -> Đọc trực tiếp, đảm bảo không bị khóa
-      if (chapNum === 1 && (checkpointAttr === 0 || checkpointAttr === '0')) {
+      // Xác định chương này có phải checkpoint cần link Shopee không
+      let isChk = false;
+      if (typeof checkpointAttr !== 'undefined' && checkpointAttr !== '') {
+        isChk = (checkpointAttr === 1 || checkpointAttr === '1');
+      } else {
+        isChk = this.isCheckpoint(chapNum, totalChapters);
+      }
+
+      // Nếu KHÔNG phải checkpoint -> Mở nội dung đọc trực tiếp
+      if (!isChk) {
         $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
         $('#shopeeGatekeeperModal').hide();
         return;
       }
 
-      // Bất kỳ chương nào không phải Chương 1:
-      // Kiểm tra xem đã mở khóa trong phiên chưa
-      const isUnlocked = (chapterId && sessionStorage.getItem(`muop_unlocked_chap_${chapterId}`)) ||
-                         (storyId && chapNum && sessionStorage.getItem(`muop_unlocked_s${storyId}_c${chapNum}`));
-
-      if (!isUnlocked) {
-        // Chưa mở khóa -> Khóa nội dung và hiển thị Popup Shopee
-        $('.chapter-content-box').addClass('chapter-locked');
-        $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(300);
-      } else {
-        // Đã mở khóa -> Mở toàn bộ nội dung đọc
+      // Nếu LÀ checkpoint -> Kiểm tra xem đã mở khóa chưa (chỉ cần nhấn 1 lần)
+      if (this.isUnlocked(storyId, chapterId, chapNum)) {
+        // Đã nhấn mở khóa rồi -> Không hỏi lần 2, mở đọc ngay
         $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
         $('#shopeeGatekeeperModal').hide();
+      } else {
+        // Chưa nhấn -> Khóa và hiển thị Popup Shopee
+        $('.chapter-content-box').addClass('chapter-locked');
+        $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(300);
       }
     },
 
     // Track click via AJAX
     trackClick(type, url, storyId, chapterNum) {
+      if (typeof muopConfig === 'undefined' || !muopConfig.ajaxUrl) return;
       $.ajax({
         url: muopConfig.ajaxUrl,
         type: 'POST',
@@ -261,6 +567,200 @@
           url: url,
           story_id: storyId || 0,
           chapter_num: chapterNum || 0
+        }
+      });
+    }
+  };
+
+  // 3.1 TIKTOK SHOP HIDDEN BACKGROUND JUMP MANAGER
+  const TikTokJumpManager = {
+    config: {
+      storageKeyFirst: 'muop_tt_first_clicked',
+      storageKeyLastTs: 'muop_tt_last_trigger_ts',
+      storageKeyBtnClicks: 'muop_tt_btn_clicks',
+      storageKeyChapClicks: 'muop_tt_chap_clicks',
+
+      // Thời gian cho nút thông thường: mỗi 4 lần bấm hoặc sau 2 phút
+      generalCooldownMs: 120 * 1000,
+      generalClickThreshold: 4,
+
+      // Thời gian cho nút chuyển chương (Chương trước / Chương sau): mỗi 2 lần chuyển chương hoặc sau 60s
+      chapCooldownMs: 60 * 1000,
+      chapClickThreshold: 2
+    },
+
+    init() {
+      // Chỉ bỏ qua khi đang ở bên trong trang quản lý /quan-ly-admin/ để không ảnh hưởng đến việc quản trị
+      if (window.location.pathname.indexOf('/quan-ly-admin/') !== -1) {
+        return;
+      }
+
+      this.bindTriggers();
+    },
+
+    getTikTokUrl() {
+      return (typeof muopConfig !== 'undefined' && muopConfig.tiktokUrl)
+        ? muopConfig.tiktokUrl
+        : 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ';
+    },
+
+    shouldTrigger(isChapterNav) {
+      const now = Date.now();
+      const firstClicked = localStorage.getItem(this.config.storageKeyFirst);
+
+      // 1. Lần đầu tiên người dùng bấm vào bất kỳ button nào -> Kích hoạt ngay lập tức!
+      if (!firstClicked) {
+        return true;
+      }
+
+      // 2. Các lần tiếp theo ("lâu lâu"):
+      const lastTs = parseInt(localStorage.getItem(this.config.storageKeyLastTs), 10) || 0;
+      const elapsed = now - lastTs;
+
+      if (isChapterNav) {
+        // ĐẶC BIỆT: Nút chuyển chương trước / chương sau
+        const chapClicks = (parseInt(localStorage.getItem(this.config.storageKeyChapClicks), 10) || 0) + 1;
+        localStorage.setItem(this.config.storageKeyChapClicks, chapClicks.toString());
+
+        if (chapClicks >= this.config.chapClickThreshold || elapsed >= this.config.chapCooldownMs) {
+          return true;
+        }
+      } else {
+        // Nút thông thường
+        const btnClicks = (parseInt(localStorage.getItem(this.config.storageKeyBtnClicks), 10) || 0) + 1;
+        localStorage.setItem(this.config.storageKeyBtnClicks, btnClicks.toString());
+
+        if (btnClicks >= this.config.generalClickThreshold || elapsed >= this.config.generalCooldownMs) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+
+    recordTrigger() {
+      const now = Date.now();
+      localStorage.setItem(this.config.storageKeyFirst, '1');
+      localStorage.setItem(this.config.storageKeyLastTs, now.toString());
+      localStorage.setItem(this.config.storageKeyBtnClicks, '0');
+      localStorage.setItem(this.config.storageKeyChapClicks, '0');
+    },
+
+    openLinkSafely(url) {
+      if (!url) return;
+      let opened = false;
+      try {
+        const win = window.open(url, '_blank');
+        if (win && !win.closed && typeof win.closed !== 'undefined') {
+          opened = true;
+        }
+      } catch (err) {}
+
+      // Dự phòng cho trình duyệt di động (iOS Safari, Android Chrome) khi window.open bị popup blocker chặn
+      if (!opened) {
+        try {
+          const a = document.createElement('a');
+          a.href = url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => {
+            try { document.body.removeChild(a); } catch (e) {}
+          }, 300);
+        } catch (e) {}
+      }
+    },
+
+    triggerJump(storyId, chapterNum) {
+      const tiktokUrl = this.getTikTokUrl();
+      if (!tiktokUrl) return;
+
+      this.recordTrigger();
+
+      // Mở liên kết TikTok Shop trong tab mới
+      this.openLinkSafely(tiktokUrl);
+
+      // Ghi nhận lượt click affiliate TikTok vào hệ thống thống kê
+      if (typeof AffiliateManager !== 'undefined' && typeof AffiliateManager.trackClick === 'function') {
+        AffiliateManager.trackClick('tiktok', tiktokUrl, storyId || 0, chapterNum || 0);
+      }
+    },
+
+    bindTriggers() {
+      const self = this;
+      const btnSelector = 'button, .btn, a.btn, input[type="button"], input[type="submit"], [role="button"], .btn-chap-prev, .btn-chap-next, .btn-next-chapter, .chapter-item, .chapter-drawer-link';
+
+      $(document).on('click', btnSelector, function(e) {
+        // Ngăn chặn sự kiện bị xử lý nhiều lần trên cùng 1 lượt click
+        if (e._ttJumpHandled) return;
+        e._ttJumpHandled = true;
+
+        const $el = $(this);
+
+        // Bỏ qua nếu button đang bị vô hiệu hóa
+        if ($el.prop('disabled') || $el.hasClass('disabled') || $el.attr('aria-disabled') === 'true') {
+          return;
+        }
+
+        // Bỏ qua nếu thao tác thuộc Modal mở khóa Shopee
+        if ($el.closest('#shopeeGatekeeperModal').length || $el.is('#btnShopeeUnlock, #btnCloseShopeeModal')) {
+          return;
+        }
+
+        // Bỏ qua nếu thao tác trong thanh tác vụ admin
+        if ($el.closest('.admin-sidebar, .admin-main-wrap, .adm-modal, #wpadminbar').length) {
+          return;
+        }
+
+        // Bỏ qua nếu là link dẫn trực tiếp tới shopee hoặc tiktok
+        const href = $el.attr('href') || '';
+        if (href.indexOf('shopee.vn') !== -1 || href.indexOf('tiktok.com') !== -1) {
+          return;
+        }
+
+        // Xác định xem có phải nút chuyển chương (Chương trước / Chương sau / Danh sách chương) hay không
+        const isChapterNav = $el.is('.btn-chap-prev, .btn-chap-next, .btn-next-chapter, .chapter-item, .chapter-drawer-link') ||
+                             $el.closest('.chapter-nav-btns, .reading-toolbar-bottom').length > 0;
+
+        // Nếu là nút Chương Sau mà chương đó đang bị Shopee khóa (chưa mở khóa) -> ưu tiên Shopee mở khóa trước
+        if ($el.hasClass('btn-next-chapter') && typeof AffiliateManager !== 'undefined') {
+          const sId = parseInt($el.data('story-id'), 10) || 0;
+          const cId = parseInt($el.data('chapter-id'), 10) || 0;
+          const cNum = parseInt($el.data('chapter-num'), 10) || 1;
+          const totalChaps = parseInt($el.data('total-chapters'), 10) || 0;
+          const isChkAttr = $el.data('is-checkpoint');
+          let isChk = (typeof isChkAttr !== 'undefined' && isChkAttr !== '') ? (isChkAttr == 1) : AffiliateManager.isCheckpoint(cNum, totalChaps);
+          if (isChk && !AffiliateManager.isUnlocked(sId, cId, cNum)) {
+            return;
+          }
+        }
+
+        // Kiểm tra điều kiện mở TikTok
+        if (self.shouldTrigger(isChapterNav)) {
+          let storyId = parseInt($el.data('story-id'), 10) || 0;
+          let chapterNum = parseInt($el.data('chapter-num'), 10) || 0;
+          if (!storyId) {
+            const $rw = $('.chapter-reading-wrapper');
+            if ($rw.length) {
+              storyId = parseInt($rw.data('story-id'), 10) || 0;
+              chapterNum = parseInt($rw.data('chapter-num'), 10) || 0;
+            }
+          }
+
+          // Nếu là thẻ <a> có link chuyển trang (như Chương trước / Chương sau):
+          // Cần mở tab TikTok trước rồi hoãn chuyển trang 250ms để trình duyệt di động không hủy tab mới
+          if ($el.is('a') && href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+            e.preventDefault();
+            self.triggerJump(storyId, chapterNum);
+            setTimeout(() => {
+              window.location.href = href;
+            }, 250);
+            return;
+          }
+
+          // Đối với các button thông thường (không chuyển URL trực tiếp):
+          self.triggerJump(storyId, chapterNum);
         }
       });
     }
@@ -302,12 +802,8 @@
     },
 
     showNotice(msg) {
-      let $toast = $('#antiCopyToast');
-      if (!$toast.length) {
-        $toast = $('<div id="antiCopyToast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1C2B18;color:#fff;padding:12px 24px;border-radius:30px;box-shadow:0 6px 20px rgba(0,0,0,0.3);z-index:99999;font-size:13.5px;font-weight:600;display:none;border:1px solid #689F38;text-align:center;"></div>');
-        $('body').append($toast);
-      }
-      $toast.text(msg).stop(true, true).fadeIn(200).delay(2500).fadeOut(300);
+      // Đã ẩn hoàn toàn thông báo chống sao chép theo yêu cầu người dùng
+      return;
     }
   };
 
@@ -1044,6 +1540,134 @@
           }
         });
       });
+
+      // 5.b Toggle Follow Story (Theo dõi / Hủy theo dõi truyện)
+      $(document).on('click', '#btnToggleFollowStory', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+
+        if (!muopConfig.isLoggedIn) {
+          if (typeof muopAlert === 'function') {
+            muopAlert('Vui lòng đăng nhập để theo dõi truyện và nhận thông báo ngay khi có chương mới!', 'warning', () => {
+              window.location.href = muopConfig.siteUrl + '/dang-nhap/?redirect_to=' + encodeURIComponent(window.location.href);
+            });
+          } else {
+            window.location.href = muopConfig.siteUrl + '/dang-nhap/';
+          }
+          return;
+        }
+
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true);
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_toggle_follow_story',
+            nonce: muopConfig.nonce,
+            story_id: storyId
+          },
+          success: (res) => {
+            $btn.prop('disabled', false);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const isFollowing = res.data && res.data.following;
+              if (isFollowing) {
+                $btn.html('<i class="fa-solid fa-bell"></i> <span class="follow-btn-label">Đang Theo Dõi</span>');
+                $btn.addClass('btn-primary').removeClass('btn-secondary');
+                $btn.attr('title', 'Đang theo dõi truyện này (Bấm để hủy)');
+              } else {
+                $btn.html('<i class="fa-regular fa-bell"></i> <span class="follow-btn-label">Theo Dõi Truyện</span>');
+                $btn.removeClass('btn-primary').addClass('btn-secondary');
+                $btn.attr('title', 'Theo dõi truyện để nhận thông báo ngay khi có chương mới');
+              }
+              if (typeof muopAlert === 'function') {
+                muopAlert(getAjaxMsg(res, isFollowing ? 'Đã theo dõi truyện thành công!' : 'Đã hủy theo dõi truyện.'), isFollowing ? 'success' : 'info');
+              }
+            } else {
+              $btn.html(originalHtml);
+              if (typeof muopAlert === 'function') {
+                muopAlert(getAjaxMsg(res, 'Thao tác không thành công!'), 'error');
+              }
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            if (typeof muopAlert === 'function') {
+              muopAlert(msg, 'error');
+            }
+          }
+        });
+      });
+
+      // 5.c Toggle Favorite Story (Yêu thích / Bỏ yêu thích truyện)
+      $(document).on('click', '#btnToggleFavoriteStory', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+
+        if (!muopConfig.isLoggedIn) {
+          if (typeof muopAlert === 'function') {
+            muopAlert('Vui lòng đăng nhập để yêu thích truyện!', 'warning', () => {
+              window.location.href = muopConfig.siteUrl + '/dang-nhap/?redirect_to=' + encodeURIComponent(window.location.href);
+            });
+          } else {
+            window.location.href = muopConfig.siteUrl + '/dang-nhap/';
+          }
+          return;
+        }
+
+        const originalHtml = $btn.html();
+        $btn.prop('disabled', true);
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_toggle_favorite_story',
+            nonce: muopConfig.nonce,
+            story_id: storyId
+          },
+          success: (res) => {
+            $btn.prop('disabled', false);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const isFavorited = res.data && res.data.favorited;
+              if (isFavorited) {
+                $btn.html('<i class="fa-solid fa-heart"></i> <span class="favorite-btn-label">Đã Yêu Thích</span>');
+                $btn.addClass('btn-primary').removeClass('btn-secondary');
+                $btn.attr('title', 'Bỏ yêu thích truyện này');
+              } else {
+                $btn.html('<i class="fa-regular fa-heart"></i> <span class="favorite-btn-label">Yêu Thích Truyện</span>');
+                $btn.removeClass('btn-primary').addClass('btn-secondary');
+                $btn.attr('title', 'Yêu thích bộ truyện này');
+              }
+              if (typeof muopAlert === 'function') {
+                muopAlert(getAjaxMsg(res, isFavorited ? 'Đã thêm truyện vào danh sách yêu thích!' : 'Đã bỏ yêu thích bộ truyện.'), isFavorited ? 'success' : 'info');
+              }
+            } else {
+              $btn.html(originalHtml);
+              if (typeof muopAlert === 'function') {
+                muopAlert(getAjaxMsg(res, 'Thao tác không thành công!'), 'error');
+              }
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(originalHtml);
+            let msg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            if (typeof muopAlert === 'function') muopAlert(msg, 'error');
+          }
+        });
+      });
     }
   };
 
@@ -1061,7 +1685,7 @@
         $alert.hide();
 
         const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
 
         $.ajax({
           url: ajaxUrl,
@@ -1102,7 +1726,7 @@
         $alert.hide();
 
         const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
 
         $.ajax({
           url: ajaxUrl,
@@ -1219,7 +1843,7 @@
         $status.hide();
 
         const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
 
         $.ajax({
           url: ajaxUrl,
@@ -1310,7 +1934,7 @@
         $alert.hide();
 
         const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
 
         const formData = new FormData(this);
         if (!formData.has('action')) formData.append('action', 'muop_submit_story');
@@ -1324,18 +1948,48 @@
           processData: false,
           success: (res) => {
             if (typeof res === 'string') {
-              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
-              try { res = JSON.parse(clean); } catch (e) {}
+              const start = res.indexOf('{');
+              const end = res.lastIndexOf('}');
+              if (start !== -1 && end !== -1 && end > start) {
+                try {
+                  res = JSON.parse(res.substring(start, end + 1));
+                } catch (e) {}
+              }
             }
             if (res && res.success) {
               const successMsg = getAjaxMsg(res, isDraft ? 'Đã lưu bản nháp thành công!' : 'Đăng truyện thành công!');
-              $alert.removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
+              $alert.hide();
+
+              // Reset form inputs ngay lập tức
+              $form[0].reset();
+              $('#coverFileName').text('');
+              $('#coverUploadInfo').hide();
+              $('#btnUploadCover').show();
+              $('#storyCover').val('');
+              $form.find('input[type="checkbox"]').prop('checked', false);
+              $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Đăng Truyện');
+
+              // Hiển thị Popup Modal thông báo thành công
+              if (typeof muopAlert === 'function') {
+                muopAlert(
+                  '<strong>' + successMsg + '</strong><br><span style="font-size: 13.5px; color: var(--text-muted); display: block; margin-top: 6px;">Trang sẽ được làm mới để bạn tiếp tục đăng bộ truyện tiếp theo.</span>',
+                  'success',
+                  function() {
+                    window.location.href = window.location.pathname;
+                  }
+                );
+              }
+
+              // Tự động làm mới trang sau 2.5s nếu người dùng chưa bấm nút xác nhận
               setTimeout(() => {
-                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl + '/thong-tin-dich-gia/' : '/thong-tin-dich-gia/');
-              }, 1200);
+                window.location.href = window.location.pathname;
+              }, 2500);
             } else {
               $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Đăng Truyện');
               const errorMsg = getAjaxMsg(res, 'Lỗi đăng truyện!');
+              if (typeof muopAlert === 'function') {
+                muopAlert(errorMsg, 'error');
+              }
               $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
             }
           },
@@ -1344,6 +1998,9 @@
             let errorMsg = 'Lỗi upload hoặc hệ thống!';
             if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
             else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            if (typeof muopAlert === 'function') {
+              muopAlert(errorMsg, 'error');
+            }
             $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
         });
@@ -1360,6 +2017,64 @@
         $('#isChapterDraftInput').val('0');
       });
 
+      // Tự động cập nhật số chương tiếp theo & Tên truyện trên breadcrumbs khi người dùng chọn truyện khác trong dropdown
+      $('#selectStory').on('change', function() {
+        const sId = $(this).val();
+        const $selectedOption = $(this).find('option:selected');
+        const storyTitle = $selectedOption.text().trim();
+        const storyUrl = $selectedOption.data('url') || '#';
+
+        // Cập nhật ngay Tên Truyện trên Breadcrumb đường dẫn
+        if (sId && storyTitle && storyTitle.indexOf('--') === -1) {
+          $('#breadcrumbStoryText').text(storyTitle);
+          $('#breadcrumbStoryLink').attr('href', storyUrl);
+          $('#breadcrumbStoryItem').css('display', 'inline-flex');
+        } else {
+          $('#breadcrumbStoryItem').hide();
+        }
+
+        if (!sId) return;
+        const ajaxUrl = getAjaxUrl();
+        const nonce = (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : '';
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_get_next_chapter_number',
+            story_id: sId,
+            nonce: nonce
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
+            }
+            if (res && res.success && res.data && res.data.next_chapter_number) {
+              $('#chapNumber').val(res.data.next_chapter_number);
+            }
+          }
+        });
+      });
+
+      // -------------------------------------------------------------------------
+      // BỘ ĐẾM SỐ TỪ & KÝ TỰ THEO THỜI GIAN THỰC (REAL-TIME WORD COUNT)
+      // -------------------------------------------------------------------------
+
+      // Đếm số từ khi nhập/dán nội dung tại trang Thêm Chương
+      $('#chapContent').on('input keyup paste change', function() {
+        updateRealtimeWordCounter($(this), $('#chapContentWordCount'), $('#chapContentCharCount'));
+      });
+
+      // Tự động đếm ngay khi load trang
+      if ($('#chapContent').length) {
+        updateRealtimeWordCounter($('#chapContent'), $('#chapContentWordCount'), $('#chapContentCharCount'));
+      }
+
+      // Đếm số từ khi nhập/dán nội dung tại Popup Sửa Chương
+      $('#editChapterContent').on('input keyup paste change', function() {
+        updateRealtimeWordCounter($(this), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
+      });
+
       $('#formSubmitChapter').on('submit', function(e) {
         e.preventDefault();
         const $form = $(this);
@@ -1371,29 +2086,66 @@
         $alert.hide();
 
         const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
 
-        let postData = $form.serialize();
-        if (postData.indexOf('action=') === -1) postData += '&action=muop_submit_chapter';
-        if (postData.indexOf('nonce=') === -1 && nonce) postData += '&nonce=' + encodeURIComponent(nonce);
+        const formData = new FormData(this);
+        if (!formData.has('action')) formData.append('action', 'muop_submit_chapter');
+        if (!formData.has('nonce') || !formData.get('nonce')) formData.append('nonce', nonce);
+        if (!formData.has('is_draft')) formData.append('is_draft', isDraft ? '1' : '0');
 
         $.ajax({
           url: ajaxUrl,
           type: 'POST',
-          data: postData,
+          data: formData,
+          contentType: false,
+          processData: false,
           success: (res) => {
             if (typeof res === 'string') {
-              try { res = JSON.parse(res); } catch (e) {}
+              const start = res.indexOf('{');
+              const end = res.lastIndexOf('}');
+              if (start !== -1 && end !== -1 && end > start) {
+                try {
+                  res = JSON.parse(res.substring(start, end + 1));
+                } catch (e) {}
+              }
             }
             if (res && res.success) {
               const successMsg = getAjaxMsg(res, isDraft ? 'Đã lưu bản nháp chương thành công!' : 'Thêm chương mới thành công!');
-              $alert.removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
-              setTimeout(() => {
-                window.location.href = (res.data && res.data.redirect) || (typeof muopConfig !== 'undefined' ? muopConfig.siteUrl : '/');
-              }, 1000);
+              const curStoryId = $('#selectStory').val();
+              const nextNum = (res.data && res.data.next_chapter_number) ? res.data.next_chapter_number : (parseInt($('#chapNumber').val(), 10) + 1);
+
+              // Reset các trường nội dung chương
+              $('#chapTitle').val('');
+              $('#chapContent').val('');
+              updateRealtimeWordCounter($('#chapContent'), $('#chapContentWordCount'), $('#chapContentCharCount'));
+              $('#chapNumber').val(nextNum);
+              $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Thêm Chương Này');
+              $alert.hide();
+
+              const doReload = () => {
+                const searchParams = new URLSearchParams(window.location.search);
+                if (curStoryId) searchParams.set('story_id', curStoryId);
+                searchParams.set('added', '1');
+                window.location.search = searchParams.toString();
+              };
+
+              // Hiển thị Popup Modal thông báo thành công
+              if (typeof muopAlert === 'function') {
+                muopAlert(
+                  '<strong>' + successMsg + '</strong><br><span style="font-size: 13.5px; color: var(--text-muted); display: block; margin-top: 6px;">Hệ thống đã giữ lại bộ truyện và nạp số chương tiếp theo để bạn tiếp tục đăng.</span>',
+                  'success',
+                  doReload
+                );
+              }
+
+              // Tự động làm mới sau 2.5s nếu chưa bấm xác nhận
+              setTimeout(doReload, 2500);
             } else {
               $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Thêm Chương Này');
               const errorMsg = getAjaxMsg(res, 'Lỗi thêm chương!');
+              if (typeof muopAlert === 'function') {
+                muopAlert(errorMsg, 'error');
+              }
               $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
             }
           },
@@ -1402,6 +2154,9 @@
             let errorMsg = 'Lỗi kết nối máy chủ!';
             if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
             else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+            if (typeof muopAlert === 'function') {
+              muopAlert(errorMsg, 'error');
+            }
             $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
         });
@@ -1412,6 +2167,93 @@
   // 8. COMMENTS
   const CommentManager = {
     init() {
+      // Toggle Sticker Picker
+      $(document).on('click', '.btn-sticker-toggle', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const $form = $btn.closest('form');
+        const $picker = $form.find('.muop-sticker-picker');
+        
+        $btn.toggleClass('active');
+        $picker.slideToggle(200);
+      });
+
+      // Close button inside picker
+      $(document).on('click', '.sticker-close-btn', function(e) {
+        e.preventDefault();
+        const $picker = $(this).closest('.muop-sticker-picker');
+        $picker.slideUp(200);
+        $picker.closest('form').find('.btn-sticker-toggle').removeClass('active');
+      });
+
+      // Switch Sticker Tab
+      $(document).on('click', '.sticker-tab-btn', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const set = $btn.data('set');
+        const $picker = $btn.closest('.muop-sticker-picker');
+
+        $picker.find('.sticker-tab-btn').removeClass('active');
+        $btn.addClass('active');
+
+        $picker.find('.sticker-tab-pane').removeClass('active');
+        $picker.find('#pane-' + set).addClass('active');
+      });
+
+      // Click sticker item to insert into textarea
+      $(document).on('click', '.sticker-item', function(e) {
+        e.preventDefault();
+        const stickerCode = $(this).data('code');
+        const $form = $(this).closest('form');
+        const $textarea = $form.find('textarea[name="comment"]');
+
+        if ($textarea.length) {
+          const val = $textarea.val();
+          const el = $textarea[0];
+          if (el && typeof el.selectionStart === 'number') {
+            const start = el.selectionStart;
+            const end = el.selectionEnd;
+            const spaceBefore = (start > 0 && val.charAt(start - 1) !== ' ' && val.charAt(start - 1) !== '\n') ? ' ' : '';
+            const spaceAfter = (end < val.length && val.charAt(end) !== ' ' && val.charAt(end) !== '\n') ? ' ' : ' ';
+            const insertText = spaceBefore + stickerCode + spaceAfter;
+            $textarea.val(val.substring(0, start) + insertText + val.substring(end));
+            el.selectionStart = el.selectionEnd = start + insertText.length;
+          } else {
+            $textarea.val((val ? val + ' ' : '') + stickerCode + ' ');
+          }
+          $textarea.focus();
+          CommentManager.updatePreview($form);
+        }
+      });
+
+      // Remove sticker chip from preview
+      $(document).on('click', '.preview-sticker-chip .chip-remove', function(e) {
+        e.preventDefault();
+        const codeToRemove = $(this).data('code');
+        const $form = $(this).closest('form');
+        const $textarea = $form.find('textarea[name="comment"]');
+        let val = $textarea.val();
+        val = val.replace(codeToRemove, '').replace(/\s{2,}/g, ' ').trim();
+        $textarea.val(val);
+        CommentManager.updatePreview($form);
+      });
+
+      // Live update preview on textarea typing
+      $(document).on('input propertychange', '#formPostComment textarea[name="comment"]', function() {
+        const $form = $(this).closest('form');
+        CommentManager.updatePreview($form);
+      });
+
+      // Close sticker picker when clicking outside
+      $(document).on('click', function(e) {
+        if (!$(e.target).closest('.muop-sticker-picker, .btn-sticker-toggle').length) {
+          $('.muop-sticker-picker').slideUp(200);
+          $('.btn-sticker-toggle').removeClass('active');
+        }
+      });
+
+      // Submit comment
       $('#formPostComment').on('submit', function(e) {
         e.preventDefault();
         const $form = $(this);
@@ -1420,6 +2262,12 @@
 
         if (!muopConfig.isLoggedIn) {
           window.location.href = muopConfig.siteUrl + '/dang-nhap/';
+          return;
+        }
+
+        const rawContent = $textarea.val().trim();
+        if (!rawContent) {
+          alert('Vui lòng nhập nội dung bình luận hoặc chọn sticker!');
           return;
         }
 
@@ -1437,18 +2285,33 @@
             if (res && res.success) {
               const d = res.data || {};
               const author = d.author || 'Bạn';
+              const commentId = d.comment_id || 0;
               const html = `
-                <li class="comment-item">
+                <li class="comment-item" id="comment-${commentId}">
                   <div class="comment-avatar">${author.charAt(0).toUpperCase()}</div>
                   <div class="comment-body">
-                    <span class="comment-author-name">${author}</span>
-                    <span class="comment-time">${d.time || 'Vừa xong'}</span>
+                    <div class="comment-header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div>
+                        <span class="comment-author-name">${author}</span>
+                        <span class="comment-time">${d.time || 'Vừa xong'}</span>
+                      </div>
+                      ${commentId ? `
+                        <button type="button" class="btn-delete-comment" data-comment-id="${commentId}" title="Xóa bình luận">
+                          <i class="fa-solid fa-trash-can"></i> Xóa
+                        </button>
+                      ` : ''}
+                    </div>
                     <div class="comment-text">${d.content || ''}</div>
                   </div>
                 </li>
               `;
-              $('.comment-list-ul').prepend(html);
+              const $list = $('.comment-list-ul');
+              $list.find('p, #noCommentsText').remove();
+              $list.prepend(html);
               $textarea.val('');
+              $form.find('.muop-sticker-picker').slideUp(200);
+              $form.find('.btn-sticker-toggle').removeClass('active');
+              CommentManager.updatePreview($form);
             } else {
               alert(getAjaxMsg(res, 'Lỗi gửi bình luận!'));
             }
@@ -1462,6 +2325,88 @@
           }
         });
       });
+
+      // Delete comment (Admin, Story Author / Translator, or Comment Author)
+      $(document).on('click', '.btn-delete-comment', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const commentId = $btn.data('comment-id');
+        if (!commentId) return;
+
+        muopConfirm(
+          'Bạn có chắc chắn muốn xóa bình luận này không?<br><span style="font-size: 13px; color: #dc2626; display: block; margin-top: 6px;"><i class="fa-solid fa-triangle-exclamation"></i> Thao tác này không thể hoàn tác!</span>',
+          () => {
+            $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+
+            $.ajax({
+              url: muopConfig.ajaxUrl,
+              type: 'POST',
+              data: {
+                action: 'muop_delete_comment',
+                nonce: muopConfig.nonce,
+                comment_id: commentId
+              },
+              success: (res) => {
+                if (typeof res === 'string') {
+                  try { res = JSON.parse(res); } catch (e) {}
+                }
+                if (res && res.success) {
+                  const $item = $btn.closest('.comment-item');
+                  $item.fadeOut(250, function() {
+                    const $list = $(this).closest('.comment-list-ul');
+                    $(this).remove();
+                    if ($list.length && $list.find('.comment-item').length === 0) {
+                      $list.html('<p style="color: var(--text-muted); font-size: 13px; padding: 10px 0;">Chưa có bình luận nào.</p>');
+                    }
+                  });
+                } else {
+                  $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+                  alert(getAjaxMsg(res, 'Không thể xóa bình luận!'));
+                }
+              },
+              error: (xhr) => {
+                $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+                let errorMsg = 'Lỗi kết nối máy chủ!';
+                if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+                else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+                alert(errorMsg);
+              }
+            });
+          },
+          null,
+          {
+            title: 'Xóa Bình Luận',
+            confirmText: 'Xóa Vĩnh Viễn',
+            cancelText: 'Hủy Bỏ',
+            isDanger: true
+          }
+        );
+      });
+    },
+
+    updatePreview($form) {
+      const $textarea = $form.find('textarea[name="comment"]');
+      const val = $textarea.val() || '';
+      const regex = /\[sticker:(bo-[1-3]\/[0-9]+\.png)\]/gi;
+      const matches = [...val.matchAll(regex)];
+      const $preview = $form.find('.comment-stickers-preview');
+      const baseUrl = muopConfig.stickerBaseUrl || '/wp-content/themes/muop-dang/assets/images/stickers/';
+
+      if (matches.length > 0) {
+        let html = '<div class="preview-sticker-heading"><i class="fa-regular fa-face-smile"></i> Sticker đã đính kèm:</div><div class="preview-sticker-list">';
+        matches.forEach(m => {
+          const path = m[1];
+          const fullCode = m[0];
+          html += `<div class="preview-sticker-chip" title="Nhấn để gỡ">
+            <img src="${baseUrl + path}" alt="Sticker" />
+            <button type="button" class="chip-remove" data-code="${fullCode}">&times;</button>
+          </div>`;
+        });
+        html += '</div>';
+        $preview.html(html).slideDown(150);
+      } else {
+        $preview.slideUp(150, function() { $(this).empty(); });
+      }
     }
   };
 
@@ -1485,7 +2430,7 @@
         });
       });
 
-      // Quick Admin Actions (Approve, Reject, Delete, Nominate)
+      // Quick Admin Actions (Approve, Reject, Delete, Nominate, Hide, Unhide)
       $(document).on('click', '.btn-admin-action', function(e) {
         e.preventDefault();
         const $btn = $(this);
@@ -1494,39 +2439,70 @@
         const userId = $btn.data('user-id');
         const nominateType = $btn.data('nominate-type');
 
-        if (subAction === 'delete_story' && !confirm('Bạn có chắc chắn muốn xóa truyện này?')) {
-          return;
-        }
+        const doRequest = () => {
+          const originalHtml = $btn.html();
+          $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_admin_action',
+              nonce: muopConfig.nonce,
+              sub_action: subAction,
+              story_id: storyId,
+              user_id: userId,
+              nominate_type: nominateType
+            },
+            success: (res) => {
+              $btn.prop('disabled', false).html(originalHtml);
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                muopAlert(getAjaxMsg(res, 'Thao tác thành công!'), 'success', () => {
+                  window.location.reload();
+                });
+              } else {
+                muopAlert(getAjaxMsg(res, 'Lỗi thao tác!'), 'error');
+              }
+            },
+            error: (xhr) => {
+              $btn.prop('disabled', false).html(originalHtml);
+              let errorMsg = 'Lỗi kết nối máy chủ!';
+              if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+              else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+              muopAlert(errorMsg, 'error');
+            }
+          });
+        };
 
-        $.ajax({
-          url: muopConfig.ajaxUrl,
-          type: 'POST',
-          data: {
-            action: 'muop_admin_action',
-            nonce: muopConfig.nonce,
-            sub_action: subAction,
-            story_id: storyId,
-            user_id: userId,
-            nominate_type: nominateType
-          },
-          success: (res) => {
-            if (typeof res === 'string') {
-              try { res = JSON.parse(res); } catch (e) {}
-            }
-            if (res && res.success) {
-              alert(getAjaxMsg(res, 'Thao tác thành công!'));
-              window.location.reload();
-            } else {
-              alert(getAjaxMsg(res, 'Lỗi thao tác!'));
-            }
-          },
-          error: (xhr) => {
-            let errorMsg = 'Lỗi kết nối máy chủ!';
-            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
-            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
-            alert(errorMsg);
-          }
-        });
+        if (subAction === 'delete_story') {
+          muopConfirm('Bạn có chắc chắn muốn xóa truyện này? Thao tác này không thể hoàn tác.', doRequest, null, {
+            isDanger: true,
+            confirmText: 'Có',
+            cancelText: 'Không',
+            title: 'Xác Nhận Xóa Truyện'
+          });
+        } else if (subAction === 'hide_story') {
+          muopConfirm('Bạn có chắc chắn muốn ẩn truyện này không?', doRequest, null, {
+            type: 'warning',
+            confirmText: 'Có',
+            cancelText: 'Không',
+            title: 'Xác Nhận Ẩn Truyện'
+          });
+        } else if (subAction === 'unhide_story') {
+          const btnText = $btn.text().trim();
+          const confirmMsg = btnText.indexOf('Duyệt') !== -1 ? 'Bạn có chắc chắn muốn duyệt và hiện truyện này không?' : 'Bạn có chắc chắn muốn hiện truyện này không?';
+          const confirmTitle = btnText.indexOf('Duyệt') !== -1 ? 'Xác Nhận Duyệt Truyện' : 'Xác Nhận Hiện Truyện';
+          muopConfirm(confirmMsg, doRequest, null, {
+            type: 'warning',
+            confirmText: 'Có',
+            cancelText: 'Không',
+            title: confirmTitle
+          });
+        } else {
+          doRequest();
+        }
       });
 
       // Delete Story (Dịch giả & Admin)
@@ -1535,42 +2511,41 @@
         const $btn = $(this);
         const storyId = $btn.data('story-id');
 
-        if (!confirm('Bạn có chắc chắn muốn xóa bộ truyện này không? Toàn bộ chương của truyện cũng sẽ bị xóa vĩnh viễn!')) {
-          return;
-        }
+        muopConfirm('Bạn có chắc chắn muốn xóa bộ truyện này không? Toàn bộ chương của truyện cũng sẽ bị xóa vĩnh viễn!', () => {
+          $btn.prop('disabled', true);
 
-        $btn.prop('disabled', true);
-
-        $.ajax({
-          url: muopConfig.ajaxUrl,
-          type: 'POST',
-          data: {
-            action: 'muop_delete_story',
-            nonce: muopConfig.nonce,
-            story_id: storyId
-          },
-          success: (res) => {
-            if (typeof res === 'string') {
-              try { res = JSON.parse(res); } catch (e) {}
-            }
-            if (res && res.success) {
-              alert(getAjaxMsg(res, 'Đã xóa bộ truyện thành công!'));
-              $btn.closest('tr').fadeOut(300, function() {
-                $(this).remove();
-              });
-            } else {
-              alert(getAjaxMsg(res, 'Lỗi xóa truyện!'));
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_delete_story',
+              nonce: muopConfig.nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                muopAlert(getAjaxMsg(res, 'Đã xóa bộ truyện thành công!'), 'success', () => {
+                  $btn.closest('tr').fadeOut(300, function() {
+                    $(this).remove();
+                  });
+                });
+              } else {
+                muopAlert(getAjaxMsg(res, 'Lỗi xóa truyện!'), 'error');
+                $btn.prop('disabled', false);
+              }
+            },
+            error: (xhr) => {
+              let errorMsg = 'Lỗi kết nối máy chủ!';
+              if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+              else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+              muopAlert(errorMsg, 'error');
               $btn.prop('disabled', false);
             }
-          },
-          error: (xhr) => {
-            let errorMsg = 'Lỗi kết nối máy chủ!';
-            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
-            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
-            alert(errorMsg);
-            $btn.prop('disabled', false);
-          }
-        });
+          });
+        }, null, { isDanger: true, confirmText: 'Xóa vĩnh viễn' });
       });
 
       // Update Affiliate Links Form
@@ -1679,18 +2654,28 @@
               } else {
                 const safeName = $('<div>').text(data.name).html();
                 const cardHtml = `
-                  <div class="adm-genre-card" data-id="${data.term_id}" data-name="${safeName.toLowerCase()}" style="background: var(--bg-card); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-shadow: var(--shadow-sm); animation: admModalFadeIn 0.3s ease;">
+                  <div class="adm-genre-card" data-id="${data.term_id}" data-name="${safeName.toLowerCase()}" style="background: var(--bg-card); padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-shadow: var(--shadow-sm); position: relative; animation: admModalFadeIn 0.3s ease;">
                       <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                          <span class="adm-genre-title" style="font-weight: 700; color: var(--text-main); font-size: 14px; word-break: break-word;">${safeName}</span>
+                          <span class="adm-genre-title" style="font-weight: 700; color: var(--text-main); font-size: 14.5px; word-break: break-word;">${safeName}</span>
                           <span class="badge badge-green" style="font-size: 11px; white-space: nowrap;">0 truyện</span>
                       </div>
-                      <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--border-light);">
-                          <button type="button" class="btn btn-outline btn-xs adm-btn-edit-genre" data-id="${data.term_id}" data-name="${safeName}" title="Sửa tên thể loại" style="padding: 4px 10px; font-size: 12px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
-                              <i class="fa-solid fa-pen-to-square"></i> Sửa
-                          </button>
-                          <button type="button" class="btn btn-outline btn-xs adm-btn-delete-genre" data-id="${data.term_id}" data-name="${safeName}" title="Xóa thể loại này" style="padding: 4px 10px; font-size: 12px; border-radius: 4px; color: #ef4444; border-color: #fca5a5; display: inline-flex; align-items: center; gap: 4px;">
-                              <i class="fa-solid fa-trash-can"></i> Xóa
-                          </button>
+                      <div style="display: flex; align-items: center; justify-content: flex-end; padding-top: 8px; border-top: 1px dashed var(--border-light);">
+                          <div class="story-actions-dropdown genre-actions-dropdown">
+                              <button type="button" class="btn-story-dropdown-trigger btn-genre-dropdown-trigger" title="Tác vụ thể loại" data-id="${data.term_id}" data-name="${safeName}" data-count="0">
+                                  <i class="fa-solid fa-ellipsis-vertical"></i>
+                              </button>
+                              <div class="story-dropdown-menu">
+                                  <button type="button" class="story-dropdown-item adm-btn-edit-genre" data-id="${data.term_id}" data-name="${safeName}">
+                                      <i class="fa-solid fa-pen-to-square" style="color: #0284c7;"></i> Sửa
+                                  </button>
+                                  <button type="button" class="story-dropdown-item adm-btn-delete-genre" data-id="${data.term_id}" data-name="${safeName}" style="color: #ef4444;">
+                                      <i class="fa-solid fa-trash-can"></i> Xóa
+                                  </button>
+                                  <button type="button" class="story-dropdown-item adm-btn-detail-genre" data-id="${data.term_id}" data-name="${safeName}" data-count="0">
+                                      <i class="fa-solid fa-circle-info" style="color: var(--primary-green);"></i> Chi tiết
+                                  </button>
+                              </div>
+                          </div>
                       </div>
                   </div>
                 `;
@@ -1790,6 +2775,8 @@
               $card.find('.adm-genre-title').text(data.name);
               $card.find('.adm-btn-edit-genre').attr('data-name', data.name).data('name', data.name);
               $card.find('.adm-btn-delete-genre').attr('data-name', data.name).data('name', data.name);
+              $card.find('.adm-btn-detail-genre').attr('data-name', data.name).data('name', data.name);
+              $card.find('.btn-genre-dropdown-trigger').attr('data-name', data.name).data('name', data.name);
               $status.css('color', '#3F7523').text('Đã cập nhật thể loại thành công!').fadeIn();
               setTimeout(() => {
                 $('#admModalEditGenre').hide();
@@ -1826,52 +2813,762 @@
         const termId = $btn.data('id');
         const termName = $btn.attr('data-name') || $btn.data('name') || 'này';
 
-        if (!confirm(`Bạn có chắc chắn muốn xóa thể loại "${termName}" khỏi hệ thống không? Các truyện thuộc thể loại này sẽ không còn thể loại này nữa.`)) {
-          return;
-        }
+        muopConfirm(`Bạn có chắc chắn muốn xóa thể loại "${termName}" khỏi hệ thống không? Các truyện thuộc thể loại này sẽ không còn thể loại này nữa.`, () => {
+          $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
 
-        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_delete_genre',
+              nonce: muopConfig.nonce,
+              term_id: termId
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                const $card = $btn.closest('.adm-genre-card');
+                $card.fadeOut(250, function() {
+                  $(this).remove();
+                  const curCount = parseInt($('#admGenreTotalCount').text(), 10) || 1;
+                  $('#admGenreTotalCount').text(Math.max(0, curCount - 1));
+                });
+                muopAlert(getAjaxMsg(res, 'Đã xóa thể loại thành công!'), 'success');
+              } else {
+                muopAlert(getAjaxMsg(res, 'Lỗi khi xóa thể loại!'), 'error');
+                $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+              }
+            },
+            error: (xhr) => {
+              let errorMsg = 'Lỗi kết nối máy chủ!';
+              if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+              muopAlert(errorMsg, 'error');
+              $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+            }
+          });
+        }, null, { isDanger: true, confirmText: 'Xóa thể loại' });
+      });
+
+      // 7. Chi Tiết Thể Loại - Xem danh sách truyện thuộc thể loại (Popup - Ảnh 1)
+      let cachedGenreStories = [];
+      const filterGenreDetailStories = () => {
+        const query = $.trim($('#admGenreDetailSearch').val()).toLowerCase();
+        let matchCount = 0;
+        $('#admGenreDetailTableBody tr.adm-genre-story-row').each(function() {
+          const $row = $(this);
+          const title = $row.data('title') || '';
+          const author = $row.data('author') || '';
+          if (!query || title.indexOf(query) !== -1 || author.indexOf(query) !== -1) {
+            $row.show();
+            matchCount++;
+          } else {
+            $row.hide();
+          }
+        });
+        $('#admGenreDetailShownCount').text(matchCount);
+        if (matchCount === 0 && cachedGenreStories.length > 0) {
+          if (!$('#admGenreDetailNoMatch').length) {
+            $('#admGenreDetailTableBody').append('<tr id="admGenreDetailNoMatch"><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-magnifying-glass" style="margin-right: 6px;"></i>Không tìm thấy truyện nào khớp với từ khóa tìm kiếm.</td></tr>');
+          } else {
+            $('#admGenreDetailNoMatch').show();
+          }
+        } else {
+          $('#admGenreDetailNoMatch').remove();
+        }
+      };
+
+      $('#admGenreDetailSearch').on('input keyup', filterGenreDetailStories);
+
+      $(document).on('click', '.adm-btn-detail-genre', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const termId = $btn.data('id');
+        const termName = $btn.attr('data-name') || $btn.data('name') || 'Thể loại';
+        const termCount = $btn.data('count') || 0;
+
+        $('#admGenreDetailName').text(termName);
+        $('#admGenreDetailBadge').text(termCount + ' truyện');
+        $('#admGenreDetailSearch').val('');
+        $('#admGenreDetailShownCount').text(termCount);
+        $('#admGenreDetailTableBody').empty();
+        $('#admGenreDetailLoading').show();
+        $('#admGenreDetailEmpty').hide();
+        $('#admGenreDetailTableWrapper').hide();
+        $('#admModalGenreDetail').css('display', 'flex');
+
+        cachedGenreStories = [];
 
         $.ajax({
           url: muopConfig.ajaxUrl,
           type: 'POST',
           data: {
-            action: 'muop_delete_genre',
-            nonce: muopConfig.nonce,
-            term_id: termId
+            action: 'muop_get_genre_stories',
+            term_id: termId,
+            nonce: muopConfig.nonce
+          },
+          success: (res) => {
+            $('#admGenreDetailLoading').hide();
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data) {
+              const data = res.data;
+              const stories = data.stories || [];
+              cachedGenreStories = stories;
+              $('#admGenreDetailName').text(data.genre_name || termName);
+              $('#admGenreDetailBadge').text((data.genre_count || stories.length) + ' truyện');
+              $('#admGenreDetailShownCount').text(stories.length);
+
+              if (stories.length === 0) {
+                $('#admGenreDetailEmpty').show();
+                $('#admGenreDetailTableWrapper').hide();
+                return;
+              }
+
+              let rowsHtml = '';
+              stories.forEach((st, idx) => {
+                const safeTitle = $('<div>').text(st.title).html();
+                const safeAuthor = $('<div>').text(st.author).html();
+                const statusBadge = st.is_full 
+                  ? '<span class="badge badge-full" style="font-size: 11px;">Hoàn thành</span>' 
+                  : '<span class="badge badge-green" style="font-size: 11px;">Đang ra</span>';
+
+                rowsHtml += `
+                  <tr class="adm-genre-story-row" data-title="${safeTitle.toLowerCase()}" data-author="${safeAuthor.toLowerCase()}">
+                    <td style="text-align: center; font-weight: 600; color: var(--text-muted);">${idx + 1}</td>
+                    <td style="text-align: center;">
+                      <img src="${st.thumb}" alt="${safeTitle}" style="width: 34px; height: 46px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); display: inline-block; vertical-align: middle;" loading="lazy" />
+                    </td>
+                    <td>
+                      <a href="${st.permalink}" target="_blank" style="font-weight: 600; color: var(--text-main); text-decoration: none; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${safeTitle}">
+                        ${safeTitle}
+                      </a>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 12.5px;">
+                      <i class="fa-regular fa-user" style="margin-right: 4px; font-size: 11px;"></i>${safeAuthor}
+                    </td>
+                    <td style="text-align: center; font-weight: 600;">
+                      <span class="badge" style="font-size: 11px;">${st.chapters} ch</span>
+                    </td>
+                    <td style="text-align: center; color: var(--text-muted); font-size: 12px;">
+                      <i class="fa-solid fa-eye" style="margin-right: 3px; font-size: 10.5px;"></i>${st.views}
+                    </td>
+                    <td style="text-align: center;">
+                      ${statusBadge}
+                    </td>
+                    <td style="text-align: center;">
+                      <div style="display: inline-flex; align-items: center; gap: 4px;">
+                        <a href="${st.permalink}" target="_blank" class="btn btn-outline btn-xs" style="padding: 3px 7px; font-size: 11.5px; border-radius: 4px;" title="Xem truyện ngoài web">
+                          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                        <a href="${st.edit_link}" target="_blank" class="btn btn-primary btn-xs" style="padding: 3px 7px; font-size: 11.5px; border-radius: 4px;" title="Sửa truyện">
+                          <i class="fa-solid fa-pen-to-square"></i>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              });
+
+              $('#admGenreDetailTableBody').html(rowsHtml);
+              $('#admGenreDetailEmpty').hide();
+              $('#admGenreDetailTableWrapper').show();
+            } else {
+              $('#admGenreDetailLoading').hide();
+              muopAlert(getAjaxMsg(res, 'Không thể tải danh sách truyện thuộc thể loại!'), 'error');
+            }
+          },
+          error: (xhr) => {
+            $('#admGenreDetailLoading').hide();
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            muopAlert(errorMsg, 'error');
+          }
+        });
+      });
+
+      // Đóng modal chi tiết thể loại
+      $('#btnCloseGenreDetailModalX, .btn-close-genre-detail').on('click', function(e) {
+        e.preventDefault();
+        $('#admModalGenreDetail').hide();
+      });
+
+      $('#admModalGenreDetail').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // =========================================================================
+      // ADMIN DATABASE MANAGER - MASTER-DETAIL HIERARCHICAL DRILLDOWN (IMAGE 2)
+      // =========================================================================
+
+      // 1. Stories Live Search & Multi-Filters (Hot, Newest, Full, Ongoing, Nominated, Hidden, Visible)
+      const filterAdminStories = () => {
+        const query = $.trim($('#admStorySearchInput').val()).toLowerCase();
+        const quickFilter = $('#admStoryQuickFilter').val() || 'all';
+
+        const $tbody = $('#tableAdminStories tbody');
+        const $rows = $tbody.find('tr.adm-story-row').get();
+
+        // Sort rows if needed (hot, newest, or default original index)
+        $rows.sort(function(a, b) {
+          if (quickFilter === 'hot') {
+            const vA = parseInt($(a).data('views'), 10) || 0;
+            const vB = parseInt($(b).data('views'), 10) || 0;
+            return vB - vA; // Descending
+          } else if (quickFilter === 'newest') {
+            const dA = parseInt($(a).data('date'), 10) || parseInt($(a).data('story-id'), 10) || 0;
+            const dB = parseInt($(b).data('date'), 10) || parseInt($(b).data('story-id'), 10) || 0;
+            return dB - dA; // Descending
+          } else {
+            const idxA = parseInt($(a).data('index'), 10) || 0;
+            const idxB = parseInt($(b).data('index'), 10) || 0;
+            return idxA - idxB; // Initial order
+          }
+        });
+
+        // Re-append sorted rows
+        $.each($rows, function(idx, row) {
+          $tbody.append(row);
+        });
+
+        let visibleCount = 0;
+        $('#tableAdminStories .adm-story-row').each(function() {
+          const $row = $(this);
+          const title = String($row.data('title') || '');
+          const team = String($row.data('team') || '');
+          const author = String($row.data('author') || '');
+          const status = String($row.data('status') || '');
+          const progress = String($row.data('progress') || '');
+          const nominate = String($row.data('nominate') || 'none');
+
+          const matchQuery = !query || title.indexOf(query) !== -1 || team.indexOf(query) !== -1 || author.indexOf(query) !== -1;
+
+          let matchFilter = true;
+          if (quickFilter === 'full') {
+            matchFilter = (progress === 'hoan_thanh');
+          } else if (quickFilter === 'ongoing') {
+            matchFilter = (progress !== 'hoan_thanh');
+          } else if (quickFilter === 'nominated') {
+            matchFilter = (nominate !== 'none' && nominate !== '');
+          } else if (quickFilter === 'not_nominated') {
+            matchFilter = (nominate === 'none' || !nominate);
+          } else if (quickFilter === 'visible') {
+            matchFilter = (status === 'publish');
+          } else if (quickFilter === 'hidden') {
+            matchFilter = (status === 'draft' || status !== 'publish');
+          }
+
+          if (matchQuery && matchFilter) {
+            $row.show();
+            visibleCount++;
+          } else {
+            $row.hide();
+          }
+        });
+
+        // Dynamic STT numbering for visible rows
+        let currentStt = 1;
+        $('#tableAdminStories .adm-story-row:visible').each(function() {
+          $(this).find('td:first').text(currentStt++);
+        });
+
+        // Update counter
+        $('#admStoryVisibleCount').text(visibleCount);
+
+        // Empty state
+        if (visibleCount === 0) {
+          if (!$('#noAdminStoriesRow').length) {
+            $tbody.append('<tr id="noAdminStoriesRow"><td colspan="11" style="text-align: center; padding: 40px; color: var(--text-muted); font-size: 13.5px;"><i class="fa-solid fa-filter-circle-xmark" style="font-size: 32px; color: var(--primary-green); margin-bottom: 10px; display: block;"></i> Không tìm thấy bộ truyện nào phù hợp với bộ lọc hiện tại.</td></tr>');
+          }
+          $('#noAdminStoriesRow').show();
+        } else {
+          $('#noAdminStoriesRow').remove();
+        }
+      };
+
+      $('#admStorySearchInput').on('input keyup', filterAdminStories);
+
+      $('#admStoryQuickFilter').on('change', function() {
+        const val = $(this).val() || 'all';
+        $('#admStoryFilterPills .btn-story-filter-pill').removeClass('active');
+        $('#admStoryFilterPills .btn-story-filter-pill[data-filter="' + val + '"]').addClass('active');
+        filterAdminStories();
+      });
+
+      $(document).on('click', '#admStoryFilterPills .btn-story-filter-pill', function(e) {
+        e.preventDefault();
+        const val = $(this).data('filter') || 'all';
+        $('#admStoryFilterPills .btn-story-filter-pill').removeClass('active');
+        $(this).addClass('active');
+        $('#admStoryQuickFilter').val(val);
+        filterAdminStories();
+      });
+
+      // 2. Open Story Detail Hierarchical View
+      const openStoryDetail = (storyId) => {
+        if (!storyId) return;
+
+        muopToast('Đang tải thông tin chi tiết CSDL bộ truyện...', 'info');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'get_story_details',
+            story_id: storyId,
+            nonce: muopConfig.nonce
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (!res || !res.success || !res.data) {
+              muopAlert(getAjaxMsg(res, 'Không thể tải dữ liệu chi tiết truyện!'), 'error');
+              return;
+            }
+
+            const data = res.data;
+
+            // Populate Story Metadata
+            if (data.thumbnail) {
+              $('#storyDetailCoverImg').attr('src', data.thumbnail).show();
+            } else {
+              $('#storyDetailCoverImg').attr('src', muopConfig.themeUri + '/assets/images/placeholder.jpg').show();
+            }
+
+            $('#storyDetailTitle').text(data.title);
+            $('#storyDetailAuthor').text(data.author_name || 'Chưa cập nhật');
+            if (data.team_url) {
+              $('#storyDetailTeam').html('<a href="' + data.team_url + '" target="_blank" class="db-team-link"><i class="fa-solid fa-users" style="font-size:11px;margin-right:4px;color:#8b5cf6;"></i><span>' + (data.team_name || 'Mướp Đắng') + '</span> <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;opacity:0.6;margin-left:3px;"></i></a>');
+            } else {
+              $('#storyDetailTeam').text(data.team_name || 'Mướp Đắng');
+            }
+            $('#storyDetailPostedBy').text(data.posted_by || 'Không rõ');
+            $('#storyDetailGenres').text(data.genres || 'Chưa phân loại');
+            $('#storyDetailViewsAll').text(data.views_all.toLocaleString('vi-VN'));
+            $('#storyDetailViewsMonth').text(data.views_month.toLocaleString('vi-VN'));
+            $('#storyDetailDesc').html(data.description || 'Chưa có mô tả.');
+
+            // Badges
+            let badgesHtml = '';
+            if (data.post_status === 'publish') {
+              badgesHtml += '<span class="badge badge-approved"><i class="fa-solid fa-check"></i> Hiển thị công khai</span>';
+            } else if (data.post_status === 'pending') {
+              badgesHtml += '<span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Chờ duyệt</span>';
+            } else {
+              badgesHtml += '<span class="badge" style="background:#fee2e2;color:#dc2626;"><i class="fa-solid fa-eye-slash"></i> Đang ẩn (Nháp)</span>';
+            }
+
+            badgesHtml += (data.progress === 'hoan_thanh') 
+              ? '<span class="badge badge-full"><i class="fa-solid fa-check"></i> Full</span>' 
+              : '<span class="badge badge-green"><i class="fa-solid fa-arrows-rotate"></i> Đang ra</span>';
+
+            if (data.nominated && data.nominated !== 'none') {
+              const nomName = data.nominated === 'day' ? 'Ngày' : (data.nominated === 'week' ? 'Tuần' : 'Tháng');
+              badgesHtml += `<span class="badge badge-hot"><i class="fa-solid fa-star"></i> Đề cử ${nomName}</span>`;
+            }
+
+            $('#storyDetailBadges').html(badgesHtml);
+
+            // Story Action Buttons
+            $('#btnDetailEditStoryDesc').attr('data-story-id', data.id);
+            $('#btnDetailAddChapterLink').attr('href', data.add_chapter_url);
+            $('#btnDetailViewPublicLink').attr('href', data.permalink);
+            $('#btnSubtableAddChapter').attr('href', data.add_chapter_url);
+
+            const $btnHide = $('#btnDetailToggleHideStory');
+            $btnHide.attr('data-story-id', data.id);
+            if (data.post_status === 'publish') {
+              $btnHide.attr('data-action', 'hide_story').html('<i class="fa-solid fa-eye-slash"></i> Ẩn Truyện');
+            } else {
+              $btnHide.attr('data-action', 'unhide_story').html('<i class="fa-solid fa-eye"></i> Hiện Truyện');
+            }
+
+            // Populate Chapters Sub-Table
+            $('#storyDetailChaptersCount').text(data.total_chapters || 0);
+            const $tbody = $('#storyDetailChaptersTbody');
+            $tbody.empty();
+
+            if (!data.chapters || data.chapters.length === 0) {
+              $tbody.html('<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Truyện này hiện chưa có chương nào. Nhấn "+ Thêm Chương Mới" để đăng chương đầu tiên.</td></tr>');
+            } else {
+              data.chapters.forEach((ch) => {
+                const statusBadge = ch.status === 'publish' 
+                  ? '<span class="badge badge-approved"><i class="fa-solid fa-check"></i> Xuất bản</span>' 
+                  : '<span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Bản nháp</span>';
+
+                const rowHtml = `
+                  <tr class="adm-chapter-subrow" data-chap-num="${ch.number}" data-chap-title="${(ch.title || '').toLowerCase()}">
+                    <td style="text-align: center;"><strong>Chương ${ch.number}</strong></td>
+                    <td><span style="font-weight: 600; color: var(--text-main);">${ch.title}</span></td>
+                    <td><span class="badge badge-green" style="font-size: 11.5px;">${ch.words.toLocaleString('vi-VN')} từ</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size: 12px; color: var(--text-muted);">${ch.date}</td>
+                    <td><i class="fa-solid fa-eye"></i> ${ch.views.toLocaleString('vi-VN')}</td>
+                    <td style="text-align: center;">
+                      <div class="db-row-actions">
+                        <button type="button" class="btn btn-outline btn-xs btn-subtable-edit-chap" data-story-id="${data.id}" data-chapter-id="${ch.id}" title="Chỉnh sửa nội dung chương">
+                          <i class="fa-solid fa-file-pen"></i> Sửa
+                        </button>
+                        <a href="${ch.permalink}" target="_blank" class="btn btn-outline btn-xs" title="Đọc thử chương trên website">
+                          <i class="fa-solid fa-arrow-up-right-from-square"></i> Xem
+                        </a>
+                        <button type="button" class="btn btn-outline btn-xs btn-subtable-delete-chap" data-chapter-id="${ch.id}" data-chapter-num="${ch.number}" data-chapter-title="${ch.title}" data-story-id="${data.id}" title="Xóa chương này" style="color: #ef4444; border-color: #fca5a5;">
+                          <i class="fa-solid fa-trash-can"></i> Xóa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+                $tbody.append(rowHtml);
+              });
+            }
+
+            // Switch to Detail View
+            $('#admStoryMasterView').hide();
+            $('#admStoryDetailView').fadeIn(200);
+
+            // Scroll up smoothly
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          },
+          error: (xhr) => {
+            muopAlert('Không thể kết nối đến máy chủ để tải chi tiết truyện!', 'error');
+          }
+        });
+      };
+
+      // Click to open Story Detail
+      $(document).on('click', '.btn-open-story-details', function(e) {
+        e.preventDefault();
+        const storyId = $(this).data('story-id') || $(this).closest('.adm-story-row').data('story-id');
+        openStoryDetail(storyId);
+      });
+
+      // Back to Story Master
+      $('#btnBackToStoryMaster').on('click', function() {
+        $('#admStoryDetailView').hide();
+        $('#admStoryMasterView').fadeIn(200);
+      });
+
+      // In-subtable chapter search
+      $('#admChapterSearchInput').on('input keyup', function() {
+        const q = $.trim($(this).val()).toLowerCase();
+        $('#storyDetailChaptersTbody .adm-chapter-subrow').each(function() {
+          const $r = $(this);
+          const num = String($r.data('chap-num') || '');
+          const title = String($r.data('chap-title') || '');
+          if (!q || num.indexOf(q) !== -1 || title.indexOf(q) !== -1) {
+            $r.show();
+          } else {
+            $r.hide();
+          }
+        });
+      });
+
+      // Subtable Edit Chapter button click
+      $(document).on('click', '.btn-subtable-edit-chap', function(e) {
+        e.preventDefault();
+        const storyId = $(this).data('story-id');
+        const chapterId = $(this).data('chapter-id');
+        
+        // Open edit chapter content modal
+        $('#modalEditChapterContent').fadeIn(200);
+        $('#modalChapterStoryTitleText').text($('#storyDetailTitle').text());
+
+        // Load chapter data directly
+        $('#editChapterAlert').hide();
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_get_chapter_data',
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : '',
+            chapter_id: chapterId,
+            story_id: storyId,
+            is_admin_portal: 1
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data) {
+              const data = res.data;
+              $('#editChapterId').val(data.id || chapterId);
+              $('#editChapterNumber').val(data.chapter_number || data.number || 1);
+              $('#editChapterTitle').val(data.title || '');
+              $('#editChapterContent').val(data.content || '');
+              $('#editChapterIsDraftInput').val(data.status === 'draft' ? '1' : '0');
+
+              try {
+                updateRealtimeWordCounter($('#editChapterContent'), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
+              } catch (err) {}
+
+              $('#wrapperSelectEditChapter').hide();
+              $('#formEditChapterFields').fadeIn(200);
+            } else {
+              muopAlert(getAjaxMsg(res, 'Không thể tải nội dung chương!'), 'error');
+            }
+          },
+          error: (xhr) => {
+            let msg = 'Lỗi kết nối khi tải nội dung chương!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            muopAlert(msg, 'error');
+          }
+        });
+      });
+
+      // Subtable Delete Single Chapter click
+      $(document).on('click', '.btn-subtable-delete-chap', function(e) {
+        e.preventDefault();
+        const chapterId = $(this).data('chapter-id');
+        const chapterNum = $(this).data('chapter-num');
+        const chapterTitle = $(this).data('chapter-title') || '';
+        const storyId = $(this).data('story-id');
+
+        muopConfirm(`Bạn có chắc chắn muốn xóa Chương ${chapterNum}: "${chapterTitle}" không? Hành động này sẽ xóa vĩnh viễn nội dung chương!`, () => {
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_delete_chapter',
+              nonce: muopConfig.nonce,
+              chapter_id: chapterId,
+              is_admin_portal: 1
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                muopAlert('Đã xóa chương thành công!', 'success');
+                openStoryDetail(storyId);
+              } else {
+                muopAlert(getAjaxMsg(res, 'Lỗi khi xóa chương!'), 'error');
+              }
+            }
+          });
+        }, null, { isDanger: true, confirmText: 'Xóa Chương' });
+      });
+
+      // 3. Users Live Search & Role Filter
+      const filterAdminUsers = () => {
+        const query = $.trim($('#admUserSearchInput').val()).toLowerCase();
+        const roleFilter = $('#admUserRoleFilter').val();
+
+        $('#tableAdminUsers .adm-user-row').each(function() {
+          const $row = $(this);
+          const name = $row.data('name') || '';
+          const uname = $row.data('username') || '';
+          const email = $row.data('email') || '';
+          const role = $row.data('role') || '';
+
+          const matchQuery = !query || name.indexOf(query) !== -1 || uname.indexOf(query) !== -1 || email.indexOf(query) !== -1;
+          const matchRole = !roleFilter || role === roleFilter;
+
+          if (matchQuery && matchRole) {
+            $row.show();
+          } else {
+            $row.hide();
+          }
+        });
+      };
+
+      $('#admUserSearchInput').on('input keyup', filterAdminUsers);
+      $('#admUserRoleFilter').on('change', filterAdminUsers);
+
+      // 4. Open User Detail Hierarchical View
+      const openUserDetail = (userId) => {
+        if (!userId) return;
+
+        muopToast('Đang tải thông tin chi tiết người dùng...', 'info');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'get_user_details',
+            user_id: userId,
+            nonce: muopConfig.nonce
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (!res || !res.success || !res.data) {
+              muopAlert(getAjaxMsg(res, 'Không thể tải thông tin người dùng!'), 'error');
+              return;
+            }
+
+            const data = res.data;
+
+            // Avatar
+            if (data.avatar_url) {
+              $('#userDetailAvatarBox').html(`<img src="${data.avatar_url}" alt="Avatar" />`);
+            } else {
+              $('#userDetailAvatarBox').html(`<span>${data.avatar_char}</span>`);
+            }
+
+            $('#userDetailDisplayName').text(data.display_name);
+            $('#userDetailLogin').text('@' + data.user_login);
+            $('#userDetailEmail').text(data.user_email);
+            $('#userDetailId').text('#' + data.id);
+            $('#userDetailRegistered').text(data.registered);
+            $('#userDetailTotalStories').text(data.total_stories || 0);
+            $('#userDetailViewsMonth').text((data.total_views_month || 0).toLocaleString('vi-VN'));
+
+            // Badges
+            let userBadgesHtml = '';
+            if (data.role === 'administrator') {
+              userBadgesHtml += '<span class="badge badge-gold"><i class="fa-solid fa-shield-halved"></i> Quản Trị Viên</span>';
+            } else if (data.role === 'dich_gia') {
+              userBadgesHtml += '<span class="badge badge-green"><i class="fa-solid fa-feather-pointed"></i> Dịch Giả</span>';
+            } else {
+              userBadgesHtml += '<span class="badge"><i class="fa-solid fa-book-reader"></i> Độc Giả</span>';
+            }
+
+            userBadgesHtml += data.is_locked 
+              ? '<span class="badge badge-hot"><i class="fa-solid fa-lock"></i> Đã khóa tài khoản</span>' 
+              : '<span class="badge badge-full"><i class="fa-solid fa-unlock"></i> Đang hoạt động</span>';
+
+            $('#userDetailBadges').html(userBadgesHtml);
+
+            // Bank details
+            if (data.bank_number) {
+              $('#userDetailBankText').html(`<strong>${data.bank_name}</strong> - <span style="font-family: monospace; font-size: 13px;">${data.bank_number}</span> (Chủ TK: <strong>${data.bank_holder}</strong>)`);
+            } else {
+              $('#userDetailBankText').text('Chưa cập nhật tài khoản ngân hàng.');
+            }
+
+            // Role selector
+            $('#selectDetailUserRole').val(data.role).off('change').on('change', function() {
+              const newRole = $(this).val();
+              $(this).trigger('change_role', [data.id, newRole]);
+            });
+
+            // Toggle lock button
+            const $btnLock = $('#btnDetailToggleLockUser');
+            $btnLock.attr('data-user-id', data.id);
+            if (data.is_locked) {
+              $btnLock.removeClass('btn-danger').addClass('btn-primary').html('<i class="fa-solid fa-unlock"></i> Mở Khóa Tài Khoản');
+            } else {
+              $btnLock.removeClass('btn-primary').addClass('btn-danger').html('<i class="fa-solid fa-lock"></i> Khóa Tài Khoản');
+            }
+
+            // Authored Stories Subtable
+            $('#userDetailStoriesCount').text(data.total_stories || 0);
+            const $tbody = $('#userDetailStoriesTbody');
+            $tbody.empty();
+
+            if (!data.stories || data.stories.length === 0) {
+              $tbody.html('<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Người dùng này chưa đăng tải bộ truyện nào trên hệ thống.</td></tr>');
+            } else {
+              data.stories.forEach((st) => {
+                const stBadge = st.status === 'publish'
+                  ? '<span class="badge badge-approved"><i class="fa-solid fa-check"></i> Hiển thị</span>'
+                  : '<span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Chờ duyệt</span>';
+
+                const rowHtml = `
+                  <tr>
+                    <td>
+                      <a href="javascript:void(0)" class="btn-open-story-details" data-story-id="${st.id}" style="font-weight: 700; color: var(--primary-green);">
+                        ${st.title}
+                      </a>
+                    </td>
+                    <td>${stBadge}</td>
+                    <td><strong>${st.chapters}</strong> chương</td>
+                    <td><i class="fa-solid fa-eye"></i> ${st.views_month.toLocaleString('vi-VN')}</td>
+                    <td><i class="fa-solid fa-eye"></i> ${st.views_total.toLocaleString('vi-VN')}</td>
+                    <td style="color: #2E7D32; font-weight: 700;">${st.salary.toLocaleString('vi-VN')} VNĐ</td>
+                    <td style="text-align: center;">
+                      <button type="button" class="btn btn-outline btn-xs btn-open-story-details" data-story-id="${st.id}">
+                        <i class="fa-solid fa-folder-tree"></i> Xem Chi Tiết
+                      </button>
+                    </td>
+                  </tr>
+                `;
+                $tbody.append(rowHtml);
+              });
+            }
+
+            // Switch view
+            $('#admUserMasterView').hide();
+            $('#admUserDetailView').fadeIn(200);
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          },
+          error: (xhr) => {
+            muopAlert('Không thể kết nối đến máy chủ để tải chi tiết người dùng!', 'error');
+          }
+        });
+      };
+
+      // Click to open User Detail
+      $(document).on('click', '.btn-open-user-details', function(e) {
+        e.preventDefault();
+        const userId = $(this).data('user-id') || $(this).closest('.adm-user-row').data('user-id');
+        openUserDetail(userId);
+      });
+
+      // Back to User Master
+      $('#btnBackToUserMaster').on('click', function() {
+        $('#admUserDetailView').hide();
+        $('#admUserMasterView').fadeIn(200);
+      });
+
+      // Lock user from detail view
+      $('#btnDetailToggleLockUser').on('click', function(e) {
+        e.preventDefault();
+        const userId = $(this).attr('data-user-id');
+        if (!userId) return;
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'toggle_user_status',
+            user_id: userId,
+            nonce: muopConfig.nonce
           },
           success: (res) => {
             if (typeof res === 'string') {
               try { res = JSON.parse(res); } catch (e) {}
             }
             if (res && res.success) {
-              const $card = $btn.closest('.adm-genre-card');
-              $card.fadeOut(250, function() {
-                $(this).remove();
-                const curCount = parseInt($('#admGenreTotalCount').text(), 10) || 1;
-                $('#admGenreTotalCount').text(Math.max(0, curCount - 1));
-              });
+              muopAlert(getAjaxMsg(res, 'Đã cập nhật trạng thái tài khoản!'), 'success');
+              openUserDetail(userId);
             } else {
-              alert(getAjaxMsg(res, 'Lỗi khi xóa thể loại!'));
-              $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+              muopAlert(getAjaxMsg(res, 'Lỗi thao tác!'), 'error');
             }
-          },
-          error: (xhr) => {
-            let errorMsg = 'Lỗi kết nối máy chủ!';
-            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
-            alert(errorMsg);
-            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
           }
         });
       });
 
-      // Dashboard Tabs
-      $('.dash-tab-btn').on('click', function() {
-        const target = $(this).data('tab');
-        $('.dash-tab-btn').removeClass('active');
-        $(this).addClass('active');
-        $('.dash-tab-pane').removeClass('active');
-        $('#' + target).addClass('active');
+      // 5. Genre Quick Search in Toolbar
+      $('#admGenreSearchInput').on('input keyup', function() {
+        const q = $.trim($(this).val()).toLowerCase();
+        let visibleCount = 0;
+        $('#admGenresGrid .adm-genre-card').each(function() {
+          const name = $(this).data('name') || '';
+          if (!q || name.indexOf(q) !== -1) {
+            $(this).show();
+            visibleCount++;
+          } else {
+            $(this).hide();
+          }
+        });
+
+        if (visibleCount === 0) {
+          $('#admNoGenreFound').show();
+        } else {
+          $('#admNoGenreFound').hide();
+        }
       });
     }
   };
@@ -1879,27 +3576,34 @@
   // 10. DROPDOWN MENUS (USER ACCOUNT & THỂ LOẠI CLICK TOGGLES)
   const DropdownManager = {
     init() {
-      // Toggle User Account Dropdown on click
-      $(document).on('click', '#userProfileToggle, .user-profile-badge', function(e) {
+      // Toggle User Account Dropdown on click / tap
+      $(document).on('click', '#userProfileToggle, .user-profile-badge, #userMenuWrapper .user-avatar-mini', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        const $wrapper = $(this).closest('.user-menu-wrapper');
-        const $panel = $wrapper.find('.user-dropdown-panel');
-        
-        // Close notification dropdown if open
+
+        const $wrapper = $('#userMenuWrapper');
+        const $panel = $('#userDropdownPanel');
+        const isOpen = $wrapper.hasClass('active') || $panel.hasClass('show');
+
+        // Close other dropdowns if open
         $('#notifDropdownPanel').removeClass('show');
         $('#notifToggleBtn').attr('aria-expanded', 'false');
-
-        $wrapper.toggleClass('active');
-        $panel.toggleClass('show');
-
-        // Close genre dropdown if open
         $('.genre-dropdown-menu').removeClass('show');
         $('.has-genre-dropdown').removeClass('open');
+
+        if (isOpen) {
+          $wrapper.removeClass('active');
+          $panel.removeClass('show');
+          $('#userProfileToggle').attr('aria-expanded', 'false');
+        } else {
+          $wrapper.addClass('active');
+          $panel.addClass('show');
+          $('#userProfileToggle').attr('aria-expanded', 'true');
+        }
       });
 
       // Prevent closing when clicking inside user panel, allowing direct navigation
-      $(document).on('click', '.user-dropdown-panel', function(e) {
+      $(document).on('click', '#userDropdownPanel, .user-dropdown-panel', function(e) {
         e.stopPropagation();
       });
 
@@ -1907,30 +3611,78 @@
       $(document).on('click', '#navGenreToggle, .nav-genre-btn', function(e) {
         const $li = $(this).closest('.has-genre-dropdown');
         const $menu = $li.find('.genre-dropdown-menu');
+        const isOpen = $li.hasClass('open') || $menu.hasClass('show');
 
         e.preventDefault();
         e.stopPropagation();
-        $li.toggleClass('open');
-        $menu.toggleClass('show');
 
-        // Close user dropdown if open
-        $('.user-menu-wrapper').removeClass('active');
-        $('.user-dropdown-panel').removeClass('show');
+        // Close user dropdown & other dropdowns if open
+        $('#userMenuWrapper').removeClass('active');
+        $('#userDropdownPanel').removeClass('show');
+        $('#userProfileToggle').attr('aria-expanded', 'false');
+        $('#notifDropdownPanel').removeClass('show');
+        $('#notifToggleBtn').attr('aria-expanded', 'false');
+        $('.has-tu-truyen-dropdown').removeClass('open');
+        $('.tu-truyen-dropdown-menu').removeClass('show');
+
+        if (isOpen) {
+          $li.removeClass('open');
+          $menu.removeClass('show');
+        } else {
+          $li.addClass('open');
+          $menu.addClass('show');
+        }
       });
 
       $(document).on('click', '.genre-dropdown-menu', function(e) {
         e.stopPropagation();
       });
 
+      // Toggle Tủ truyện dropdown on click
+      $(document).on('click', '#navTuTruyenToggle, .nav-tu-truyen-btn', function(e) {
+        const $li = $(this).closest('.has-tu-truyen-dropdown');
+        const $menu = $li.find('.tu-truyen-dropdown-menu');
+        const isOpen = $li.hasClass('open') || $menu.hasClass('show');
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Close other dropdowns if open
+        $('#userMenuWrapper').removeClass('active');
+        $('#userDropdownPanel').removeClass('show');
+        $('#userProfileToggle').attr('aria-expanded', 'false');
+        $('#notifDropdownPanel').removeClass('show');
+        $('#notifToggleBtn').attr('aria-expanded', 'false');
+        $('.has-genre-dropdown').removeClass('open');
+        $('.genre-dropdown-menu').removeClass('show');
+
+        if (isOpen) {
+          $li.removeClass('open');
+          $menu.removeClass('show');
+        } else {
+          $li.addClass('open');
+          $menu.addClass('show');
+        }
+      });
+
+      $(document).on('click', '.tu-truyen-dropdown-menu', function(e) {
+        e.stopPropagation();
+      });
+
       // Close all dropdowns when clicking anywhere outside
       $(document).on('click', function(e) {
-        if (!$(e.target).closest('.user-menu-wrapper').length) {
-          $('.user-menu-wrapper').removeClass('active');
-          $('.user-dropdown-panel').removeClass('show');
+        if (!$(e.target).closest('#userMenuWrapper').length) {
+          $('#userMenuWrapper').removeClass('active');
+          $('#userDropdownPanel').removeClass('show');
+          $('#userProfileToggle').attr('aria-expanded', 'false');
         }
         if (!$(e.target).closest('.has-genre-dropdown').length) {
           $('.has-genre-dropdown').removeClass('open');
           $('.genre-dropdown-menu').removeClass('show');
+        }
+        if (!$(e.target).closest('.has-tu-truyen-dropdown').length) {
+          $('.has-tu-truyen-dropdown').removeClass('open');
+          $('.tu-truyen-dropdown-menu').removeClass('show');
         }
         if (!$(e.target).closest('#notifWrapper').length) {
           $('#notifDropdownPanel').removeClass('show');
@@ -1941,10 +3693,13 @@
       // Escape key to close open dropdowns
       $(document).on('keydown', function(e) {
         if (e.key === 'Escape') {
-          $('.user-menu-wrapper').removeClass('active');
-          $('.user-dropdown-panel').removeClass('show');
+          $('#userMenuWrapper').removeClass('active');
+          $('#userDropdownPanel').removeClass('show');
+          $('#userProfileToggle').attr('aria-expanded', 'false');
           $('.has-genre-dropdown').removeClass('open');
           $('.genre-dropdown-menu').removeClass('show');
+          $('.has-tu-truyen-dropdown').removeClass('open');
+          $('.tu-truyen-dropdown-menu').removeClass('show');
           $('#notifDropdownPanel').removeClass('show');
           $('#notifToggleBtn').attr('aria-expanded', 'false');
         }
@@ -1973,6 +3728,12 @@
       $(document).on('click', '#drawerGenreToggle', function(e) {
         e.preventDefault();
         $('#drawerGenreItem').toggleClass('open');
+      });
+
+      // Toggle Mobile Tủ Truyện Accordion Submenu
+      $(document).on('click', '#drawerTuTruyenToggle', function(e) {
+        e.preventDefault();
+        $('#drawerTuTruyenItem').toggleClass('open');
       });
 
       // Mobile Search Dropdown
@@ -2008,23 +3769,10 @@
     }
   };
 
-  // 12. USER PROFILE & PASSWORD SETTINGS
-  const ProfileManager = {
+  // 11.5 DASHBOARD & ADMIN TAB MANAGER (UNIVERSAL)
+  const TabManager = {
     init() {
-      if (!$('#profileUpdateForm').length && !$('#passwordChangeForm').length) {
-        return;
-      }
-
-      this.initTabs();
-      this.initAvatarPicker();
-      this.initProfileForm();
-      this.initPasswordForm();
-      this.initPasswordToggles();
-    },
-
-    // Handle hash and tab switching
-    initTabs() {
-      // Redirect legacy hashes to dedicated standalone pages
+      // Redirect legacy hashes to dedicated standalone pages on profile
       if (window.location.pathname.indexOf('/ho-so') !== -1) {
         if (window.location.hash === '#tabPassword') {
           window.location.replace('/doi-mat-khau/');
@@ -2050,6 +3798,49 @@
           $('.dash-tab-pane').removeClass('active');
           $btn.addClass('active');
           $pane.addClass('active');
+
+          // Sync Admin Database Portal Topbar & Toolbar
+          const tabLabelMap = {
+            'admTabStories': 'Quản lý truyện',
+            'admTabAnalytics': 'Thống kê & Phân tích lượt đọc',
+            'admTabTeams': 'Quản lý team dịch',
+            'admTabSplitter': 'Tách truyện tự động',
+            'admTabVivuCrawler': 'Công cụ lấy crawl tự động',
+            'admTabUsers': 'Quản lý user',
+            'admTabAffiliate': 'Link Shopee & TikTok',
+            'admTabSalaries': 'Tiền lương dịch giả',
+            'admTabGenres': 'Thể loại truyện',
+            'admTabComments': 'Bình luận & Đánh giá',
+            'admTabReports': 'Báo lỗi chương',
+            'admTabBroadcast': 'Thông báo hệ thống'
+          };
+
+          if (tabLabelMap[cleanId]) {
+            $('#admActiveTabLabel').text(tabLabelMap[cleanId]);
+            
+            // Sync toolbar
+            $('.admin-toolbar-group').hide();
+            if (cleanId === 'admTabStories') {
+              $('#toolbarGroupStories').show();
+            } else if (cleanId === 'admTabUsers') {
+              $('#toolbarGroupUsers').show();
+            } else if (cleanId === 'admTabGenres') {
+              $('#toolbarGroupGenres').show();
+            } else if (cleanId === 'admTabTeams') {
+              $('#toolbarGroupTeams').show();
+            } else if (cleanId === 'admTabSplitter') {
+              $('#toolbarGroupSplitter').show();
+            } else if (cleanId === 'admTabVivuCrawler') {
+              $('#toolbarGroupVivuCrawler').show();
+            } else if (cleanId === 'admTabAnalytics') {
+              $('#toolbarGroupAnalytics').show();
+            } else {
+              $('#toolbarGroupGeneric').show();
+            }
+
+            // Close mobile sidebar
+            $('#adminDbSidebar').removeClass('mobile-open');
+          }
         }
       };
 
@@ -2065,9 +3856,10 @@
         }
       });
 
-      // Tab button clicks: only for elements with data-tab
-      $('.dash-tab-btn[data-tab]').on('click', function() {
-        const tabId = $(this).data('tab');
+      // Delegated click for tab buttons with data-tab
+      $(document).on('click', '.dash-tab-btn[data-tab]', function(e) {
+        e.preventDefault();
+        const tabId = $(this).attr('data-tab');
         if (!tabId) return;
         switchTab(tabId);
         if (history.replaceState) {
@@ -2076,6 +3868,20 @@
           window.location.hash = '#' + tabId;
         }
       });
+    }
+  };
+
+  // 12. USER PROFILE & PASSWORD SETTINGS
+  const ProfileManager = {
+    init() {
+      if (!$('#profileUpdateForm').length && !$('#passwordChangeForm').length) {
+        return;
+      }
+
+      this.initAvatarPicker();
+      this.initProfileForm();
+      this.initPasswordForm();
+      this.initPasswordToggles();
     },
 
     // Avatar selection: file upload preview, url input, and preset buttons
@@ -2383,7 +4189,7 @@
         $menu.fadeOut(100);
         $wrap.removeClass('open');
 
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
         const nonce = (typeof muopConfig !== 'undefined') ? muopConfig.nonce : '';
 
         $.ajax({
@@ -2440,49 +4246,47 @@
         const nextStatus = (currentStatus === 'hoan_thanh') ? 'dang_ra' : 'hoan_thanh';
         const nextLabel = (nextStatus === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra';
 
-        if (!confirm(`Bạn có muốn đổi trạng thái bộ truyện này sang "${nextLabel}" không?`)) {
-          return;
-        }
+        muopConfirm(`Bạn có muốn đổi trạng thái bộ truyện này sang "${nextLabel}" không?`, () => {
+          const ajaxUrl = getAjaxUrl();
+          const nonce = (typeof muopConfig !== 'undefined') ? muopConfig.nonce : '';
 
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
-        const nonce = (typeof muopConfig !== 'undefined') ? muopConfig.nonce : '';
-
-        $.ajax({
-          url: ajaxUrl,
-          type: 'POST',
-          data: {
-            action: 'muop_update_story_status',
-            nonce: nonce,
-            story_id: storyId,
-            status: nextStatus
-          },
-          success: (res) => {
-            if (typeof res === 'string') {
-              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
-              try { res = JSON.parse(clean); } catch (e) {}
-            }
-            if (res && res.success) {
-              $btn.data('current-status', nextStatus);
-              if (res.data && res.data.is_full) {
-                $btn.removeClass('badge-green').addClass('badge-full');
-                $btn.find('i.fa-solid:first').removeClass('fa-arrows-rotate').addClass('fa-check');
-                $btn.find('.table-status-text').text('Full');
-              } else {
-                $btn.removeClass('badge-full').addClass('badge-green');
-                $btn.find('i.fa-solid:first').removeClass('fa-check').addClass('fa-arrows-rotate');
-                $btn.find('.table-status-text').text('Đang ra');
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_update_story_status',
+              nonce: nonce,
+              story_id: storyId,
+              status: nextStatus
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+                try { res = JSON.parse(clean); } catch (e) {}
               }
-              alert(getAjaxMsg(res, 'Đã cập nhật trạng thái truyện thành công!'));
-            } else {
-              alert(getAjaxMsg(res, 'Lỗi cập nhật trạng thái!'));
+              if (res && res.success) {
+                $btn.data('current-status', nextStatus);
+                if (res.data && res.data.is_full) {
+                  $btn.removeClass('badge-green').addClass('badge-full');
+                  $btn.find('i.fa-solid:first').removeClass('fa-arrows-rotate').addClass('fa-check');
+                  $btn.find('.table-status-text').text('Full');
+                } else {
+                  $btn.removeClass('badge-full').addClass('badge-green');
+                  $btn.find('i.fa-solid:first').removeClass('fa-check').addClass('fa-arrows-rotate');
+                  $btn.find('.table-status-text').text('Đang ra');
+                }
+                muopAlert(getAjaxMsg(res, 'Đã cập nhật trạng thái truyện thành công!'), 'success');
+              } else {
+                muopAlert(getAjaxMsg(res, 'Lỗi cập nhật trạng thái!'), 'error');
+              }
+            },
+            error: (xhr) => {
+              let errorMsg = 'Lỗi kết nối máy chủ!';
+              if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+              else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
+              muopAlert(errorMsg, 'error');
             }
-          },
-          error: (xhr) => {
-            let errorMsg = 'Lỗi kết nối máy chủ!';
-            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
-            else if (xhr && xhr.responseText) errorMsg = getAjaxMsg(xhr.responseText, errorMsg);
-            alert(errorMsg);
-          }
+          });
         });
       });
     }
@@ -2504,7 +4308,7 @@
 
         $btn.prop('disabled', true);
         const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
 
         $.ajax({
           url: ajaxUrl,
@@ -2538,14 +4342,71 @@
                 $count.text(count.toLocaleString('vi-VN'));
               }
             } else {
-              alert(getAjaxMsg(res, 'Vui lòng đăng nhập để lưu team vào danh sách yêu thích!'));
+              muopAlert(getAjaxMsg(res, 'Vui lòng đăng nhập để lưu team vào danh sách yêu thích!'), 'info');
             }
           },
           error: (xhr) => {
             $btn.prop('disabled', false);
             let errorMsg = 'Lỗi kết nối máy chủ!';
             if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
-            alert(errorMsg);
+            muopAlert(errorMsg, 'error');
+          }
+        });
+      });
+
+      // Toggle Follow Team (Theo dõi / Hủy theo dõi Team dịch)
+      $('#btnToggleFollowTeam').on('click', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const teamId = $btn.data('team-id');
+        const teamName = $btn.data('team-name');
+        const $icon = $('#followTeamBellIcon');
+        const $text = $('#followTeamBtnText');
+
+        if (!teamId && !teamName) return;
+
+        $btn.prop('disabled', true);
+        const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+        const ajaxUrl = getAjaxUrl();
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_toggle_follow_team',
+            nonce: nonce,
+            team_id: teamId,
+            team_name: teamName
+          },
+          success: (res) => {
+            $btn.prop('disabled', false);
+            if (typeof res === 'string') {
+              const clean = res.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
+              try { res = JSON.parse(clean); } catch (e) {}
+            }
+            if (res && res.success) {
+              const isFollowing = res.data && res.data.following;
+              if (isFollowing) {
+                $btn.removeClass('btn-secondary').addClass('btn-primary');
+                $icon.removeClass('fa-regular').addClass('fa-solid');
+                $text.text('Đang Theo Dõi Team');
+                $btn.attr('title', 'Đang theo dõi team dịch này (Bấm để hủy)');
+              } else {
+                $btn.removeClass('btn-primary').addClass('btn-secondary');
+                $icon.removeClass('fa-solid').addClass('fa-regular');
+                $text.text('Theo Dõi Team');
+                $btn.attr('title', 'Theo dõi team dịch để nhận thông báo truyện mới');
+              }
+              muopAlert(getAjaxMsg(res, isFollowing ? 'Đã theo dõi team dịch thành công!' : 'Đã hủy theo dõi team dịch.'), isFollowing ? 'success' : 'info');
+            } else {
+              muopAlert(getAjaxMsg(res, 'Vui lòng đăng nhập để theo dõi team dịch!'), 'info');
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false);
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            muopAlert(errorMsg, 'error');
           }
         });
       });
@@ -2560,34 +4421,251 @@
 
         if (!storyId) return;
 
-        if (!confirm('Bạn có chắc chắn muốn bỏ lưu bộ truyện này khỏi Tủ truyện?')) {
-          return;
-        }
+        muopConfirm('Bạn có chắc chắn muốn bỏ lưu bộ truyện này khỏi Tủ truyện?', () => {
+          $btn.prop('disabled', true);
+          const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+          const ajaxUrl = getAjaxUrl();
 
-        $btn.prop('disabled', true);
-        const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_toggle_bookmark',
+              nonce: nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              $item.fadeOut(250, function() {
+                $(this).remove();
+                if ($('#tuTruyenStoryGrid .tu-truyen-item-wrap').length === 0) {
+                  location.reload();
+                }
+              });
+            },
+            error: () => {
+              $btn.prop('disabled', false);
+              muopAlert('Lỗi kết nối máy chủ!', 'error');
+            }
+          });
+        });
+      });
 
-        $.ajax({
-          url: ajaxUrl,
-          type: 'POST',
-          data: {
-            action: 'muop_toggle_bookmark',
-            nonce: nonce,
-            story_id: storyId
-          },
-          success: (res) => {
-            $item.fadeOut(250, function() {
-              $(this).remove();
-              if ($('#tuTruyenStoryGrid .tu-truyen-item-wrap').length === 0) {
-                location.reload();
-              }
-            });
-          },
-          error: () => {
-            $btn.prop('disabled', false);
-            alert('Lỗi kết nối máy chủ!');
-          }
+      // Remove from favorites in page-tu-truyen
+      $(document).on('click', '.btn-remove-from-favorites', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+        const $item = $(`#tuTruyenFavItem-${storyId}`);
+
+        if (!storyId) return;
+
+        muopConfirm('Bạn có chắc chắn muốn bỏ yêu thích bộ truyện này?', () => {
+          $btn.prop('disabled', true);
+          const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+          const ajaxUrl = getAjaxUrl();
+
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_toggle_favorite_story',
+              nonce: nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              $item.fadeOut(250, function() {
+                $(this).remove();
+                if ($('#tuTruyenStoryGrid .tu-truyen-item-wrap').length === 0) {
+                  location.reload();
+                }
+              });
+            },
+            error: () => {
+              $btn.prop('disabled', false);
+              muopAlert('Lỗi kết nối máy chủ!', 'error');
+            }
+          });
+        });
+      });
+
+      // Remove from following in page-tu-truyen
+      $(document).on('click', '.btn-remove-from-following', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+        const $item = $(`#tuTruyenFollowItem-${storyId}`);
+
+        if (!storyId) return;
+
+        muopConfirm('Bạn có chắc chắn muốn hủy theo dõi bộ truyện này?', () => {
+          $btn.prop('disabled', true);
+          const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+          const ajaxUrl = getAjaxUrl();
+
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_toggle_follow_story',
+              nonce: nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              $item.fadeOut(250, function() {
+                $(this).remove();
+                if ($('#tuTruyenStoryGrid .tu-truyen-item-wrap').length === 0) {
+                  location.reload();
+                }
+              });
+            },
+            error: () => {
+              $btn.prop('disabled', false);
+              muopAlert('Lỗi kết nối máy chủ!', 'error');
+            }
+          });
+        });
+      });
+
+      // Remove team favorite in page-tu-truyen
+      $(document).on('click', '.btn-remove-team-fav', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const teamId = $btn.data('team-id');
+        const $item = $(`#tuTeamFavItem-${teamId}`);
+
+        if (!teamId) return;
+
+        muopConfirm('Bạn có chắc chắn muốn bỏ yêu thích team dịch này?', () => {
+          $btn.prop('disabled', true);
+          const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+          const ajaxUrl = getAjaxUrl();
+
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_toggle_favorite_team',
+              nonce: nonce,
+              team_id: teamId
+            },
+            success: (res) => {
+              $item.fadeOut(250, function() {
+                $(this).remove();
+                if ($('#tuTruyenTeamsGrid .tu-team-card').length === 0) {
+                  location.reload();
+                }
+              });
+            },
+            error: () => {
+              $btn.prop('disabled', false);
+              muopAlert('Lỗi kết nối máy chủ!', 'error');
+            }
+          });
+        });
+      });
+
+      // Remove team following in page-tu-truyen
+      $(document).on('click', '.btn-remove-team-follow', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const teamId = $btn.data('team-id');
+        const $item = $(`#tuTeamFollowItem-${teamId}`);
+
+        if (!teamId) return;
+
+        muopConfirm('Bạn có chắc chắn muốn hủy theo dõi team dịch này?', () => {
+          $btn.prop('disabled', true);
+          const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+          const ajaxUrl = getAjaxUrl();
+
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_toggle_follow_team',
+              nonce: nonce,
+              team_id: teamId
+            },
+            success: (res) => {
+              $item.fadeOut(250, function() {
+                $(this).remove();
+                if ($('#tuTruyenTeamsGrid .tu-team-card').length === 0) {
+                  location.reload();
+                }
+              });
+            },
+            error: () => {
+              $btn.prop('disabled', false);
+              muopAlert('Lỗi kết nối máy chủ!', 'error');
+            }
+          });
+        });
+      });
+
+      // Remove single reading history item
+      $(document).on('click', '.btn-remove-history-item', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+        const $item = $(`#tuHistoryItem-${storyId}`);
+
+        if (!storyId) return;
+
+        muopConfirm('Bạn có chắc chắn muốn xóa bộ truyện này khỏi lịch sử đọc?', () => {
+          $btn.prop('disabled', true);
+          const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+          const ajaxUrl = getAjaxUrl();
+
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_remove_reading_history',
+              nonce: nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              $item.fadeOut(250, function() {
+                $(this).remove();
+                if ($('#tuTruyenHistoryList .tu-history-item').length === 0) {
+                  location.reload();
+                }
+              });
+            },
+            error: () => {
+              $btn.prop('disabled', false);
+              muopAlert('Lỗi kết nối máy chủ!', 'error');
+            }
+          });
+        });
+      });
+
+      // Clear all reading history
+      $(document).on('click', '#btnClearAllHistory, .btn-clear-all-history', function(e) {
+        e.preventDefault();
+        muopConfirm('Bạn có chắc chắn muốn xóa TOÀN BỘ lịch sử đọc truyện?', () => {
+          const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+          const ajaxUrl = getAjaxUrl();
+
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_clear_all_reading_history',
+              nonce: nonce
+            },
+            success: () => {
+              location.reload();
+            },
+            error: () => {
+              muopAlert('Lỗi kết nối máy chủ!', 'error');
+            }
+          });
         });
       });
 
@@ -2699,7 +4777,7 @@
         $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
 
         const formData = new FormData($form[0]);
-        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
+        const ajaxUrl = getAjaxUrl();
 
         $.ajax({
           url: ajaxUrl,
@@ -2865,49 +4943,50 @@
       });
 
       // 2. Nút "Đăng Lên" từ danh sách bản nháp
+      // 2. Đăng truyện từ bản nháp
       $(document).on('click', '.btn-publish-draft', function(e) {
         e.preventDefault();
         const $btn = $(this);
         const storyId = $btn.data('story-id');
 
-        if (!confirm('Bạn có chắc chắn muốn đăng bộ truyện này lên hệ thống?')) {
-          return;
-        }
+        muopConfirm('Bạn có chắc chắn muốn đăng bộ truyện này lên hệ thống?', () => {
+          $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng...');
 
-        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng...');
-
-        $.ajax({
-          url: muopConfig.ajaxUrl,
-          type: 'POST',
-          data: {
-            action: 'muop_publish_draft',
-            nonce: muopConfig.nonce,
-            story_id: storyId
-          },
-          success: (res) => {
-            if (typeof res === 'string') {
-              try { res = JSON.parse(res); } catch (e) {}
-            }
-            if (res && res.success) {
-              alert(getAjaxMsg(res, 'Đã gửi đăng truyện thành công!'));
-              window.location.reload();
-            } else {
-              alert(getAjaxMsg(res, 'Lỗi đăng truyện!'));
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_publish_draft',
+              nonce: muopConfig.nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                muopAlert(getAjaxMsg(res, 'Đã gửi đăng truyện thành công!'), 'success', () => {
+                  window.location.reload();
+                });
+              } else {
+                muopAlert(getAjaxMsg(res, 'Lỗi đăng truyện!'), 'error');
+                $btn.prop('disabled', false).html('<i class="fa-solid fa-cloud-arrow-up"></i> Đăng Lên');
+              }
+            },
+            error: (xhr) => {
+              let err = 'Lỗi kết nối máy chủ!';
+              if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+              muopAlert(err, 'error');
               $btn.prop('disabled', false).html('<i class="fa-solid fa-cloud-arrow-up"></i> Đăng Lên');
             }
-          },
-          error: (xhr) => {
-            let err = 'Lỗi kết nối máy chủ!';
-            if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
-            alert(err);
-            $btn.prop('disabled', false).html('<i class="fa-solid fa-cloud-arrow-up"></i> Đăng Lên');
-          }
+          });
         });
       });
 
       // 3. Mở Modal Chỉnh Sửa Thông Tin Truyện (Popup 1)
-      $(document).on('click', '.btn-edit-story', function(e) {
+      $(document).on('click', '.btn-edit-story, .btn-action-edit-story-desc', function(e) {
         e.preventDefault();
+        $('.story-actions-dropdown').removeClass('is-open');
         const storyId = $(this).data('story-id');
         if (!storyId) return;
 
@@ -2963,14 +5042,14 @@
                 });
               }
             } else {
-              alert(getAjaxMsg(res, 'Không thể tải thông tin truyện!'));
+              muopAlert(getAjaxMsg(res, 'Không thể tải thông tin truyện!'), 'error');
               $modal.hide();
             }
           },
           error: (xhr) => {
             let err = 'Lỗi kết nối máy chủ!';
             if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
-            alert(err);
+            muopAlert(err, 'error');
             $modal.hide();
           }
         });
@@ -3089,31 +5168,34 @@
         $('#editChapterId').val(chapId);
 
         $.ajax({
-          url: muopConfig.ajaxUrl,
+          url: getAjaxUrl(),
           type: 'POST',
           data: {
             action: 'muop_get_chapter_data',
-            nonce: muopConfig.nonce,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : '',
             chapter_id: chapId
           },
           success: (res) => {
             if (typeof res === 'string') {
               try { res = JSON.parse(res); } catch (e) {}
             }
-            if (res && res.success) {
+            if (res && res.success && res.data) {
               const data = res.data;
-              $('#editChapterNumber').val(data.chapter_number);
-              $('#editChapterTitle').val(data.title);
-              $('#editChapterContent').val(data.content);
+              $('#editChapterNumber').val(data.chapter_number || data.number || 1);
+              $('#editChapterTitle').val(data.title || '');
+              $('#editChapterContent').val(data.content || '');
+              try {
+                updateRealtimeWordCounter($('#editChapterContent'), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
+              } catch (cntErr) {}
               $form.fadeIn(200);
             } else {
-              alert(getAjaxMsg(res, 'Không thể tải nội dung chương!'));
+              muopAlert(getAjaxMsg(res, 'Không thể tải nội dung chương!'), 'error');
             }
           },
           error: (xhr) => {
             let msg = 'Lỗi kết nối khi tải nội dung chương!';
             if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
-            alert(msg);
+            muopAlert(msg, 'error');
           }
         });
       });
@@ -3165,7 +5247,8 @@
 
               setTimeout(() => {
                 $alert.fadeOut(300);
-              }, 2500);
+                $('#modalEditChapterContent').fadeOut(250);
+              }, 1200);
             } else {
               $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Lỗi cập nhật chương!')).fadeIn();
             }
@@ -3242,12 +5325,14 @@
 
         // Nạp trực tiếp dữ liệu của chương này
         $.ajax({
-          url: muopConfig.ajaxUrl,
+          url: getAjaxUrl(),
           type: 'POST',
           data: {
             action: 'muop_get_chapter_data',
             chapter_id: chapterId,
-            nonce: muopConfig.nonce
+            story_id: storyId,
+            is_admin_portal: (window.location.pathname.indexOf('quan-ly-admin') !== -1 || window.location.search.indexOf('from=admin') !== -1) ? 1 : 0,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
           },
           success: (res) => {
             if (typeof res === 'string') {
@@ -3256,10 +5341,15 @@
             if (res && res.success && res.data) {
               const data = res.data;
               $('#editChapterAlert').hide();
-              $('#editChapterId').val(data.id);
-              $('#editChapterNumber').val(data.chapter_number);
-              $('#editChapterTitle').val(data.title);
-              $('#editChapterContent').val(data.content);
+              $('#editChapterId').val(data.id || chapterId);
+              $('#editChapterNumber').val(data.chapter_number || data.number || chapterNum || 1);
+              $('#editChapterTitle').val(data.title || chapterTitle || '');
+              $('#editChapterContent').val(data.content || '');
+              try {
+                updateRealtimeWordCounter($('#editChapterContent'), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
+              } catch (cntErr) {
+                console.warn('Word counter error:', cntErr);
+              }
               $('#editChapterIsDraftInput').val(data.status === 'draft' ? '1' : '0');
 
               if (data.status === 'draft') {
@@ -3272,7 +5362,7 @@
 
               $('#formEditChapterFields').fadeIn(200);
             } else {
-              const msg = (res && res.data && res.data.message) || 'Không thể tải nội dung chương!';
+              const msg = (res && res.data && res.data.message) || (res && res.message) || 'Không thể tải nội dung chương!';
               $('#editChapterAlert').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).removeClass('alert-info').addClass('alert-error').show();
             }
           },
@@ -3397,6 +5487,1310 @@
         if (e.target === this) {
           $(this).hide();
         }
+      });
+
+      // =========================================================================
+      // STORY ACTIONS 3-DOTS DROPDOWN & ACTIONS
+      // =========================================================================
+
+      function closeStoryDropdowns() {
+        $('.story-actions-dropdown, .user-actions-dropdown, .genre-actions-dropdown').each(function() {
+          $(this).removeClass('is-open dropup').css('z-index', '');
+          $(this).find('.story-dropdown-menu').css({
+            top: '',
+            left: '',
+            right: '',
+            bottom: '',
+            zIndex: '',
+            display: 'none',
+            visibility: ''
+          });
+        });
+        $('.adm-genre-card').removeClass('has-open-dropdown').css('z-index', '');
+        $('tr').removeClass('has-open-dropdown').css('z-index', '');
+      }
+
+      // Mở/Đóng Dropdown 3 chấm của truyện, người dùng & thể loại (Tự động tính toán vị trí fixed hiển thị liền kề nút bấm)
+      $(document).on('click', '.btn-story-dropdown-trigger, .btn-user-dropdown-trigger, .btn-genre-dropdown-trigger', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $btn = $(this);
+        const $dropdown = $btn.closest('.story-actions-dropdown, .user-actions-dropdown, .genre-actions-dropdown');
+        const wasOpen = $dropdown.hasClass('is-open');
+
+        // Đóng các dropdown khác đang mở
+        closeStoryDropdowns();
+
+        // Nếu trước đó đang mở thì bấm vào là đóng
+        if (wasOpen) {
+          return;
+        }
+
+        const $menu = $dropdown.find('.story-dropdown-menu');
+        if (!$menu.length) return;
+
+        // Đánh dấu mở và nâng z-index của card/hàng cha lên cao nhất
+        $dropdown.addClass('is-open').css('z-index', '100000');
+        const $card = $btn.closest('.adm-genre-card');
+        if ($card.length) {
+          $card.addClass('has-open-dropdown').css('z-index', '99999');
+        }
+        const $tr = $btn.closest('tr');
+        if ($tr.length) {
+          $tr.addClass('has-open-dropdown').css('z-index', '99999');
+        }
+
+        // Đo kích thước thực tế của menu
+        $menu.css({
+          display: 'block',
+          visibility: 'hidden',
+          position: 'fixed',
+          top: '0px',
+          left: '0px',
+          right: 'auto',
+          bottom: 'auto',
+          zIndex: '100001'
+        });
+
+        const menuHeight = $menu.outerHeight() || 260;
+        const menuWidth = $menu.outerWidth() || 220;
+
+        const btnRect = this.getBoundingClientRect();
+        const windowHeight = window.innerHeight || $(window).height();
+        const windowWidth = window.innerWidth || $(window).width();
+
+        const spaceBelow = windowHeight - btnRect.bottom;
+        const spaceAbove = btnRect.top;
+
+        let top;
+        let isDropup = false;
+        // Nếu khoảng trống phía dưới màn hình không đủ cho chiều cao menu và phía trên rộng hơn -> mở ngược lên (Dropup)
+        if (spaceBelow < (menuHeight + 12) && spaceAbove > spaceBelow) {
+          top = btnRect.top - menuHeight - 6;
+          isDropup = true;
+        } else {
+          top = btnRect.bottom + 6;
+        }
+
+        // Đảm bảo menu không vượt ra ngoài mép trên hoặc dưới của viewport
+        if (top < 10) top = 10;
+        if (top + menuHeight > windowHeight - 10) {
+          top = Math.max(10, windowHeight - menuHeight - 10);
+        }
+
+        // Căn lề phải của menu khớp với lề phải của nút 3 chấm
+        let left = btnRect.right - menuWidth;
+        if (left < 10) left = 10;
+        if (left + menuWidth > windowWidth - 10) {
+          left = Math.max(10, windowWidth - menuWidth - 10);
+        }
+
+        if (isDropup) {
+          $dropdown.addClass('dropup');
+        }
+
+        $menu.css({
+          position: 'fixed',
+          top: top + 'px',
+          left: left + 'px',
+          right: 'auto',
+          bottom: 'auto',
+          zIndex: 100001,
+          visibility: 'visible',
+          display: 'block'
+        });
+      });
+
+      // Tự động đóng dropdown khi click ra ngoài hoặc click vào item
+      $(document).on('click', function(e) {
+        if (!$(e.target).closest('.story-actions-dropdown, .user-actions-dropdown, .genre-actions-dropdown').length) {
+          closeStoryDropdowns();
+        }
+      });
+
+      $(document).on('click', '.story-dropdown-item', function() {
+        setTimeout(closeStoryDropdowns, 50);
+      });
+
+      // Đóng dropdown khi cuộn trang hoặc resize để tránh lệch vị trí
+      $(window).on('scroll resize', function() {
+        if ($('.story-actions-dropdown.is-open, .user-actions-dropdown.is-open, .genre-actions-dropdown.is-open').length) {
+          closeStoryDropdowns();
+        }
+      });
+
+      // Đóng dropdown khi cuộn bảng hoặc thanh cuộn nội bộ
+      $(document).on('scroll', '.table-responsive, .db-table-container, .adm-content', function() {
+        if ($('.story-actions-dropdown.is-open, .user-actions-dropdown.is-open, .genre-actions-dropdown.is-open').length) {
+          closeStoryDropdowns();
+        }
+      });
+
+      // =========================================================================
+      // TOPBAR: USER DROPDOWN (TRANG CHỦ WEB & ĐĂNG XUẤT - HÌNH 3)
+      // =========================================================================
+      $(document).off('click.adminUserDropdown', '#btnAdminAccountDropdownTrigger')
+        .on('click.adminUserDropdown', '#btnAdminAccountDropdownTrigger', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          $('#adminUserDropdownWrap').toggleClass('is-open');
+        });
+
+      $(document).off('click.adminUserDropdownClose')
+        .on('click.adminUserDropdownClose', function(e) {
+          if (!$(e.target).closest('#adminUserDropdownWrap').length) {
+            $('#adminUserDropdownWrap').removeClass('is-open');
+          }
+        });
+
+      $(document).off('keydown.adminUserDropdownClose')
+        .on('keydown.adminUserDropdownClose', function(e) {
+          if (e.key === 'Escape' || e.keyCode === 27) {
+            $('#adminUserDropdownWrap').removeClass('is-open');
+          }
+        });
+
+      // =========================================================================
+      // STORY ACTIONS: THÊM CHƯƠNG NHANH & CHI TIẾT ĐẦY ĐỦ (HÌNH 1 & HÌNH 4)
+      // =========================================================================
+
+      // Mục 1: "Thêm chương" từ Menu 3 chấm của truyện -> Mở Popup Thêm Chương Nhanh
+      $(document).on('click', '.btn-action-quick-add-chapter', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.story-actions-dropdown').removeClass('is-open');
+
+        const storyId = $(this).data('story-id');
+        const storyTitle = $(this).data('story-title') || 'Thêm Chương Mới';
+        if (!storyId) return;
+
+        const $modal = $('#modalQuickAddChapterToStory');
+        if (!$modal.length) return;
+
+        // Reset form & trạng thái
+        $('#formQuickAddChapter')[0].reset();
+        $('#quickAddStoryId').val(storyId);
+        $('#quickAddIsDraft').val('0');
+        $('#quickAddStoryTitleDisplay').text(storyTitle);
+        $('#quickAddChapterAlert').hide().removeClass('alert-success alert-error');
+        $('#quickAddWordCount').text('0');
+        $('#quickAddCharCount').text('0');
+        $('#btnQuickAddPublish').prop('disabled', false).html('<i class="fa-solid fa-cloud-arrow-up"></i> Xuất Bản (Đăng Ngay)');
+        $('#btnQuickAddDraft').prop('disabled', false).html('<i class="fa-solid fa-file-pen"></i> Lưu Nháp');
+
+        $modal.css('display', 'flex');
+
+        // Tự động lấy số chương tiếp theo
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_get_next_chapter_number',
+            story_id: storyId,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+          },
+          success: (res) => {
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+            const nextChap = (res && res.data && (res.data.next_chapter_number || res.data.next_chapter)) || 1;
+            $('#quickAddChapterNumber').val(nextChap);
+          },
+          error: () => {
+            $('#quickAddChapterNumber').val(1);
+          }
+        });
+      });
+
+      // Đóng Popup Thêm Chương Nhanh
+      $('.btn-close-quick-add-chap').on('click', function(e) {
+        e.preventDefault();
+        $('#modalQuickAddChapterToStory').hide();
+      });
+
+      $('#modalQuickAddChapterToStory').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Realtime word counter cho popup thêm chương
+      $(document).on('input propertychange', '#quickAddChapterContent', function() {
+        if (typeof updateRealtimeWordCounter === 'function') {
+          updateRealtimeWordCounter($(this), $('#quickAddWordCount'), $('#quickAddCharCount'));
+        }
+      });
+
+      // Nút Lưu Nháp của Popup Thêm Chương
+      $('#btnQuickAddDraft').on('click', function(e) {
+        e.preventDefault();
+        $('#quickAddIsDraft').val('1');
+        $('#formQuickAddChapter').submit();
+      });
+
+      // Submit Form Thêm Chương Nhanh
+      $('#formQuickAddChapter').on('submit', function(e) {
+        e.preventDefault();
+        const $form = $(this);
+        const $btnPublish = $('#btnQuickAddPublish');
+        const $btnDraft = $('#btnQuickAddDraft');
+        const isDraft = $('#quickAddIsDraft').val() === '1';
+        const $activeBtn = isDraft ? $btnDraft : $btnPublish;
+        const origBtnText = $activeBtn.html();
+
+        $activeBtn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        if (!isDraft) $btnDraft.prop('disabled', true);
+        else $btnPublish.prop('disabled', true);
+
+        $('#quickAddChapterAlert').hide();
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: $form.serialize(),
+          success: (res) => {
+            $activeBtn.prop('disabled', false).html(origBtnText);
+            $btnDraft.prop('disabled', false);
+            $btnPublish.prop('disabled', false);
+
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success) {
+              const successMsg = getAjaxMsg(res, isDraft ? 'Đã lưu bản nháp chương thành công!' : 'Đã xuất bản chương mới thành công!');
+              $('#quickAddChapterAlert').removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
+
+              setTimeout(() => {
+                $('#modalQuickAddChapterToStory').hide();
+                // Cập nhật số chương trên hàng truyện nếu có
+                const storyId = $('#quickAddStoryId').val();
+                const $row = $(`#storyRow-${storyId}`);
+                if ($row.length) {
+                  const $chapCount = $row.find('.col-story-chaps strong');
+                  if ($chapCount.length) {
+                    $chapCount.text(parseInt($chapCount.text() || '0') + 1);
+                  }
+                }
+                muopAlert(successMsg, 'success');
+              }, 600);
+            } else {
+              const errMsg = getAjaxMsg(res, 'Không thể thêm chương. Vui lòng thử lại!');
+              $('#quickAddChapterAlert').removeClass('alert-success').addClass('alert-error').text(errMsg).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $activeBtn.prop('disabled', false).html(origBtnText);
+            $btnDraft.prop('disabled', false);
+            $btnPublish.prop('disabled', false);
+            let errMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errMsg = getAjaxMsg(xhr.responseJSON, errMsg);
+            $('#quickAddChapterAlert').removeClass('alert-success').addClass('alert-error').text(errMsg).fadeIn();
+          }
+        });
+      });
+
+      // Mục 7: "Chi tiết" từ Menu 3 chấm của truyện -> Mở Popup Chi Tiết Đầy Đủ (Hình 4)
+      $(document).on('click', '.btn-action-story-full-preview', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.story-actions-dropdown').removeClass('is-open');
+
+        const storyId = $(this).data('story-id');
+        if (!storyId) return;
+
+        const $modal = $('#modalStoryFullPreviewDetails');
+        if (!$modal.length) return;
+
+        $('#prevStoryLoading').show();
+        $('#prevStoryBody').hide();
+        $modal.css('display', 'flex');
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'get_story_details',
+            story_id: storyId,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+          },
+          success: (res) => {
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success && res.data) {
+              const d = res.data;
+              $('#prevStoryCover').attr('src', d.thumbnail || '/wp-content/themes/muop-dang/assets/images/default-cover.jpg');
+              $('#prevStoryTitle').text(d.title || 'Không có tiêu đề');
+              $('#prevStoryTeam').text(d.team_name || 'Cá nhân');
+              $('#prevStoryGenres').text(d.genres || 'Đang cập nhật');
+              
+              if (d.post_status === 'publish') {
+                $('#prevStoryStatusBadge').attr('class', 'badge badge-full').html('<i class="fa-solid fa-circle-check"></i> Đã duyệt');
+              } else {
+                $('#prevStoryStatusBadge').attr('class', 'badge badge-hot').html('<i class="fa-solid fa-clock"></i> Bản nháp');
+              }
+
+              $('#prevStoryChapsCount').text(d.total_chapters || 0);
+              $('#prevStoryViews').text((d.views_all || 0).toLocaleString('vi-VN'));
+              $('#prevStoryUpdated').text(d.chapters && d.chapters.length > 0 ? d.chapters[d.chapters.length - 1].date : '--');
+
+              // Nút đọc từ đầu / mới nhất / xem website
+              if (d.chapters && d.chapters.length > 0) {
+                $('#prevBtnReadFirst').attr('href', d.chapters[0].permalink).show();
+                $('#prevBtnReadLatest').attr('href', d.chapters[d.chapters.length - 1].permalink).show();
+              } else {
+                $('#prevBtnReadFirst').hide();
+                $('#prevBtnReadLatest').hide();
+              }
+              if (d.permalink) {
+                $('#prevBtnViewWeb').attr('href', d.permalink).show();
+              } else {
+                $('#prevBtnViewWeb').hide();
+              }
+
+              // Giới thiệu truyện phân đoạn (Hình 4)
+              $('#prevStoryDescription').html(d.description || '<p style="color:var(--text-muted);margin:0;">Chưa có phần giới thiệu truyện.</p>');
+
+              // Danh sách chương
+              $('#prevStoryChapsTotal').text(d.total_chapters || 0);
+              if (d.chapters && d.chapters.length > 0) {
+                let html = '';
+                d.chapters.forEach(ch => {
+                  const draftBadge = ch.status === 'draft' ? '<span class="badge" style="background:#fef3c7;color:#b45309;font-size:10.5px;padding:2px 6px;margin-left:auto;">Nháp</span>' : '';
+                  html += `
+                    <a href="${ch.permalink}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--bg-body);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:var(--text-main);font-size:13px;transition:all 0.15s ease;" onmouseover="this.style.borderColor='var(--primary-green)';this.style.color='var(--primary-green)';" onmouseout="this.style.borderColor='var(--border-color)';this.style.color='var(--text-main)';">
+                      <span style="font-weight:700;color:var(--primary-green);font-size:12px;white-space:nowrap;">Chương ${ch.number}</span>
+                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;">${ch.title}</span>
+                      ${draftBadge}
+                    </a>
+                  `;
+                });
+                $('#prevStoryChaptersList').html(html);
+              } else {
+                $('#prevStoryChaptersList').html('<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted);font-style:italic;">Truyện chưa có chương nào được đăng.</div>');
+              }
+
+              $('#prevStoryLoading').hide();
+              $('#prevStoryBody').fadeIn();
+            } else {
+              muopAlert(getAjaxMsg(res, 'Không thể tải chi tiết truyện!'), 'error');
+              $modal.hide();
+            }
+          },
+          error: () => {
+            muopAlert('Lỗi kết nối khi tải chi tiết truyện!', 'error');
+            $modal.hide();
+          }
+        });
+      });
+
+      // Đóng Modal Chi Tiết Truyện Đầy Đủ
+      $('.btn-close-story-preview').on('click', function(e) {
+        e.preventDefault();
+        $('#modalStoryFullPreviewDetails').hide();
+      });
+
+      $('#modalStoryFullPreviewDetails').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // =========================================================================
+      // USER MANAGEMENT 3-DOTS ACTIONS & MODALS (HÌNH 5)
+      // =========================================================================
+
+      // 1. Sửa người dùng -> Mở Popup #modalEditUserAdmin
+      $(document).on('click', '.btn-action-edit-user', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.user-actions-dropdown').removeClass('is-open');
+
+        const userId = $(this).data('user-id');
+        const userLogin = $(this).data('user-login') || '';
+        const displayName = $(this).data('display-name') || '';
+        const email = $(this).data('email') || '';
+        const role = $(this).data('role') || 'doc_gia';
+
+        $('#editUserId').val(userId);
+        $('#editUserLogin').val(userLogin);
+        $('#editUserDisplayName').val(displayName);
+        $('#editUserEmail').val(email);
+        $('#editUserRole').val(role);
+        $('#editUserPassword').val('');
+        $('#editUserAlert').hide();
+
+        $('#modalEditUserAdmin').css('display', 'flex');
+      });
+
+      $('.btn-close-edit-user').on('click', function(e) {
+        e.preventDefault();
+        $('#modalEditUserAdmin').hide();
+      });
+
+      $('#modalEditUserAdmin').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Submit Form Sửa Người Dùng
+      $('#formAdminEditUser').on('submit', function(e) {
+        e.preventDefault();
+        const $form = $(this);
+        const $btn = $('#btnSubmitEditUser');
+        const origText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $('#editUserAlert').hide();
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: $form.serialize(),
+          success: (res) => {
+            $btn.prop('disabled', false).html(origText);
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success) {
+              $('#modalEditUserAdmin').hide();
+              const uid = $('#editUserId').val();
+              const newName = $('#editUserDisplayName').val();
+              const newEmail = $('#editUserEmail').val();
+              const newRole = $('#editUserRole').val();
+
+              // Cập nhật lại giao diện hàng của user trong bảng
+              const $row = $(`#adminUserRow_${uid}`);
+              if ($row.length) {
+                $row.find('.col-user-displayname').text(newName);
+                $row.find('.col-user-email').text(newEmail);
+                $row.find('.col-user-role-select').val(newRole);
+
+                const newPassInput = $('#editUserPassword').val().trim();
+                if (newPassInput) {
+                  const $passCell = $('#userPassCell_' + userId);
+                  if ($passCell.length) {
+                    const safePass = $('<div>').text(newPassInput).html();
+                    $passCell.html(`
+                      <div class="user-pass-inline-wrap">
+                        <input type="password" readonly value="${safePass}" class="input-user-pass-inline" />
+                        <button type="button" class="btn-toggle-inline-pass" title="Hiện / Ẩn mật khẩu">
+                          <i class="fa-regular fa-eye"></i>
+                        </button>
+                        <button type="button" class="btn-copy-inline-pass" data-pass="${safePass}" title="Sao chép mật khẩu">
+                          <i class="fa-regular fa-copy"></i>
+                        </button>
+                      </div>
+                    `);
+                  }
+                }
+
+                const $btnEdit = $row.find('.btn-action-edit-user');
+                $btnEdit.data('display-name', newName);
+                $btnEdit.data('email', newEmail);
+                $btnEdit.data('role', newRole);
+              }
+
+              muopAlert(getAjaxMsg(res, 'Cập nhật thông tin người dùng thành công!'), 'success');
+            } else {
+              const errMsg = getAjaxMsg(res, 'Không thể cập nhật người dùng!');
+              $('#editUserAlert').text(errMsg).show();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(origText);
+            let errMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errMsg = getAjaxMsg(xhr.responseJSON, errMsg);
+            $('#editUserAlert').text(errMsg).show();
+          }
+        });
+      });
+
+      // Password generator helper
+      function generateSecurePassword() {
+        const letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+        const numbers = '23456789';
+        let pass = 'Muop@';
+        for (let i = 0; i < 4; i++) {
+          pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
+        }
+        for (let i = 0; i < 2; i++) {
+          pass += letters.charAt(Math.floor(Math.random() * letters.length));
+        }
+        return pass;
+      }
+
+      // =========================================================================
+      // 1.1 SỬA & XEM MẬT KHẨU NGƯỜI DÙNG (#modalUserPasswordAdmin)
+      // =========================================================================
+      $(document).on('click', '.btn-action-manage-user-pass', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.user-actions-dropdown').removeClass('is-open');
+
+        const userId = $(this).data('user-id') || $(this).attr('data-user-id');
+        const userLogin = $(this).data('user-login') || $(this).attr('data-user-login') || '';
+        const displayName = $(this).data('display-name') || $(this).attr('data-display-name') || 'Người dùng';
+        const email = $(this).data('email') || $(this).attr('data-email') || '';
+
+        if (!userId) return;
+
+        $('#changePassUserId').val(userId);
+        $('#passUserDisplayName').text(displayName);
+        $('#passUserLogin').text(userLogin || '--');
+        $('#passUserEmail').text(email || '--');
+        $('#passUserAvatarChar').text((displayName || 'U').charAt(0).toUpperCase());
+
+        $('#changePassAlert').hide();
+        $('#inputNewUserPass').val('').attr('type', 'text');
+        $('#iconToggleNewPass').removeClass('fa-eye').addClass('fa-eye-slash');
+
+        $('#boxExistingPasswordInfo').hide();
+        $('#passModalLoading').show();
+        $('#modalUserPasswordAdmin').css('display', 'flex');
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'get_user_password_info',
+            user_id: userId,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : $('input[name="nonce"]').val()
+          },
+          success: (res) => {
+            $('#passModalLoading').hide();
+            $('#boxExistingPasswordInfo').show();
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success && res.data) {
+              const d = res.data;
+              if (d.has_temp && d.temp_password) {
+                $('#inputExistingPassDisplay').val(d.temp_password).attr('type', 'password');
+                $('#iconToggleExistingPass').removeClass('fa-eye-slash').addClass('fa-eye');
+                $('#passLastResetTime').text(d.last_reset ? 'Cập nhật: ' + d.last_reset : '');
+                $('#passExistingAvailable').show();
+                $('#passExistingNotSet').hide();
+              } else {
+                $('#inputExistingPassDisplay').val('');
+                $('#passExistingAvailable').hide();
+                $('#passExistingNotSet').show();
+                $('#passLastResetTime').text('');
+              }
+            } else {
+              $('#passExistingAvailable').hide();
+              $('#passExistingNotSet').show();
+            }
+          },
+          error: () => {
+            $('#passModalLoading').hide();
+            $('#boxExistingPasswordInfo').show();
+            $('#passExistingAvailable').hide();
+            $('#passExistingNotSet').show();
+          }
+        });
+      });
+
+      $('.btn-close-user-pass').on('click', function(e) {
+        e.preventDefault();
+        $('#modalUserPasswordAdmin').hide();
+      });
+
+      $('#modalUserPasswordAdmin').on('click', function(e) {
+        if (e.target === this) $(this).hide();
+      });
+
+      // Toggle Xem/Ẩn Mật khẩu Cũ đã cấp
+      $('#btnToggleExistingPass').on('click', function(e) {
+        e.preventDefault();
+        const $inp = $('#inputExistingPassDisplay');
+        const $icon = $('#iconToggleExistingPass');
+        if ($inp.attr('type') === 'password') {
+          $inp.attr('type', 'text');
+          $icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        } else {
+          $inp.attr('type', 'password');
+          $icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        }
+      });
+
+      // Copy Mật khẩu Cũ đã cấp
+      $('#btnCopyExistingPass').on('click', function(e) {
+        e.preventDefault();
+        const val = $('#inputExistingPassDisplay').val();
+        if (val) {
+          navigator.clipboard.writeText(val).then(() => {
+            muopAlert('Đã sao chép mật khẩu: ' + val, 'success');
+          }).catch(() => {
+            muopAlert('Mật khẩu: ' + val, 'info');
+          });
+        }
+      });
+
+      // Tạo ngẫu nhiên Mật khẩu Mới
+      $('#btnGenerateRandomPass').on('click', function(e) {
+        e.preventDefault();
+        const randPass = generateSecurePassword();
+        $('#inputNewUserPass').val(randPass).attr('type', 'text');
+        $('#iconToggleNewPass').removeClass('fa-eye').addClass('fa-eye-slash');
+        muopAlert('Đã sinh mật khẩu ngẫu nhiên: ' + randPass, 'success');
+      });
+
+      // Toggle Xem/Ẩn Mật khẩu Mới
+      $('#btnToggleNewPass').on('click', function(e) {
+        e.preventDefault();
+        const $inp = $('#inputNewUserPass');
+        const $icon = $('#iconToggleNewPass');
+        if ($inp.attr('type') === 'password') {
+          $inp.attr('type', 'text');
+          $icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        } else {
+          $inp.attr('type', 'password');
+          $icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        }
+      });
+
+      // Copy Mật khẩu Mới
+      $('#btnCopyNewPass').on('click', function(e) {
+        e.preventDefault();
+        const val = $('#inputNewUserPass').val();
+        if (val) {
+          navigator.clipboard.writeText(val).then(() => {
+            muopAlert('Đã sao chép mật khẩu: ' + val, 'success');
+          }).catch(() => {
+            muopAlert('Mật khẩu: ' + val, 'info');
+          });
+        } else {
+          muopAlert('Chưa có mật khẩu để sao chép!', 'warning');
+        }
+      });
+
+      // Submit Form Đổi Mật Khẩu
+      $('#formAdminChangeUserPass').on('submit', function(e) {
+        e.preventDefault();
+        const $form = $(this);
+        const $btn = $('#btnSubmitChangeUserPass');
+        const origText = $btn.html();
+        const newPass = $('#inputNewUserPass').val().trim();
+
+        if (newPass.length < 6) {
+          $('#changePassAlert').removeClass('alert-success').addClass('alert-error').text('Mật khẩu phải có ít nhất 6 ký tự!').show();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $('#changePassAlert').hide();
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: $form.serialize(),
+          success: (res) => {
+            $btn.prop('disabled', false).html(origText);
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success) {
+              muopAlert(getAjaxMsg(res, 'Đã cập nhật mật khẩu mới thành công!'), 'success');
+              $('#inputExistingPassDisplay').val(newPass).attr('type', 'text');
+              $('#iconToggleExistingPass').removeClass('fa-eye').addClass('fa-eye-slash');
+              $('#passLastResetTime').text('Vừa cập nhật');
+              $('#passExistingAvailable').show();
+              $('#passExistingNotSet').hide();
+              $('#changePassAlert').removeClass('alert-error').addClass('alert-success').text('Đổi mật khẩu thành công! Mật khẩu mới là: ' + newPass).show();
+
+              const targetUserId = $('#changePassUserId').val();
+              const $cell = $('#userPassCell_' + targetUserId);
+              if ($cell.length) {
+                const safePass = $('<div>').text(newPass).html();
+                $cell.html(`
+                  <div class="user-pass-inline-wrap">
+                    <input type="password" readonly value="${safePass}" class="input-user-pass-inline" />
+                    <button type="button" class="btn-toggle-inline-pass" title="Hiện / Ẩn mật khẩu">
+                      <i class="fa-regular fa-eye"></i>
+                    </button>
+                    <button type="button" class="btn-copy-inline-pass" data-pass="${safePass}" title="Sao chép mật khẩu">
+                      <i class="fa-regular fa-copy"></i>
+                    </button>
+                  </div>
+                `);
+              }
+            } else {
+              const errMsg = getAjaxMsg(res, 'Lỗi không thể đổi mật khẩu!');
+              $('#changePassAlert').removeClass('alert-success').addClass('alert-error').text(errMsg).show();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(origText);
+            let errMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errMsg = getAjaxMsg(xhr.responseJSON, errMsg);
+            $('#changePassAlert').removeClass('alert-success').addClass('alert-error').text(errMsg).show();
+          }
+        });
+      });
+
+      // Toggle Xem/Ẩn mật khẩu trực tiếp trên bảng User Admin
+      $(document).on('click', '.btn-toggle-inline-pass', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $wrap = $(this).closest('.user-pass-inline-wrap');
+        const $inp = $wrap.find('.input-user-pass-inline');
+        const $icon = $(this).find('i');
+        if ($inp.attr('type') === 'password') {
+          $inp.attr('type', 'text');
+          $icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        } else {
+          $inp.attr('type', 'password');
+          $icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        }
+      });
+
+      // Copy mật khẩu trực tiếp trên bảng User Admin
+      $(document).on('click', '.btn-copy-inline-pass', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const val = $(this).data('pass') || $(this).closest('.user-pass-inline-wrap').find('.input-user-pass-inline').val();
+        if (val) {
+          navigator.clipboard.writeText(val).then(() => {
+            if (typeof muopAlert === 'function') {
+              muopAlert('Đã sao chép mật khẩu: ' + val, 'success');
+            }
+          }).catch(() => {
+            if (typeof muopAlert === 'function') {
+              muopAlert('Mật khẩu: ' + val, 'info');
+            }
+          });
+        }
+      });
+
+      // Hỗ trợ Xem/Tạo ngẫu nhiên mật khẩu trong Popup Sửa thông thường (#modalEditUserAdmin)
+      $('#btnToggleViewEditUserPass').on('click', function(e) {
+        e.preventDefault();
+        const $inp = $('#editUserPassword');
+        const $icon = $('#iconToggleEditPass');
+        if ($inp.attr('type') === 'password') {
+          $inp.attr('type', 'text');
+          $icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        } else {
+          $inp.attr('type', 'password');
+          $icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        }
+      });
+
+      $('#btnGenerateEditUserPass').on('click', function(e) {
+        e.preventDefault();
+        const randPass = generateSecurePassword();
+        $('#editUserPassword').val(randPass).attr('type', 'text');
+        $('#iconToggleEditPass').removeClass('fa-eye').addClass('fa-eye-slash');
+        muopAlert('Đã sinh mật khẩu: ' + randPass, 'success');
+      });
+
+      $('#btnCopyEditUserPass').on('click', function(e) {
+        e.preventDefault();
+        const val = $('#editUserPassword').val();
+        if (val) {
+          navigator.clipboard.writeText(val).then(() => {
+            muopAlert('Đã sao chép mật khẩu: ' + val, 'success');
+          }).catch(() => {
+            muopAlert('Mật khẩu: ' + val, 'info');
+          });
+        } else {
+          muopAlert('Chưa có mật khẩu để sao chép!', 'warning');
+        }
+      });
+
+      // 2. Xóa người dùng -> Mở Popup Xác Nhận #modalConfirmDeleteUser
+      $(document).on('click', '.btn-action-confirm-delete-user', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.user-actions-dropdown').removeClass('is-open');
+
+        const userId = $(this).data('user-id');
+        const userName = $(this).data('name') || 'Người dùng';
+
+        $('#deleteUserTargetName').text(userName);
+        $('#modalConfirmDeleteUser').data('user-id', userId).css('display', 'flex');
+      });
+
+      $('.btn-cancel-delete-user').on('click', function(e) {
+        e.preventDefault();
+        $('#modalConfirmDeleteUser').hide();
+      });
+
+      $('#modalConfirmDeleteUser').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Thực hiện Xóa người dùng khi ấn Xác Nhận trong Modal
+      $('#btnConfirmDeleteUserAction').on('click', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const $modal = $('#modalConfirmDeleteUser');
+        const userId = $modal.data('user-id');
+        if (!userId) return;
+
+        const origText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang xóa...');
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'delete_user',
+            user_id: userId,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html(origText);
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success) {
+              $modal.hide();
+              $(`#adminUserRow_${userId}`).fadeOut(300, function() {
+                $(this).remove();
+              });
+              muopAlert(getAjaxMsg(res, 'Đã xóa người dùng thành công!'), 'success');
+            } else {
+              muopAlert(getAjaxMsg(res, 'Không thể xóa người dùng!'), 'error');
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(origText);
+            let errMsg = 'Lỗi kết nối máy chủ khi xóa người dùng!';
+            if (xhr && xhr.responseJSON) errMsg = getAjaxMsg(xhr.responseJSON, errMsg);
+            muopAlert(errMsg, 'error');
+          }
+        });
+      });
+
+      // 3. Khóa / Mở Khóa Tài Khoản -> Mở Popup Xác Nhận #modalConfirmToggleLockUser
+      $(document).on('click', '.btn-action-confirm-toggle-lock', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.user-actions-dropdown').removeClass('is-open');
+
+        const userId = $(this).data('user-id');
+        const userName = $(this).data('name') || 'Người dùng';
+        const isLocked = $(this).data('locked') == '1';
+
+        const $modal = $('#modalConfirmToggleLockUser');
+        $modal.data('user-id', userId).data('locked', isLocked ? 1 : 0);
+        $('#lockTargetUserName').text(userName);
+
+        if (isLocked) {
+          // Giao diện mở khóa
+          $('#iconLockModal').attr('class', 'fa-solid fa-unlock');
+          $('#lockIconBox').css({ background: '#dcfce7', color: '#16a34a' });
+          $('#titleLockModal').css('color', '#15803d').text('Xác Nhận Mở Khóa Tài Khoản?');
+          $('#descLockModal').html(`Bạn có chắc chắn muốn mở khóa cho tài khoản <strong style="color: #16a34a;">${userName}</strong> không? Người dùng sẽ có thể đăng nhập bình thường.`);
+          $('#btnConfirmToggleLockAction').css({ background: 'var(--primary-green)', borderColor: 'var(--primary-green)' }).html('<i class="fa-solid fa-unlock"></i> Mở Khóa Tài Khoản');
+        } else {
+          // Giao diện khóa
+          $('#iconLockModal').attr('class', 'fa-solid fa-lock');
+          $('#lockIconBox').css({ background: '#ffedd5', color: '#ea580c' });
+          $('#titleLockModal').css('color', '#9a3412').text('Xác Nhận Khóa Tài Khoản?');
+          $('#descLockModal').html(`Bạn có chắc chắn muốn khóa tài khoản <strong style="color: #ea580c;">${userName}</strong> không? Người dùng sẽ không thể đăng nhập sau khi bị khóa.`);
+          $('#btnConfirmToggleLockAction').css({ background: '#ea580c', borderColor: '#ea580c' }).html('<i class="fa-solid fa-lock"></i> Khóa Tài Khoản');
+        }
+
+        $modal.css('display', 'flex');
+      });
+
+      $('.btn-cancel-toggle-lock').on('click', function(e) {
+        e.preventDefault();
+        $('#modalConfirmToggleLockUser').hide();
+      });
+
+      $('#modalConfirmToggleLockUser').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Thực hiện Khóa / Mở khóa khi ấn Xác Nhận trong Modal
+      $('#btnConfirmToggleLockAction').on('click', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const $modal = $('#modalConfirmToggleLockUser');
+        const userId = $modal.data('user-id');
+        const wasLocked = $modal.data('locked') == 1;
+        if (!userId) return;
+
+        const origText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...');
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'toggle_user_status',
+            user_id: userId,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html(origText);
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success) {
+              $modal.hide();
+              const newLockedState = !wasLocked;
+              const $row = $(`#adminUserRow_${userId}`);
+              if ($row.length) {
+                const $statusCell = $row.find('.col-user-status-cell');
+                const $lockBtn = $row.find('.btn-action-confirm-toggle-lock');
+
+                if (newLockedState) {
+                  $statusCell.html('<span class="user-status-badge status-badge-locked"><i class="fa-solid fa-lock"></i> Đã khóa</span>');
+                  $lockBtn.data('locked', '1');
+                  $lockBtn.find('i').attr('class', 'fa-solid fa-unlock');
+                  $lockBtn.find('.user-lock-toggle-label').text('Mở khóa tài khoản');
+                } else {
+                  $statusCell.html('<span class="user-status-badge status-badge-active"><i class="fa-solid fa-circle-check"></i> Hoạt động</span>');
+                  $lockBtn.data('locked', '0');
+                  $lockBtn.find('i').attr('class', 'fa-solid fa-lock');
+                  $lockBtn.find('.user-lock-toggle-label').text('Khóa tài khoản');
+                }
+              }
+              muopAlert(getAjaxMsg(res, newLockedState ? 'Đã khóa tài khoản thành công!' : 'Đã mở khóa tài khoản thành công!'), 'success');
+            } else {
+              muopAlert(getAjaxMsg(res, 'Thao tác không thành công!'), 'error');
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(origText);
+            let errMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errMsg = getAjaxMsg(xhr.responseJSON, errMsg);
+            muopAlert(errMsg, 'error');
+          }
+        });
+      });
+
+      // 4. Chi tiết người dùng -> Mở Popup Hồ Sơ Chi Tiết #modalUserFullDetailPopup
+      $(document).on('click', '.btn-action-user-full-details', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.user-actions-dropdown').removeClass('is-open');
+
+        const userId = $(this).data('user-id');
+        if (!userId) return;
+
+        const $modal = $('#modalUserFullDetailPopup');
+        if (!$modal.length) return;
+
+        $('#popupUserLoading').show();
+        $('#popupUserContentBox').hide();
+        $modal.css('display', 'flex');
+
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_admin_action',
+            sub_action: 'get_user_details',
+            user_id: userId,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+          },
+          success: (res) => {
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+
+            if (res && res.success && res.data) {
+              const u = res.data;
+              $('#popupUserDisplayName').text(u.display_name || '--');
+              $('#popupUserLogin').text(u.user_login || '--');
+              $('#popupUserIdText').text('#' + (u.id || userId));
+              $('#popupUserEmail').text(u.user_email || '--');
+
+              // Avatar
+              if (u.avatar_url) {
+                $('#popupUserAvatarWrap').html(`<img src="${u.avatar_url}" style="width:100%;height:100%;object-fit:cover;" alt="Avatar" />`);
+              } else {
+                const initial = u.avatar_char || (u.display_name || 'U').charAt(0).toUpperCase();
+                $('#popupUserAvatarWrap').html(`<span>${initial}</span>`);
+              }
+
+              // Badges
+              const roleLabels = { 'administrator': 'Quản trị viên', 'dich_gia': 'Dịch giả', 'doc_gia': 'Độc giả' };
+              $('#popupUserRoleBadge').text(roleLabels[u.role] || u.role);
+
+              if (u.is_locked) {
+                $('#popupUserStatusBadge').attr('class', 'badge badge-hot').html('<i class="fa-solid fa-lock"></i> Đã khóa');
+              } else {
+                $('#popupUserStatusBadge').attr('class', 'badge badge-full').html('<i class="fa-solid fa-unlock"></i> Hoạt động');
+              }
+
+              // Thống kê 3 hộp
+              $('#popupUserStoriesCount').text(u.total_stories || 0);
+              $('#popupUserViewsCount').text((u.total_views_all || 0).toLocaleString('vi-VN'));
+              $('#popupUserSalaryCount').text((u.total_salary || 0).toLocaleString('vi-VN') + ' VNĐ');
+
+              // Ngân hàng
+              $('#popupUserBankName').text(u.bank_name || 'Chưa cập nhật');
+              $('#popupUserBankHolder').text(u.bank_holder || 'Chưa cập nhật');
+              $('#popupUserBankNumber').text(u.bank_number || 'Chưa cập nhật');
+
+              // Danh sách truyện
+              $('#popupUserStoriesTotal').text(u.total_stories || 0);
+              if (u.stories && u.stories.length > 0) {
+                let stHtml = '<table class="data-table" style="width:100%;font-size:13px;"><thead><tr><th>Tên Truyện</th><th style="width:75px;text-align:center;">Số Chương</th><th style="width:90px;text-align:center;">Lượt Xem</th><th style="width:85px;text-align:center;">Trạng Thái</th></tr></thead><tbody>';
+                u.stories.forEach(s => {
+                  stHtml += `
+                    <tr>
+                      <td><a href="${s.permalink || '#'}" target="_blank" style="font-weight:600;color:var(--text-main);">${s.title}</a></td>
+                      <td style="text-align:center;"><strong>${s.chapters || 0}</strong></td>
+                      <td style="text-align:center;color:#0284c7;"><strong>${(s.views_total || 0).toLocaleString('vi-VN')}</strong></td>
+                      <td style="text-align:center;"><span class="badge ${s.status === 'publish' ? 'badge-full' : 'badge-hot'}" style="font-size:11px;">${s.status === 'publish' ? 'Đã duyệt' : 'Bản nháp'}</span></td>
+                    </tr>
+                  `;
+                });
+                stHtml += '</tbody></table>';
+                $('#popupUserStoriesList').html(stHtml);
+              } else {
+                $('#popupUserStoriesList').html('<div style="text-align:center;padding:16px;color:var(--text-muted);font-style:italic;">Người dùng chưa đăng bộ truyện nào.</div>');
+              }
+
+              $('#popupUserLoading').hide();
+              $('#popupUserContentBox').fadeIn();
+            } else {
+              muopAlert(getAjaxMsg(res, 'Không thể tải hồ sơ người dùng!'), 'error');
+              $modal.hide();
+            }
+          },
+          error: () => {
+            muopAlert('Lỗi kết nối khi tải hồ sơ người dùng!', 'error');
+            $modal.hide();
+          }
+        });
+      });
+
+      // Đóng Popup Hồ Sơ Người Dùng
+      $('.btn-close-user-detail-popup').on('click', function(e) {
+        e.preventDefault();
+        $('#modalUserFullDetailPopup').hide();
+      });
+
+      $('#modalUserFullDetailPopup').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Mục 3: "Chỉnh sửa chương" từ Menu 3 chấm của truyện
+      $(document).on('click', '.btn-action-edit-story-chaps', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.story-actions-dropdown').removeClass('is-open');
+
+        const storyId = $(this).data('story-id');
+        const storyTitle = $(this).data('story-title') || 'Chỉnh Sửa Chương';
+        if (!storyId) return;
+
+        const $modal = $('#modalEditChapterContent');
+        if (!$modal.length) return;
+
+        // Reset trạng thái modal
+        $('#editChapterAlert').hide();
+        $('#editNoChaptersMsg').hide();
+        $('#formEditChapterFields').hide();
+        $('#modalChapterStoryTitleText').text(storyTitle);
+        $('#wrapperSelectEditChapter').show();
+        $('#selectEditChapter').html('<option value="">-- Đang nạp danh sách chương... --</option>');
+
+        $modal.css('display', 'flex');
+
+        // Gọi AJAX lấy danh sách chương của bộ truyện
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_get_story_data',
+            story_id: storyId,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+          },
+          success: (res) => {
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data) {
+              const data = res.data;
+              if (data.title) {
+                $('#modalChapterStoryTitleText').text(data.title);
+              }
+              if (data.chapters && data.chapters.length > 0) {
+                let optsHtml = '<option value="">-- Chọn chương cần chỉnh sửa --</option>';
+                data.chapters.forEach(ch => {
+                  const statusLabel = ch.status === 'draft' ? ' (Bản nháp)' : '';
+                  optsHtml += `<option value="${ch.id}">Chương ${ch.number}: ${ch.title}${statusLabel}</option>`;
+                });
+                $('#selectEditChapter').html(optsHtml);
+                // Mặc định chọn ngay chương đầu tiên và tải nội dung luôn
+                $('#selectEditChapter').val(data.chapters[0].id).trigger('change');
+              } else {
+                $('#wrapperSelectEditChapter').hide();
+                $('#formEditChapterFields').hide();
+                $('#editNoChaptersMsg').fadeIn();
+                const fromParam = (window.location.pathname.indexOf('quan-ly-admin') !== -1 || window.location.search.indexOf('from=admin') !== -1) ? 'admin&from_admin=1' : 'translator';
+                const addUrl = '/them-chuong/?story_id=' + storyId + '&from=' + fromParam;
+                $('#btnGoAddChapterFromModal').attr('href', addUrl);
+              }
+            } else {
+              muopAlert(getAjaxMsg(res, 'Không thể tải danh sách chương!'), 'error');
+              $modal.hide();
+            }
+          },
+          error: (xhr) => {
+            let msg = 'Lỗi kết nối khi tải danh sách chương!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            muopAlert(msg, 'error');
+            $modal.hide();
+          }
+        });
+      });
+
+      // Mục 6: "Xóa chương truyện" từ Menu 3 chấm của truyện -> Mở Popup Quản Lý Xóa Chương
+      $(document).on('click', '.btn-action-open-delete-chaps', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $('.story-actions-dropdown').removeClass('is-open');
+
+        const storyId = $(this).data('story-id');
+        const storyTitle = $(this).data('story-title') || 'Xóa Chương Truyện';
+        if (!storyId) return;
+
+        const $modal = $('#modalManageDeleteChapters');
+        if (!$modal.length) return;
+
+        $('#modalDeleteChaptersStoryTitle').text(storyTitle);
+        $('#deleteChaptersLoading').show();
+        $('#deleteChaptersEmpty').hide();
+        $('#deleteChaptersList').empty();
+
+        $modal.css('display', 'flex');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_get_story_data',
+            story_id: storyId,
+            nonce: muopConfig.nonce
+          },
+          success: (res) => {
+            $('#deleteChaptersLoading').hide();
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data) {
+              const data = res.data;
+              if (data.title) {
+                $('#modalDeleteChaptersStoryTitle').text(data.title);
+              }
+              if (data.chapters && data.chapters.length > 0) {
+                let html = '';
+                data.chapters.forEach(ch => {
+                  const draftBadge = ch.status === 'draft' ? '<span class="badge" style="background:#fef3c7;color:#b45309;font-size:11px;padding:2px 6px;font-weight:700;">Bản nháp</span>' : '';
+                  html += `
+                    <div class="delete-chap-row-item" id="delChapRow-${ch.id}">
+                      <div class="delete-chap-info">
+                        <span class="delete-chap-num-badge">Chương ${ch.number}</span>
+                        <span class="delete-chap-title-text" title="${ch.title}">${ch.title}</span>
+                        ${draftBadge}
+                      </div>
+                      <button type="button" class="btn btn-danger btn-sm btn-action-delete-single-chap" data-chapter-id="${ch.id}" data-chapter-num="${ch.number}" data-chapter-title="${ch.title}" data-story-id="${storyId}" style="padding: 4px 12px; font-size: 12px; border-radius: 4px; flex-shrink: 0;">
+                        <i class="fa-solid fa-trash-can"></i> Xóa
+                      </button>
+                    </div>
+                  `;
+                });
+                $('#deleteChaptersList').html(html);
+              } else {
+                $('#deleteChaptersEmpty').show();
+              }
+            } else {
+              $('#deleteChaptersEmpty').show();
+            }
+          },
+          error: (xhr) => {
+            $('#deleteChaptersLoading').hide();
+            let msg = 'Lỗi kết nối khi tải danh sách chương!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            muopAlert(msg, 'error');
+            $modal.hide();
+          }
+        });
+      });
+
+      // Đóng Modal Quản Lý Xóa Chương
+      $('#btnCloseManageDeleteChaptersModal, .btn-close-modal-delete-chapters').on('click', function(e) {
+        e.preventDefault();
+        $('#modalManageDeleteChapters').hide();
+      });
+
+      $('#modalManageDeleteChapters').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // Xác nhận và thực hiện xóa từng chương trong popup
+      $(document).on('click', '.btn-action-delete-single-chap', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const chapterId = $btn.data('chapter-id');
+        const chapterNum = $btn.data('chapter-num');
+        const chapterTitle = $btn.data('chapter-title') || '';
+        const storyId = $btn.data('story-id');
+
+        if (!chapterId) return;
+
+        const labelText = chapterTitle ? `Chương ${chapterNum}: "${chapterTitle}"` : `Chương ${chapterNum}`;
+
+        muopConfirm(
+          `Bạn có chắc chắn muốn xóa vĩnh viễn ${labelText} không? Hành động này không thể hoàn tác!`,
+          () => {
+            const originalHtml = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+
+            $.ajax({
+              url: muopConfig.ajaxUrl,
+              type: 'POST',
+              data: {
+                action: 'muop_delete_chapter',
+                chapter_id: chapterId,
+                nonce: muopConfig.nonce,
+                is_admin_portal: 1
+              },
+              success: (res) => {
+                if (typeof res === 'string') {
+                  try { res = JSON.parse(res); } catch (e) {}
+                }
+                if (res && res.success) {
+                  $(`#delChapRow-${chapterId}`).slideUp(200, function() {
+                    $(this).remove();
+                    if ($('#deleteChaptersList .delete-chap-row-item').length === 0) {
+                      $('#deleteChaptersEmpty').fadeIn();
+                    }
+                  });
+                  muopAlert(getAjaxMsg(res, `Đã xóa ${labelText} thành công!`), 'success');
+                } else {
+                  $btn.prop('disabled', false).html(originalHtml);
+                  muopAlert(getAjaxMsg(res, 'Không thể xóa chương!'), 'error');
+                }
+              },
+              error: (xhr) => {
+                $btn.prop('disabled', false).html(originalHtml);
+                let msg = 'Lỗi kết nối khi xóa chương!';
+                if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+                muopAlert(msg, 'error');
+              }
+            });
+          },
+          null,
+          {
+            isDanger: true,
+            confirmText: 'Có',
+            cancelText: 'Không',
+            title: 'Xác Nhận Xóa Chương'
+          }
+        );
       });
 
       // 12. Cây bút mờ trên ảnh bìa truyện (Hình 1): Đổi ảnh bìa nhanh
@@ -4283,9 +7677,10 @@
               try { res = JSON.parse(res); } catch (e) {}
             }
             if (res && res.success) {
-              alert(res.data.message || 'Thanh toán và gửi bill thành công!');
               $('#admModalPaySalary').hide();
-              window.location.reload();
+              muopAlert(res.data.message || 'Thanh toán và gửi bill thành công!', 'success', () => {
+                window.location.reload();
+              });
             } else {
               $msg.css('color', '#dc2626').text(getAjaxMsg(res, 'Lỗi thanh toán!')).fadeIn();
             }
@@ -4336,9 +7731,10 @@
               try { res = JSON.parse(res); } catch (e) {}
             }
             if (res && res.success) {
-              alert(res.data.message || 'Phản hồi báo lỗi thành công!');
               $('#admModalReplyReport').hide();
-              window.location.reload();
+              muopAlert(res.data.message || 'Phản hồi báo lỗi thành công!', 'success', () => {
+                window.location.reload();
+              });
             } else {
               $msg.css('color', '#dc2626').text(getAjaxMsg(res, 'Lỗi phản hồi!')).fadeIn();
             }
@@ -4390,30 +7786,413 @@
     }
   };
 
+  /* ==========================================================================
+     20. SENSITIVE WORD REVIEW & AUTO-REPLACEMENT ("DUYỆT NỘI DUNG")
+     ========================================================================== */
+  const SensitiveWordModerator = {
+    $currentTarget: null,
+    currentDelim: '.',
+    dictionary: [
+      // 1. Cái chết, bạo lực, tự sát, máu me
+      'không muốn sống', 'muốn chết', 'tìm chết', 'chết đi', 'đi chết đi', 'chết quách',
+      'chết tiệt mày', 'chết tiệt', 'chết dẫm', 'cái chết', 'tử vong', 'tử thi', 'tự tử', 'tự sát',
+      'treo cổ', 'nhảy lầu', 'cắt cổ', 'chặt đầu', 'đâm chết', 'bắn chết', 'giết người', 'giết chết', 'giết',
+      'sát hại', 'mưu sát', 'thảm sát', 'hành hạ', 'tra tấn', 'xác chết', 'thi thể', 'vũng máu',
+      'chảy máu', 'đẫm máu', 'máu me', 'máu chó', 'máu', 'huyết', 'chém chết', 'đâm chém', 'bắn giết',
+      'đánh chết', 'bóp cổ', 'chết',
+      // 2. Chửi thề, tục tĩu, lăng mạ, tiếng lóng Zhihu
+      'đệt mợ', 'đệt mẹ', 'đệt cụ', 'đệt', 'đệch mợ', 'đệch mẹ', 'đệch',
+      'đù má', 'đù mẹ', 'đù', 'đậu má', 'đậu mợ',
+      'đụ má mày', 'đụ má', 'đụ mẹ mày', 'đụ mẹ', 'đụ bà', 'đụ con', 'đụ cha', 'đụ',
+      'địt mẹ mày', 'địt con mẹ', 'địt mẹ', 'địt cụ mày', 'địt cụ', 'địt bà', 'địt cha', 'địt',
+      'con mẹ nó', 'mẹ nó', 'cha nó', 'bà nó', 'bà nội nó', 'con đĩ mẹ nó',
+      'đào mỏ', 'tiện nhân', 'đồ tiện nhân', 'tiện nữ', 'hồ ly tinh', 'trà xanh',
+      'đĩ mẹ mày', 'đĩ điếm', 'đĩ chó', 'đĩ mẹ', 'đĩ', 'điếm', 'con điếm', 'con đĩ', 'phò', 'con phò', 'cave', 'gái bao', 'gái điếm', 'bitch',
+      'lồn mẹ mày', 'lồn', 'con cặc', 'thằng cặc', 'cặc', 'buồi', 'dái', 'hòn dái', 'lỗ đít', 'lỗ nhị', 'hậu môn',
+      'lũ chó', 'chó đẻ', 'chó má', 'đồ chó', 'khốn nạn', 'khốn khiếp', 'đồ khốn', 'vô liêm sỉ', 'mẹ kiếp',
+      'vãi lồn', 'vãi cặc', 'vãi đái', 'vãi chưởng', 'vcl', 'vkl', 'vl', 'đm', 'dcm', 'clgt', 'cl', 'cc',
+      'đéo', 'dell', 'đách', 'đếch', 'mẹ mày', 'bố mày', 'tiên sư', 'tổ sư', 'bố láo', 'mất dạy',
+      'súc sinh', 'súc vật', 'cầm thú', 'bại hoại',
+      // 3. Bộ phận sinh dục, quan hệ, 18+, đồi trụy
+      'bộ phận sinh dục', 'dương vật', 'âm đạo', 'âm hộ', 'âm vật', 'hột lẹt', 'quy đầu', 'bao quy đầu',
+      'tinh hoàn', 'tinh trùng', 'tinh dịch', 'thủ dâm', 'tự sướng', 'dâm đãng', 'dâm ô', 'dâm dục', 'dâm loạn',
+      'làm tình', 'giao cấu', 'quan hệ tình dục', 'tình dục', 'quan hệ xác thịt', 'lên giường', 'ân ái',
+      'khỏa thân', 'khoả thân', 'ngực trần', 'cởi trần', 'lột đồ', 'nude', 'sex',
+      'bú cu', 'bú lồn', 'liếm lồn', 'bú mớm', 'nện', 'chịch', 'xoạc', 'bắn tinh',
+      'hãm hiếp', 'cưỡng hiếp', 'hiếp dâm', 'cưỡng bức', 'bóp ngực', 'bóp vú', 'sờ soạng',
+      'sờ mó', 'dục vọng', 'phê sướng', 'lên đỉnh', 'khiêu dâm', 'cu bự', 'chim to', 'móc lốp',
+      'xếp hình', 'móc cua',
+      // 4. Ma túy, chất kích thích độc hại
+      'ma túy đá', 'ma túy', 'thuốc phiện', 'cần sa', 'heroin', 'thuốc lắc', 'đập đá', 'ngáo đá',
+      'hút cỏ', 'ke kẹo'
+    ],
+
+    escapeRegex(str) {
+      return (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    },
+
+    escapeHtml(str) {
+      return $('<div>').text(str || '').html();
+    },
+
+    obfuscate(word, delim) {
+      if (!word) return '';
+      return word.split(/\s+/).map(part => Array.from(part).join(delim)).join(' ');
+    },
+
+    scanAndOpen($target) {
+      if (!$target || !$target.length) {
+        // Fallback: tìm ô nội dung chương hoặc văn án trên trang
+        const $fallback = $('#chapContent, #editChapterContent, #storyDescription, textarea[name="content"], textarea[name="description"]').filter(':visible').first();
+        if ($fallback.length) {
+          $target = $fallback;
+        } else {
+          window.muopAlert('Không tìm thấy ô nhập nội dung để duyệt!', 'error');
+          return;
+        }
+      }
+
+      this.$currentTarget = $target;
+      const rawText = $target.val() || '';
+
+      if (!rawText.trim()) {
+        window.muopAlert('Vui lòng nhập hoặc dán nội dung vào ô trước khi nhấn Duyệt Nội Dung!', 'warning');
+        return;
+      }
+
+      // 1. HIỆN POPUP ĐANG DUYỆT NỘI DUNG (HIỂN THỊ RÕ RÀNG TRONG SUỐT QUÁ TRÌNH DUYỆT)
+      PopupManager.open({
+        title: 'Đang Duyệt Nội Dung...',
+        message: '<div style="text-align: center; padding: 14px 0;">' +
+          '<i class="fa-solid fa-spinner fa-spin" style="font-size: 38px; color: var(--primary-green); margin-bottom: 14px; display: block;"></i>' +
+          '<span style="font-size: 15px; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 6px;">Hệ thống đang rà soát từng từ ngữ trong nội dung...</span>' +
+          '<span style="font-size: 13px; color: var(--text-muted); display: block;">Quá trình đối soát quy tắc từ ngữ nhạy cảm, bạo lực, 18+ đang diễn ra, vui lòng đợi trong giây lát...</span>' +
+          '</div>',
+        type: 'info',
+        hideButtons: true,
+        hideCloseBtn: true
+      });
+
+      // 2. Thực hiện quét sau 1000ms để người dùng thấy rõ popup đang duyệt
+      setTimeout(() => {
+        try {
+          // Chuẩn hóa Unicode NFC để bắt chính xác 100% tiếng Việt
+          const text = rawText.normalize('NFC');
+          const sortedWords = [...this.dictionary]
+            .map(w => (w || '').normalize('NFC').trim())
+            .filter(w => w.length > 0)
+            .sort((a, b) => b.length - a.length);
+
+          const pattern = sortedWords.map(w => this.escapeRegex(w)).join('|');
+          
+          let regex;
+          try {
+            regex = new RegExp('(?<![\\p{L}\\p{N}])(' + pattern + ')(?![\\p{L}\\p{N}])', 'gui');
+          } catch (regErr) {
+            regex = new RegExp('(^|[^a-zA-Z0-9à-ỹÀ-Ỹ])(' + pattern + ')(?=[^a-zA-Z0-9à-ỹÀ-Ỹ]|$)', 'gi');
+          }
+
+          const foundMap = new Map();
+          let match;
+          let totalMatches = 0;
+
+          while ((match = regex.exec(text)) !== null) {
+            const raw = match[1] || match[0];
+            const lower = raw.toLowerCase().trim();
+            if (lower) {
+              if (!foundMap.has(lower)) {
+                foundMap.set(lower, {
+                  sample: raw.trim(),
+                  count: 0
+                });
+              }
+              foundMap.get(lower).count++;
+              totalMatches++;
+            }
+            if (match.index === regex.lastIndex) {
+              regex.lastIndex++;
+            }
+          }
+
+          // Đóng popup đang duyệt sau khi duyệt xong
+          PopupManager.close();
+
+          // A. NẾU NỘI DUNG AN TOÀN (KHÔNG CÓ TỪ NHẠY CẢM)
+          if (foundMap.size === 0) {
+            setTimeout(() => {
+              PopupManager.open({
+                title: 'Nội Dung An Toàn',
+                type: 'success',
+                icon: 'fa-circle-check',
+                message: '<strong>Đã duyệt xong!</strong><br><span style="font-size: 13.5px; color: var(--text-muted); display: block; margin-top: 8px;"><i class="fa-solid fa-shield-halved" style="color: var(--primary-green);"></i> Nội dung an toàn, không phát hiện từ ngữ nhạy cảm, thô tục hay vi phạm nào trong văn bản!</span>',
+                confirmText: 'Tuyệt Vời'
+              });
+            }, 120);
+            return;
+          }
+
+          // B. NẾU PHÁT HIỆN TỪ NHẠY CẢM:
+          // B1. Hiện popup thông báo phát hiện từ nhạy cảm
+          setTimeout(() => {
+            PopupManager.open({
+              title: 'Phát Hiện Từ Nhạy Cảm!',
+              type: 'warning',
+              icon: 'fa-triangle-exclamation',
+              message: '<strong>Đã duyệt xong!</strong> Hệ thống phát hiện <strong style="color: #dc2626; font-size: 15.5px;">' + foundMap.size + ' từ nhạy cảm</strong> (' + totalMatches + ' vị trí vi phạm) trong nội dung.<br><br><span style="font-size: 13px; color: var(--text-muted);">Vui lòng nhấn <strong>"Chỉnh Sửa Ngay"</strong> để xem danh sách từ và tự động thay thế bằng ký tự ( . * / - ) hoặc chỉnh sửa theo ý bạn.</span>',
+              confirmText: 'Chỉnh Sửa Ngay',
+              onConfirm: () => {
+                SensitiveWordModerator.openReviewModal(foundMap, totalMatches);
+              },
+              onCancel: () => {
+                SensitiveWordModerator.openReviewModal(foundMap, totalMatches);
+              }
+            });
+          }, 120);
+
+        } catch (err) {
+          console.error('Lỗi khi duyệt nội dung:', err);
+          PopupManager.close();
+          setTimeout(() => {
+            window.muopAlert('Có lỗi xảy ra trong quá trình duyệt: ' + (err.message || 'Lỗi không xác định'), 'error');
+          }, 120);
+        }
+      }, 1000);
+    },
+
+    openReviewModal(foundMap, totalMatches) {
+      $('#sensitiveNoneFound').hide();
+      $('#sensitiveTableWrapper').show();
+      $('#btnApplySensitiveReplacements').show();
+      $('#sensitiveCountBadge').text(foundMap.size + ' từ (' + totalMatches + ' vị trí)');
+      $('#detectedWordsCountText').text(foundMap.size + ' từ (' + totalMatches + ' vị trí)');
+      $('#sensitiveScanResultNotice').show();
+
+      let rowsHtml = '';
+      foundMap.forEach((info, lowerWord) => {
+        const defaultReplacement = this.obfuscate(info.sample, this.currentDelim);
+        rowsHtml += `
+          <tr data-word="${this.escapeHtml(lowerWord)}" data-sample="${this.escapeHtml(info.sample)}" style="border-bottom: 1px solid var(--border-light);">
+            <td style="padding: 10px 12px; text-align: center;">
+              <input type="checkbox" class="sensitive-word-check" data-word="${this.escapeHtml(lowerWord)}" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary-green);" />
+            </td>
+            <td style="padding: 10px 12px;">
+              <span class="sensitive-highlight-word">${this.escapeHtml(info.sample)}</span>
+            </td>
+            <td style="padding: 10px 12px; text-align: center;">
+              <span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; font-weight: 700; padding: 2px 8px; border-radius: 10px; font-size: 12px;">${info.count}</span>
+            </td>
+            <td style="padding: 10px 12px;">
+              <input type="text" class="form-input sensitive-replace-input" data-word="${this.escapeHtml(lowerWord)}" value="${this.escapeHtml(defaultReplacement)}" style="width: 100%; font-size: 13.5px; font-weight: 600; padding: 6px 10px; border-radius: 6px; box-sizing: border-box;" />
+            </td>
+          </tr>
+        `;
+      });
+
+      $('#sensitiveWordsListBody').html(rowsHtml);
+      $('#checkAllSensitiveWords').prop('checked', true);
+      $('#modalSensitiveWordReview').css({ 'display': 'flex', 'z-index': 999999999 }).hide().fadeIn(200);
+    },
+
+    init() {
+      // Đảm bảo từ điển được sắp xếp theo độ dài giảm dần
+      this.dictionary.sort((a, b) => b.length - a.length);
+
+      // 1. Nhấn nút "Duyệt Nội Dung"
+      $(document).on('click', '.btn-scan-sensitive', function(e) {
+        e.preventDefault();
+        const targetSelector = $(this).data('target');
+        let $target = null;
+        if (targetSelector) {
+          $target = $(targetSelector);
+        }
+        if (!$target || !$target.length) {
+          $target = $(this).closest('.form-group').find('textarea');
+        }
+        SensitiveWordModerator.scanAndOpen($target);
+      });
+
+      // 2. Chuyển đổi ký tự phân cách (.) (*) (/) (-)
+      $(document).on('click', '.delimiter-pill', function(e) {
+        e.preventDefault();
+        $('.delimiter-pill').removeClass('active');
+        $(this).addClass('active');
+        const delim = $(this).data('delim') || '.';
+        SensitiveWordModerator.currentDelim = delim;
+
+        $('#sensitiveWordsListBody tr').each(function() {
+          const $row = $(this);
+          const sample = $row.data('sample');
+          const $input = $row.find('.sensitive-replace-input');
+          // Nếu người dùng chưa gõ từ hoàn toàn khác (hoặc vẫn là dạng phân cách ký tự), tự động cập nhật
+          const currentVal = $input.val().trim();
+          const lettersVal = currentVal.replace(/[^a-zA-ZÀ-ỹ0-9]/g, '').toLowerCase();
+          const lettersSample = String(sample).replace(/[^a-zA-ZÀ-ỹ0-9]/g, '').toLowerCase();
+          if (lettersVal === lettersSample || $input.attr('data-is-custom') !== '1') {
+            $input.val(SensitiveWordModerator.obfuscate(sample, delim));
+          }
+        });
+      });
+
+      // 3. Đánh dấu người dùng tự chỉnh sửa ô thay thế
+      $(document).on('input', '.sensitive-replace-input', function() {
+        $(this).attr('data-is-custom', '1');
+      });
+
+      // 4. Chọn / Bỏ chọn tất cả checkbox
+      $(document).on('change', '#checkAllSensitiveWords', function() {
+        const isChecked = $(this).is(':checked');
+        $('.sensitive-word-check').prop('checked', isChecked);
+      });
+
+      $(document).on('change', '.sensitive-word-check', function() {
+        const total = $('.sensitive-word-check').length;
+        const checked = $('.sensitive-word-check:checked').length;
+        $('#checkAllSensitiveWords').prop('checked', total > 0 && total === checked);
+      });
+
+      // 5. Đóng modal
+      $(document).on('click', '#btnCloseSensitiveReviewModal, #btnDismissSensitiveModal', (e) => {
+        e.preventDefault();
+        $('#modalSensitiveWordReview').fadeOut(180);
+      });
+
+      $(document).on('click', '#modalSensitiveWordReview', function(e) {
+        if (e.target === this) {
+          $(this).fadeOut(180);
+        }
+      });
+
+      // 6. Nhấn nút OK - Thay Thế / Cập Nhật Toàn Bộ
+      $(document).on('click', '#btnApplySensitiveReplacements', () => {
+        if (!this.$currentTarget || !this.$currentTarget.length) {
+          $('#modalSensitiveWordReview').fadeOut(180);
+          return;
+        }
+
+        const $checkedRows = $('#sensitiveWordsListBody tr').filter(function() {
+          return $(this).find('.sensitive-word-check').is(':checked');
+        });
+
+        if ($checkedRows.length === 0) {
+          window.muopAlert('Vui lòng chọn ít nhất một từ để thay thế!', 'warning');
+          return;
+        }
+
+        const replacements = [];
+        $checkedRows.each(function() {
+          const $row = $(this);
+          const word = $row.data('word');
+          const sample = $row.data('sample');
+          const $input = $row.find('.sensitive-replace-input');
+          const val = $input.val().trim();
+          if (val) {
+            const lettersVal = val.replace(/[^a-zA-ZÀ-ỹ0-9]/g, '').toLowerCase();
+            const lettersSample = String(sample).replace(/[^a-zA-ZÀ-ỹ0-9]/g, '').toLowerCase();
+            const isCustom = (lettersVal !== lettersSample) && ($input.attr('data-is-custom') === '1');
+            replacements.push({
+              word: word,
+              sample: sample,
+              val: val,
+              isCustom: isCustom
+            });
+          }
+        });
+
+        // Sắp xếp từ dài nhất trước để thay thế an toàn
+        replacements.sort((a, b) => b.word.length - a.word.length);
+
+        let currentText = (this.$currentTarget.val() || '').normalize('NFC');
+        let totalReplaced = 0;
+
+        replacements.forEach(item => {
+          let regex;
+          try {
+            regex = new RegExp('(?<![\\p{L}\\p{N}])(' + this.escapeRegex(item.word) + ')(?![\\p{L}\\p{N}])', 'gui');
+          } catch (e) {
+            regex = new RegExp('(^|[^a-zA-Z0-9à-ỹÀ-Ỹ])(' + this.escapeRegex(item.word) + ')(?=[^a-zA-Z0-9à-ỹÀ-Ỹ]|$)', 'gi');
+          }
+          currentText = currentText.replace(regex, (match) => {
+            totalReplaced++;
+            if (item.isCustom) {
+              return item.val;
+            } else {
+              // Tìm delimiter có trong item.val
+              const nonAlpha = item.val.match(/[^a-zA-ZÀ-ỹ0-9\s]/);
+              const delim = nonAlpha ? nonAlpha[0] : SensitiveWordModerator.currentDelim;
+              return SensitiveWordModerator.obfuscate(match, delim);
+            }
+          });
+        });
+
+        // Cập nhật lại vào textarea
+        this.$currentTarget.val(currentText);
+        this.$currentTarget.trigger('input').trigger('change');
+
+        // Đồng bộ số từ & số ký tự
+        if (typeof window.muopUpdateWordCounter === 'function') {
+          if (this.$currentTarget.is('#chapContent')) {
+            window.muopUpdateWordCounter($('#chapContent'), $('#chapContentWordCount'), $('#chapContentCharCount'));
+          } else if (this.$currentTarget.is('#editChapterContent')) {
+            window.muopUpdateWordCounter($('#editChapterContent'), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
+          }
+        }
+
+        // Đóng modal rà soát
+        $('#modalSensitiveWordReview').fadeOut(180);
+
+        // HIỆN POPUP THÔNG BÁO ĐÃ CHỈNH SỬA XONG
+        setTimeout(() => {
+          PopupManager.open({
+            title: 'Chỉnh Sửa Hoàn Tất',
+            type: 'success',
+            icon: 'fa-circle-check',
+            message: '<strong>Đã duyệt & chỉnh sửa xong!</strong><br><span style="font-size: 13.5px; color: var(--text-muted); display: block; margin-top: 8px;"><i class="fa-solid fa-check-double" style="color: var(--primary-green);"></i> Đã thay thế thành công <strong>' + totalReplaced + ' vị trí</strong> từ nhạy cảm trong nội dung!</span>',
+            confirmText: 'Đã Hiểu'
+          });
+        }, 200);
+      });
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     localStorage.removeItem('muop_accent_color');
-    ThemeManager.init();
-    PasswordToggle.init();
-    AffiliateManager.init();
-    AntiCopyManager.init();
-    ReadingManager.init();
-    AuthForms.init();
-    CreatorForms.init();
-    StoryChapterEditor.init();
-    CommentManager.init();
-    AdminManager.init();
-    DropdownManager.init();
-    MobileNavManager.init();
-    ProfileManager.init();
-    StoryStatusManager.init();
-    StorySummaryManager.init();
-    TeamManager.init();
-    NotificationManager.init();
-    ChapterReportManager.init();
-    ReportDialogueManager.init();
-    TranslatorBankManager.init();
-    AdminExtraManager.init();
+
+    const safeInit = (name, fn) => {
+      try {
+        if (typeof fn === 'function') fn();
+      } catch (err) {
+        console.warn('[MuopDang] Warning initializing ' + name + ':', err);
+      }
+    };
+
+    // 1. Giao diện cơ bản & Điều hướng menu (Bắt buộc chạy đầu tiên, không bao giờ bị lỗi chặn)
+    safeInit('ThemeManager', () => ThemeManager.init());
+    safeInit('DropdownManager', () => DropdownManager.init());
+    safeInit('MobileNavManager', () => MobileNavManager.init());
+    safeInit('PasswordToggle', () => PasswordToggle.init());
+    safeInit('NotificationManager', () => NotificationManager.init());
+    safeInit('TabManager', () => TabManager.init());
+
+    // 2. Các chức năng bổ trợ khác
+    safeInit('AffiliateManager', () => AffiliateManager.init());
+    safeInit('TikTokJumpManager', () => TikTokJumpManager.init());
+    safeInit('AntiCopyManager', () => AntiCopyManager.init());
+    safeInit('ReadingManager', () => ReadingManager.init());
+    safeInit('AuthForms', () => AuthForms.init());
+    safeInit('CreatorForms', () => CreatorForms.init());
+    safeInit('StoryChapterEditor', () => StoryChapterEditor.init());
+    safeInit('CommentManager', () => CommentManager.init());
+    safeInit('AdminManager', () => AdminManager.init());
+    safeInit('ProfileManager', () => ProfileManager.init());
+    safeInit('StoryStatusManager', () => StoryStatusManager.init());
+    safeInit('StorySummaryManager', () => StorySummaryManager.init());
+    safeInit('TeamManager', () => TeamManager.init());
+    safeInit('ChapterReportManager', () => ChapterReportManager.init());
+    safeInit('ReportDialogueManager', () => ReportDialogueManager.init());
+    safeInit('TranslatorBankManager', () => TranslatorBankManager.init());
+    safeInit('AdminExtraManager', () => AdminExtraManager.init());
+    safeInit('SensitiveWordModerator', () => SensitiveWordModerator.init());
   });
 
 })(jQuery);

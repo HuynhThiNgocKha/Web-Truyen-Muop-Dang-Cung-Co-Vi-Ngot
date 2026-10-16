@@ -19,10 +19,10 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
 
         <div class="section-header">
             <h1 class="section-title">
-                <i class="fa-solid fa-magnifying-glass"></i> Kết Quả Tìm Kiếm: "<?php echo get_search_query(); ?>"
+                <i class="fa-solid fa-magnifying-glass"></i> Kết Quả Tìm Kiếm: "<?php echo esc_html(get_search_query()); ?>"
             </h1>
-            <span style="font-size: 13.5px; color: var(--text-muted);">
-                Tìm thấy <?php echo $wp_query->found_posts; ?> truyện
+            <span style="font-size: 14px; font-weight: 500; color: var(--text-muted);">
+                Tìm thấy <?php echo number_format($wp_query->found_posts); ?> truyện
             </span>
         </div>
 
@@ -40,16 +40,19 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
             ?>
         </div>
 
-        <div style="display: flex; justify-content: center; gap: 8px; margin-top: 36px;">
-            <?php
-            echo paginate_links(array(
-                'total'     => $wp_query->max_num_pages,
-                'current'   => $paged,
-                'prev_text' => '<i class="fa-solid fa-chevron-left"></i> Trước',
-                'next_text' => 'Sau <i class="fa-solid fa-chevron-right"></i>'
-            ));
-            ?>
-        </div>
+        <!-- Phân trang (Chỉ hiển thị khi có từ 2 trang trở lên) -->
+        <?php if ($wp_query->max_num_pages > 1) : ?>
+            <div class="pagination-wrapper">
+                <?php
+                echo paginate_links(array(
+                    'total'     => $wp_query->max_num_pages,
+                    'current'   => $paged,
+                    'prev_text' => '<i class="fa-solid fa-chevron-left"></i> Trước',
+                    'next_text' => 'Sau <i class="fa-solid fa-chevron-right"></i>'
+                ));
+                ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

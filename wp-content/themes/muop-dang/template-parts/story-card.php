@@ -46,10 +46,11 @@ if (!$thumb_url) {
             <img class="story-cover-img" src="<?php echo esc_url($thumb_url); ?>" alt="<?php the_title_attribute(); ?>" loading="lazy" />
         </a>
 
-        <!-- Badges: Full (Đỏ) nếu đã hoàn thành, Mới (Hồng) nếu mới đăng -->
+        <!-- Badges: Full (Đỏ) nếu đã hoàn thành, Mới (Hồng) nếu mới đăng trong vòng 24h -->
         <?php 
-        $is_full = ($status === 'hoan_thanh');
-        $is_new  = (current_time('timestamp') - get_the_time('U', $story_id)) <= (14 * 86400);
+        $is_full   = ($status === 'hoan_thanh');
+        $story_age = current_time('timestamp') - (int) get_the_time('U', $story_id);
+        $is_new    = ($story_age >= -60 && $story_age <= 86400);
         ?>
         <?php if ($is_full || $is_new) : ?>
             <div class="story-badge-top">
@@ -82,9 +83,9 @@ if (!$thumb_url) {
         <div class="story-card-subrow">
             <span class="story-sub-chap">
                 <?php if ($is_new_updated) : ?>
-                    Chương <?php echo $latest_chapter_num ?: 1; ?>
+                    Chương <?php echo $latest_chapter_num ?: ($chap_count ?: 1); ?>
                 <?php else : ?>
-                    Chương: <?php echo $chap_count; ?>
+                    <?php echo $chap_count; ?> Chương
                 <?php endif; ?>
             </span>
             <span class="story-sub-time" title="<?php echo esc_attr($story_update_data['formatted']); ?>">

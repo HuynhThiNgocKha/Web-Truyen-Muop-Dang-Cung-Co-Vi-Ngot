@@ -56,7 +56,7 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
 
                     <div class="form-group">
                         <label class="form-label" for="storyTeam">Team (Dịch Giả)</label>
-                        <input type="text" id="storyTeam" name="team_name" class="form-input" value="<?php echo esc_attr(current_user_can('administrator') ? 'Mướp Đắng Cũng Có Vị Ngọt' : $current_user->display_name); ?>" placeholder="Tên team dịch" />
+                        <input type="text" id="storyTeam" name="team_name" class="form-input" value="<?php echo esc_attr(current_user_can('administrator') ? 'Mướp Đắng Cũng Có Vị Ngọt' : $current_user->display_name); ?>" placeholder="Tên team dịch" <?php echo current_user_can('administrator') ? 'readonly style="background: rgba(0,0,0,0.04); cursor: not-allowed;" title="Admin luôn đăng với vai trò team Mướp Đắng Cũng Có Vị Ngọt"' : ''; ?> />
                     </div>
                 </div>
 
@@ -139,8 +139,13 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                 </h3>
 
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label" for="storyDescription">Nội Dung Giới Thiệu / Văn Án (*)</label>
-                    <textarea id="storyDescription" name="description" class="form-input" rows="8" placeholder="Nhập phần tóm tắt văn án hấp dẫn để thu hút độc giả..." required></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                        <label class="form-label" for="storyDescription" style="margin-bottom: 0;">Nội Dung Giới Thiệu / Văn Án (*)</label>
+                        <button type="button" class="btn btn-outline btn-scan-sensitive btn-sm" data-target="#storyDescription" style="padding: 5px 14px; font-size: 13px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;" title="Rà soát và thay thế các từ ngữ nhạy cảm trong văn án">
+                            <i class="fa-solid fa-shield-halved" style="color: var(--primary-green);"></i> Duyệt Nội Dung
+                        </button>
+                    </div>
+                    <textarea id="storyDescription" name="description" class="form-input form-textarea-large" rows="12" style="min-height: 240px; font-size: 15px; line-height: 1.7; padding: 14px 16px;" placeholder="Nhập phần tóm tắt văn án hấp dẫn để thu hút độc giả..." required></textarea>
                 </div>
             </div>
 

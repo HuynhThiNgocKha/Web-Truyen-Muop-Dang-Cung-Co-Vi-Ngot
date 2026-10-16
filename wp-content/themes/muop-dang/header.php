@@ -20,6 +20,21 @@ $genres = get_terms(array(
 <head>
     <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+      // Suppress unhandled third-party browser extension errors (e.g. content.js)
+      window.addEventListener('error', function(e) {
+        if (e && e.filename && (e.filename.indexOf('content.js') !== -1 || e.filename.indexOf('extension') !== -1)) {
+          e.preventDefault && e.preventDefault();
+          e.stopImmediatePropagation && e.stopImmediatePropagation();
+          return true;
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e && e.reason && e.reason.stack && (e.reason.stack.indexOf('content.js') !== -1 || e.reason.stack.indexOf('extension') !== -1)) {
+          e.preventDefault && e.preventDefault();
+        }
+      });
+    </script>
     <link rel="profile" href="https://gmpg.org/xfn/11">
     <link rel="icon" type="image/png" href="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>">
     <link rel="apple-touch-icon" href="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>">
@@ -28,6 +43,13 @@ $genres = get_terms(array(
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
 
+<noscript>
+    <div style="position: sticky; top: 0; left: 0; right: 0; z-index: 999999; background: #dc2626; color: #ffffff; padding: 12px 18px; text-align: center; font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
+        <i class="fa-solid fa-triangle-exclamation" style="margin-right: 6px;"></i> Trình duyệt của bạn đang tắt JavaScript. Vui lòng bật lại JavaScript trong Cài đặt trình duyệt (Chrome / Safari) để sử dụng trang web!
+    </div>
+</noscript>
+
+<?php if (!is_page_template('templates/page-quan-ly-admin.php')) : ?>
 <header class="site-header">
     <!-- HEADER 1 (CỐ ĐỊNH) -->
     <div class="header-top">
@@ -51,6 +73,7 @@ $genres = get_terms(array(
             <!-- Search Bar (Desktop) -->
             <div class="search-form-wrapper">
                 <form role="search" method="get" class="search-box" action="<?php echo esc_url(home_url('/')); ?>">
+                    <input type="hidden" name="post_type" value="truyen" />
                     <input type="search" placeholder="Tìm kiếm tên truyện, tác giả, dịch giả..." value="<?php echo get_search_query(); ?>" name="s" required autocomplete="off" />
                     <button type="submit" title="Tìm kiếm">
                         <i class="fa-solid fa-magnifying-glass"></i>
@@ -65,17 +88,6 @@ $genres = get_terms(array(
                     <i class="fa-solid fa-moon"></i>
                 </button>
 
-                <!-- Admin Mode Switcher Pill (if Admin) -->
-                <?php if (current_user_can('administrator')) : ?>
-                    <div class="admin-mode-pill desktop-only" title="Chế độ xem trang của Admin">
-                        <i class="fa-solid fa-eye"></i>
-                        <select id="adminModeSelect">
-                            <option value="admin" <?php selected($preview_mode, 'admin'); ?>>Xem: Admin</option>
-                            <option value="dich_gia" <?php selected($preview_mode, 'dich_gia'); ?>>Xem: Dịch Giả</option>
-                            <option value="doc_gia" <?php selected($preview_mode, 'doc_gia'); ?>>Xem: Độc Giả</option>
-                        </select>
-                    </div>
-                <?php endif; ?>
 
                 <!-- Chuông Thông Báo (Chỉ hiển thị khi đã đăng nhập theo yêu cầu Hình 1) -->
                 <?php if ($is_logged_in) : 
@@ -112,7 +124,7 @@ $genres = get_terms(array(
                     $user_custom_avatar = get_user_meta($current_user->ID, 'muop_user_avatar', true);
                 ?>
                     <div class="user-menu-wrapper" id="userMenuWrapper">
-                        <div class="user-profile-badge" id="userProfileToggle" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" title="Tài khoản cá nhân">
+                        <div class="user-profile-badge" id="userProfileToggle" role="button" tabindex="0" onclick="" aria-haspopup="true" aria-expanded="false" title="Tài khoản cá nhân">
                             <div class="user-avatar-mini">
                                 <?php if (!empty($user_custom_avatar)) : ?>
                                     <img src="<?php echo esc_url($user_custom_avatar); ?>" alt="<?php echo esc_attr($current_user->display_name); ?>" class="user-avatar-mini-img" />
@@ -147,36 +159,38 @@ $genres = get_terms(array(
                             </div>
 
                             <a href="<?php echo esc_url(home_url('/ho-so/')); ?>">
-                                <i class="fa-solid fa-id-card"></i> <span>Thông tin</span>
-                            </a>
-                            <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>">
-                                <i class="fa-solid fa-bookmark"></i> <span>Tủ truyện của tôi</span>
-                            </a>
-                            <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>">
-                                <i class="fa-solid fa-key"></i> <span>Đổi mật khẩu</span>
-                            </a>
-                            <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>">
-                                <i class="fa-solid fa-sliders"></i> <span>Cài đặt đọc truyện</span>
+                                <i class="fa-solid fa-id-card"></i> <span>Thông Tin</span>
                             </a>
 
-                            <?php if (in_array('dich_gia', (array)$current_user->roles) || current_user_can('administrator')) : ?>
+                            <?php if (muop_user_is_translator($current_user->ID)) : ?>
                                 <a href="<?php echo esc_url(home_url('/thong-tin-dich-gia/')); ?>">
-                                    <i class="fa-solid fa-feather-pointed"></i> <span>Kênh dịch giả</span>
-                                </a>
-                                <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>">
-                                    <i class="fa-solid fa-circle-plus"></i> <span>Đăng truyện mới</span>
+                                    <i class="fa-solid fa-feather-pointed"></i> <span>Kênh Dịch Giả</span>
                                 </a>
                             <?php endif; ?>
 
                             <?php if (current_user_can('administrator')) : ?>
                                 <a href="<?php echo esc_url(home_url('/quan-ly-admin/')); ?>">
-                                    <i class="fa-solid fa-sliders"></i> <span>Quản trị hệ thống</span>
+                                    <i class="fa-solid fa-sliders"></i> <span>Quản Trị Hệ Thống</span>
+                                </a>
+                            <?php endif; ?>
+
+                            <a href="<?php echo esc_url(home_url('/doi-mat-khau/')); ?>">
+                                <i class="fa-solid fa-key"></i> <span>Đổi Mật Khẩu</span>
+                            </a>
+
+                            <a href="<?php echo esc_url(home_url('/cai-dat-doc-truyen/')); ?>">
+                                <i class="fa-solid fa-sliders"></i> <span>Cài Đặt Đọc Truyện</span>
+                            </a>
+
+                            <?php if (muop_user_is_translator($current_user->ID) || current_user_can('administrator')) : ?>
+                                <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>">
+                                    <i class="fa-solid fa-circle-plus"></i> <span>Đăng Truyện Mới</span>
                                 </a>
                             <?php endif; ?>
 
                             <div class="user-dropdown-divider"></div>
                             <a href="<?php echo esc_url(wp_logout_url(home_url())); ?>" class="logout-link" style="color: #E53935;">
-                                <i class="fa-solid fa-arrow-right-from-bracket" style="color: #E53935;"></i> <span>Đăng xuất</span>
+                                <i class="fa-solid fa-arrow-right-from-bracket" style="color: #E53935;"></i> <span>Đăng Xuất</span>
                             </a>
                         </div>
                     </div>
@@ -197,6 +211,7 @@ $genres = get_terms(array(
         <div class="mobile-search-row">
             <div class="container mobile-search-container">
                 <form role="search" method="get" class="mobile-search-bar" action="<?php echo esc_url(home_url('/')); ?>">
+                    <input type="hidden" name="post_type" value="truyen" />
                     <i class="fa-solid fa-magnifying-glass search-leading-icon"></i>
                     <input type="search" placeholder="Tìm kiếm tên truyện, tác giả, dịch giả..." value="<?php echo get_search_query(); ?>" name="s" autocomplete="off" />
                     <button type="submit" class="mobile-search-submit-btn" aria-label="Tìm kiếm">
@@ -213,14 +228,14 @@ $genres = get_terms(array(
             <ul class="nav-links">
                 <li class="<?php echo is_front_page() ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/')); ?>">
-                        <i class="fa-solid fa-house"></i> Trang chủ
+                        <i class="fa-solid fa-house"></i> Trang Chủ
                     </a>
                 </li>
 
                 <!-- Thể loại Dropdown -->
                 <li class="has-genre-dropdown">
                     <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="nav-genre-btn" id="navGenreToggle">
-                        <i class="fa-solid fa-tags"></i> Thể loại <i class="fa-solid fa-caret-down caret-genre" style="font-size: 11px; margin-left: 3px;"></i>
+                        <i class="fa-solid fa-tags"></i> Thể Loại <i class="fa-solid fa-caret-down caret-genre" style="font-size: 11px; margin-left: 3px;"></i>
                     </a>
                     <div class="genre-dropdown-menu" id="genreDropdownMenu">
                         <?php
@@ -234,15 +249,15 @@ $genres = get_terms(array(
                             endforeach;
                         else:
                         ?>
-                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Ngôn tình</a>
+                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Ngôn Tình</a>
                             <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Ngọt</a>
                             <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Ngược</a>
-                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Đam mỹ</a>
-                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Cổ trang</a>
-                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Hiện đại</a>
-                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Tương lai</a>
-                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Xuyên không</a>
-                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Xuyên sách</a>
+                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Đam Mỹ</a>
+                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Cổ Trang</a>
+                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Hiện Đại</a>
+                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Tương Lai</a>
+                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Xuyên Không</a>
+                            <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Xuyên Sách</a>
                             <a href="<?php echo esc_url(home_url('/the-loai/')); ?>">Zhihu</a>
                         <?php endif; ?>
                     </div>
@@ -250,17 +265,17 @@ $genres = get_terms(array(
 
                 <li class="<?php echo is_page('truyen-moi') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/truyen-moi/')); ?>">
-                        <i class="fa-solid fa-clock"></i> Truyện mới
+                        <i class="fa-solid fa-clock"></i> Truyện Mới
                     </a>
                 </li>
                 <li class="<?php echo is_page('truyen-hot') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/truyen-hot/')); ?>">
-                        <i class="fa-solid fa-fire"></i> Truyện hot
+                        <i class="fa-solid fa-fire"></i> Truyện Hot
                     </a>
                 </li>
                 <li class="<?php echo is_page('truyen-full') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/truyen-full/')); ?>">
-                        <i class="fa-solid fa-circle-check"></i> Truyện full
+                        <i class="fa-solid fa-circle-check"></i> Truyện Full
                     </a>
                 </li>
                 <?php if ($is_logged_in) : ?>
@@ -269,12 +284,38 @@ $genres = get_terms(array(
                             <i class="fa-solid fa-users"></i> Team Dịch
                         </a>
                     </li>
-                    <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
-                        <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>">
-                            <i class="fa-solid fa-bookmark"></i> Tủ Truyện
+                    <li class="has-tu-truyen-dropdown <?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
+                        <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="nav-tu-truyen-btn" id="navTuTruyenToggle">
+                            <i class="fa-solid fa-bookmark"></i> Tủ Truyện <i class="fa-solid fa-caret-down caret-tu-truyen" style="font-size: 11px; margin-left: 3px;"></i>
                         </a>
+                        <div class="tu-truyen-dropdown-menu" id="tuTruyenDropdownMenu">
+                            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=saved')); ?>">
+                                <i class="fa-solid fa-bookmark" style="color: var(--primary-green);"></i> Truyện Đã Lưu
+                            </a>
+                            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=favorites')); ?>">
+                                <i class="fa-solid fa-heart" style="color: #f43f5e;"></i> Truyện Yêu Thích
+                            </a>
+                            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=following')); ?>">
+                                <i class="fa-solid fa-bell" style="color: #8b5cf6;"></i> Truyện Đang Theo Dõi
+                            </a>
+                            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=teams_favorite')); ?>">
+                                <i class="fa-solid fa-users-viewfinder" style="color: #ec4899;"></i> Team Dịch Đã Yêu Thích
+                            </a>
+                            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=teams_following')); ?>">
+                                <i class="fa-solid fa-user-check" style="color: #10b981;"></i> Team Dịch Đang Theo Dõi
+                            </a>
+                            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=history')); ?>">
+                                <i class="fa-solid fa-clock-rotate-left" style="color: #0284c7;"></i> Truyện Đã Đọc
+                            </a>
+                        </div>
                     </li>
                 <?php endif; ?>
+
+                <li class="<?php echo is_page('gioi-thieu') ? 'active' : ''; ?>">
+                    <a href="<?php echo esc_url(home_url('/gioi-thieu/')); ?>">
+                        <i class="fa-solid fa-circle-info"></i> Giới Thiệu
+                    </a>
+                </li>
 
                 <!-- Translator / Admin button: Đăng Truyện -->
                 <?php if ($user_role === 'dich_gia' || $user_role === 'administrator') : ?>
@@ -284,12 +325,6 @@ $genres = get_terms(array(
                         </a>
                     </li>
                 <?php endif; ?>
-
-                <li class="<?php echo is_page('gioi-thieu') ? 'active' : ''; ?>">
-                    <a href="<?php echo esc_url(home_url('/gioi-thieu/')); ?>">
-                        <i class="fa-solid fa-circle-info"></i> Giới thiệu
-                    </a>
-                </li>
             </ul>
         </div>
     </div>
@@ -317,19 +352,19 @@ $genres = get_terms(array(
             <ul class="drawer-nav-list">
                 <li class="<?php echo is_front_page() ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/')); ?>" class="drawer-nav-link">
-                        <span>Trang chủ</span>
+                        <span>Trang Chủ</span>
                     </a>
                 </li>
                 <li class="<?php echo is_page('truyen-moi') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/truyen-moi/')); ?>" class="drawer-nav-link">
-                        <span>Truyện mới</span>
+                        <span>Truyện Mới</span>
                     </a>
                 </li>
 
                 <!-- Thể loại accordion item chuẩn Hình 2 -->
                 <li class="drawer-nav-item has-sub <?php echo (is_tax('the_loai') || is_page('the-loai')) ? 'open' : ''; ?>" id="drawerGenreItem">
                     <div class="drawer-nav-link drawer-accordion-toggle" id="drawerGenreToggle" role="button" tabindex="0">
-                        <span>Thể loại</span>
+                        <span>Thể Loại</span>
                         <i class="fa-solid fa-chevron-down drawer-caret"></i>
                     </div>
                     <div class="drawer-sub-menu" id="drawerGenreSubMenu">
@@ -343,12 +378,12 @@ $genres = get_terms(array(
                                 endforeach;
                             else: 
                             ?>
-                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Ngôn tình</a>
+                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Ngôn Tình</a>
                                 <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Ngọt</a>
                                 <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Ngược</a>
-                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Đam mỹ</a>
-                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Cổ trang</a>
-                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Hiện đại</a>
+                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Đam Mỹ</a>
+                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Cổ Trang</a>
+                                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Hiện Đại</a>
                                 <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="drawer-genre-tag">Zhihu</a>
                             <?php endif; ?>
                         </div>
@@ -371,10 +406,51 @@ $genres = get_terms(array(
                             <span>Team Dịch</span>
                         </a>
                     </li>
-                    <li class="<?php echo is_page('tu-truyen') ? 'active' : ''; ?>">
-                        <a href="<?php echo esc_url(home_url('/tu-truyen/')); ?>" class="drawer-nav-link">
-                            <span>Tủ truyện</span>
-                        </a>
+                    <li class="drawer-nav-item has-sub <?php echo is_page('tu-truyen') ? 'open' : ''; ?>" id="drawerTuTruyenItem">
+                        <div class="drawer-nav-link drawer-accordion-toggle" id="drawerTuTruyenToggle" role="button" tabindex="0">
+                            <span>Tủ Truyện</span>
+                            <i class="fa-solid fa-chevron-down drawer-caret"></i>
+                        </div>
+                        <div class="drawer-sub-menu" id="drawerTuTruyenSubMenu">
+                            <ul class="drawer-sub-list" style="list-style: none; padding: 4px 0 6px 14px; margin: 0; display: flex; flex-direction: column; gap: 2px;">
+                                <li>
+                                    <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=saved')); ?>" class="drawer-tu-link">
+                                        <i class="fa-solid fa-bookmark" style="color: var(--primary-green);"></i>
+                                        <span>Truyện Đã Lưu</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=favorites')); ?>" class="drawer-tu-link">
+                                        <i class="fa-solid fa-heart" style="color: #f43f5e;"></i>
+                                        <span>Truyện Yêu Thích</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=following')); ?>" class="drawer-tu-link">
+                                        <i class="fa-solid fa-bell" style="color: #8b5cf6;"></i>
+                                        <span>Truyện Đang Theo Dõi</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=teams_favorite')); ?>" class="drawer-tu-link">
+                                        <i class="fa-solid fa-users-viewfinder" style="color: #ec4899;"></i>
+                                        <span>Team Dịch Đã Yêu Thích</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=teams_following')); ?>" class="drawer-tu-link">
+                                        <i class="fa-solid fa-user-check" style="color: #10b981;"></i>
+                                        <span>Team Dịch Đang Theo Dõi</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=history')); ?>" class="drawer-tu-link">
+                                        <i class="fa-solid fa-clock-rotate-left" style="color: #0284c7;"></i>
+                                        <span>Truyện Đã Đọc</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </li>
                 <?php endif; ?>
                 <?php if ($user_role === 'dich_gia' || $user_role === 'administrator') : ?>
@@ -386,12 +462,13 @@ $genres = get_terms(array(
                 <?php endif; ?>
                 <li class="<?php echo is_page('gioi-thieu') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/gioi-thieu/')); ?>" class="drawer-nav-link">
-                        <span>Giới thiệu</span>
+                        <span>Giới Thiệu</span>
                     </a>
                 </li>
             </ul>
         </nav>
     </div>
 </aside>
+<?php endif; ?>
 
-<main class="site-main">
+<main class="site-main<?php echo is_page_template('templates/page-quan-ly-admin.php') ? ' site-main-admin' : ''; ?>">

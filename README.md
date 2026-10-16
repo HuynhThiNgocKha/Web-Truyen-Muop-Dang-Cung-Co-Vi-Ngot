@@ -16,9 +16,12 @@ Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được x
 
 | Vai trò | Tên đăng nhập | Mật khẩu | Chức năng nổi bật |
 | :--- | :--- | :--- | :--- |
-| **Quản trị viên (Admin)** | `admin` | `AdminPassword@2026` | Toàn quyền quản trị, kiểm duyệt truyện, gắn link Shopee/TikTok, xem click, quản lý người dùng, xem lương dịch giả, đổi chế độ xem. |
+| **Quản trị viên (Admin)** | `admin` | `Ngockha2405` | Toàn quyền quản trị, kiểm duyệt truyện, gắn link Shopee/TikTok, xem click, quản lý người dùng, xem lương dịch giả, đổi chế độ xem. |
+| **Quản trị viên 2** | `ngockha24052001` | `Ngockha2405` | Toàn quyền quản trị hệ thống. |
+| **Quản trị viên 3** | `comotkhonghai59` | `Ngockha2405` | Toàn quyền quản trị hệ thống. |
 | **Dịch giả 1 (Translator)** | `dichgia_muop` | `dichgia123` | Đăng truyện, thêm chương, quản lý truyện đã đăng, xem view ngày/tuần/tháng/năm, xem nhuận bút 8đ/view, trả lời bình luận. |
 | **Dịch giả 2 (Translator)** | `dichgia_bocute` | `dichgia123` | Đăng truyện, thêm chương, tính lương, quản lý tác phẩm. |
+| **Dịch giả 3 (Translator)** | `test_dichgia` | `dichgia123` | Kiểm thử tài khoản dịch giả. |
 | **Độc giả 1 (Reader)** | `docgia_linh` | `docgia123` | Đọc truyện, lưu tủ truyện, lịch sử đọc, bình luận, bật/tắt giao diện Sáng/Tối. |
 | **Độc giả 2 (Reader)** | `docgia_minh` | `docgia123` | Đọc truyện, tủ truyện cá nhân. |
 
@@ -30,18 +33,17 @@ Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được x
 - **Header 1 (Cố định):**
   - Logo thương hiệu hình lá mầm xanh mát mắt
   - Tên website: **Mướp Đắng Cũng Có Vị Ngọt**
-  - Khung tìm kiếm truyện, tác giả, dịch giả tức thời
+  - Khung tìm kiếm truyện, tác giả, dịch giả tức thời (giới hạn chuẩn xác `post_type=truyen`)
   - Icon chuyển đổi chế độ **Sáng / Tối (Dark / Light Mode)** lưu tùy chọn người dùng
   - Khung Đăng nhập / Đăng ký hoặc Dropdown hồ sơ cá nhân khi đã đăng nhập
   - Thanh chọn **Chế độ xem cho Admin** (Xem với tư cách: Admin, Dịch giả, Độc giả).
-- **Header 2 (Cố định):**
-  - Button **Trang chủ**
-  - Dropdown **Thể loại** (Ngôn tình, Ngọt, Ngược, Đam mỹ, Cổ trang, Hiện đại, Tương lai, Xuyên không, Xuyên sách, Zhihu, Trọng sinh, Hài hước...)
-  - Button **Truyện mới**
-  - Button **Truyện hot**
-  - Button **Truyện full**
-  - Button **Đăng Truyện** (tự động hiển thị khi đăng nhập bằng tài khoản Dịch giả hoặc Admin)
-  - Button **Giới thiệu**
+- **Header 2 (Thanh menu điều hướng Desktop 1 hàng):**
+  - Tối ưu hóa toàn bộ menu nằm gọn trên **1 hàng duy nhất** (`flex-wrap: nowrap; white-space: nowrap`), không bị rớt dòng.
+  - Sắp xếp vị trí menu chuẩn: **Trang Chủ** ➔ Dropdown **Thể Loại** ➔ **Truyện Mới** ➔ **Truyện Hot** ➔ **Truyện Full** ➔ Dropdown **Tủ Truyện** ➔ **Giới Thiệu** ➔ Button vàng **+ Đăng Truyện**.
+- **Hệ Thống Phân Trang Thông Minh (Smart Pagination):**
+  - Ô số bo tròn nhỏ gọn (33px × 33px), khoảng cách gần nhau (`gap: 6px`).
+  - Ô số trang hiện tại hiển thị khung tròn xanh lá thương hiệu (`#3F7523`) chữ trắng nổi bật.
+  - **Tự động ẩn phân trang khi chỉ có 1 trang**, chỉ hiển thị khi có từ 2 trang trở lên trên toàn bộ các trang (Truyện Hot, Truyện Mới, Truyện Full, Thể Loại, Tìm Kiếm, Tủ Truyện, Team Dịch).
 - **Trang chủ (Center):**
   - Banner chào mừng phong cách xanh bơ
   - **Mục Truyện đề cử:** Hiển thị 12 truyện được ban biên tập đề cử
@@ -51,36 +53,43 @@ Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được x
 - **Footer (Cố định):**
   - Logo, tên web, slogan: *"Mướp Đắng Cũng Có Vị Ngọt – nơi tâm hồn bạn được thả lỏng cùng với những câu truyện mà Mướp mang đến cho bạn"*
   - Bản quyền: `Copyright © 2026 Mướp Đắng Cũng Có Vị Ngọt. All right reserved.`
+- **Cơ chế Đăng xuất Nhanh (Direct Logout):**
+  - Bỏ qua hoàn toàn màn hình xác nhận rườm rà mặc định của WordPress, tự động đăng xuất và chuyển hướng tức thì về trang chủ.
 
 ### 2. Trang Chi Tiết Truyện & Trang Đọc Truyện
 - **Trang mô tả truyện:**
   - Đường dẫn Breadcrumbs tương tác
   - Bố cục: Bên trái ảnh bìa truyện, bên phải thông tin: Tên truyện, Tác giả, Team dịch, Thể loại, Trạng thái (Đang ra / Hoàn thành), Số chương, Số lượt xem, Cập nhật gần nhất
-  - Các nút: Đọc từ đầu, Đọc mới nhất, Lưu vào tủ truyện, Thêm chương mới
+  - Các nút: Đọc từ đầu, Đọc mới nhất, Lưu vào tủ truyện, Nút **Yêu Thích** (Tim đỏ) & Nút **Theo Dõi** (Chuông tím), Thêm chương mới
   - Đoạn giới thiệu / văn án truyện
   - Danh sách chương với thời gian cập nhật
   - Khung bình luận và danh sách nhận xét của độc giả
 - **Trang đọc chương truyện:**
   - Breadcrumbs dẫn về Truyện và Trang chủ
   - Thanh điều hướng: Chương trước, Chọn nhanh chương trong dropdown, Chương sau
-  - Công cụ chỉnh cỡ chữ đọc truyện (A- / A+)
+  - Công cụ chỉnh cỡ chữ đọc truyện (A- / A+) và khoảng cách dòng/đoạn
+  - **Báo lỗi chương truyện:** Độc giả bấm báo lỗi chi tiết (chính tả, trùng, mất chữ, ảnh hỏng), Admin & Dịch giả nhận thông báo và phản hồi trực tiếp.
   - **Bảo vệ nội dung (Chống copy):** Vô hiệu hóa chuột phải, chặn sao chép (copy/cut), chặn bôi đen văn bản, chặn các phím tắt `Ctrl+C`, `Ctrl+U`, `Ctrl+S`, `F12`.
   - **Cơ chế Popup Shopee Gatekeeper:**
     - Xuất hiện bắt đầu từ **Chương 2** và định kỳ **cứ cách 3 chương hiện 1 lần** (Chương 2, 5, 8, 11...).
-    - Thông báo: *"1. Để giúp Mướp có thể duy trì web lâu dài mọi người click vào link này nha. 2. Link Shopee."*
+    - Thông báo: *"Để giúp Mướp có thể duy trì web lâu dài mọi người click vào link này nha. Link Shopee."*
     - Nội dung chương bị làm mờ, độc giả **bắt buộc phải bấm vào link Shopee** mới mở khóa đọc tiếp.
     - Hệ thống tự động ghi nhận lượt click vào cơ sở dữ liệu (`wp_affiliate_clicks`).
   - **Cơ chế liên kết ẩn:** Kích hoạt mở liên kết affiliate Shopee/TikTok khi độc giả tương tác lần đầu trên trang hoặc khi ấn nút chuyển sang chương kế tiếp.
 
-### 3. Kênh Dịch Giả (Translator Portal)
-- Hiển thị hồ sơ: Tên, avatar, email, ngày tham gia
+### 3. Kênh Dịch Giả & Quản Lý Đăng Truyện
+- Hiển thị hồ sơ: Tên, avatar, email, ngày tham gia, tài khoản ngân hàng nhận lương
 - Thống kê lượt xem truyện: Hôm nay, trong tuần, trong tháng, trong năm
 - **Hệ thống tính tiền nhuận bút:** **8 VNĐ cho mỗi 1 lượt xem (view)**
   - Tự động tính số tiền nhận trong tháng hiện tại
-  - Xem lại số tiền và lượt xem của tháng trước
+  - Xem lại số tiền và lượt xem của tháng trước kèm hóa đơn ủy nhiệm chi
   - Tự động làm mới chu kỳ mỗi tháng
-- Quản lý danh sách tác phẩm: Trạng thái (Đã duyệt / Chờ duyệt), thêm chương, chỉnh sửa
+- Quản lý danh sách tác phẩm: Trạng thái (Đang ra / Hoàn thành / Chờ duyệt), thêm chương, chỉnh sửa
 - Quản lý và phản hồi bình luận của bạn đọc trên truyện của mình.
+- **Hệ Thống Duyệt Nội Dung & Quét Từ Nhạy Cảm (Sensitive Content Scanner):**
+  - Đổi tên thành **Duyệt Nội Dung**, hoạt động ngay trong màn hình đăng truyện và thêm chương.
+  - Popup quét trực quan: Hiển thị trạng thái "Đang duyệt nội dung...", "Đã duyệt xong, nội dung an toàn!", hoặc phát hiện từ nhạy cảm.
+  - Highlight trực tiếp các từ nhạy cảm và mở popup chỉnh sửa nhanh nội dung ngay tại chỗ.
 
 ### 4. Bảng Quản Trị Hệ Thống (Admin Portal)
 - 6 thẻ chỉ số KPI tổng quan: Lượt xem tháng, Tổng bộ truyện, Tổng độc giả, Tổng dịch giả, Click Shopee, Click TikTok
@@ -88,7 +97,17 @@ Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được x
 - **Quản lý Link Shopee & TikTok:**
   - Tùy chỉnh link Shopee và link TikTok 
   - Thống kê chi tiết số lượt click thực tế và xem nhật ký IP, chương mở khóa
-- **Quản lý Người Dùng & Phân Quyền:** Xem danh sách, thêm tài khoản mới, phân quyền (Độc giả, Dịch giả, Quản trị viên), Khóa / Mở khóa tài khoản
-- **Quản lý Lương Dịch Giả:** Bảng kê chi tiết từng dịch giả, số view đạt được và tổng số tiền nhuận bút được nhận (nhân với 8đ/view)
+- **Quản lý Người Dùng & Phân Quyền:**
+  - Xem danh sách người dùng với bảng dữ liệu tối ưu: STT, ID, Avatar, Tên hiển thị, Username, Email, Mật khẩu, Vai trò, Ngày đăng ký, Trạng thái, Hành động.
+  - Cột **Mật Khẩu** trực quan: Mặc định hiển thị `••••••••`, có nút con mắt `👁️` xem trực tiếp mật khẩu, nút `📋` sao chép nhanh, nút `✏️` đổi mật khẩu mới. Tự động đồng bộ mật khẩu khi đổi trên hệ thống.
+  - Cột **Trạng Thái** chuẩn: Badge xanh lá tươi tắn "Hoạt động" (`status-badge-active`) và badge đỏ "Đã khóa" (`status-badge-locked`).
+  - Phân quyền nhanh (Độc giả, Dịch giả, Quản trị viên) với dropdown inline.
+  - Xem chi tiết hồ sơ tài khoản và lịch sử hoạt động.
+- **Bộ Điều Khiển Kéo Qua Lại Bảng Dữ Liệu (Data Table Scroll Controller):**
+  - **Thanh điều hướng đầu bảng (Top Toolbar Controller):** Nút **[ ◀ Trái ]** và **[ Phải ▶ ]** giúp cuộn ngang mượt mà.
+  - **2 Nút bấm nổi hai bên sườn (Floating Side Scroll Buttons):** Nút tròn nổi mép trái ◀ và mép phải ▶ nhấp nháy thu hút, cho phép bấm cuộn ở bất kỳ dòng nào.
+  - **Kéo chuột qua lại (Drag-to-Scroll):** Giữ chuột rê qua lại với con trỏ `grab` / `grabbing`.
+  - Tự động đồng bộ và hiển thị khi chuyển giữa các tab quản trị.
+- **Quản lý Lương Dịch Giả:** Bảng kê chi tiết từng dịch giả, số view đạt được và tổng số tiền nhuận bút được nhận (nhân với 8đ/view), tải hóa đơn thanh toán
 - **Quản lý Thể Loại & Bình Luận:** CRUD thể loại, kiểm duyệt bình luận
 - **Chuyển chế độ xem giao diện:** Xem tức thời với tư cách Độc Giả, Dịch Giả, Quản Trị Viên.

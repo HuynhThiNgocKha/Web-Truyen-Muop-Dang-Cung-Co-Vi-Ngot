@@ -125,6 +125,16 @@ if ( ! defined( 'WP_CONTENT_URL' ) ) {
 	define( 'WP_CONTENT_URL', $protocol . $host . '/wp-content' );
 }
 
+if ( ! defined( 'COOKIEPATH' ) ) {
+	define( 'COOKIEPATH', '/' );
+}
+if ( ! defined( 'SITECOOKIEPATH' ) ) {
+	define( 'SITECOOKIEPATH', '/' );
+}
+if ( ! defined( 'ADMIN_COOKIE_PATH' ) ) {
+	define( 'ADMIN_COOKIE_PATH', '/' );
+}
+
 /* That's all, stop editing! Happy publishing. */
 
 /** Absolute path to the WordPress directory. */

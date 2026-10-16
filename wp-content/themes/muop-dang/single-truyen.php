@@ -30,26 +30,47 @@ $chap_count = count($chapters);
 $first_chap_url = !empty($chapters) ? get_permalink($chapters[0]->ID) : '#';
 $last_chap_url  = !empty($chapters) ? get_permalink(end($chapters)->ID) : '#';
 
-// Bookmarked check & Role check
+// Bookmarked check, Role check, Follow check & Favorite check
 $is_bookmarked = false;
-$can_manage_story = is_user_logged_in() && (current_user_can('administrator') || current_user_can('dich_gia'));
-$can_change_status = $can_manage_story;
+$is_following  = false;
+$is_favorited  = false;
+$can_manage_story = false;
+$can_change_status = false;
+
+$story_post_author = (int) get_post_field('post_author', $story_id);
+$current_uid = get_current_user_id();
+$is_own_story = ($current_uid > 0 && $current_uid === $story_post_author);
+$can_show_follow = !$is_own_story; // Không hiển thị nếu là chính dịch giả của truyện
+$can_show_favorite = !$is_own_story;
 
 if (is_user_logged_in()) {
     global $wpdb;
-    $current_uid = get_current_user_id();
     $table_bm = $wpdb->prefix . 'reading_bookmarks';
     $is_bookmarked = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_bm WHERE user_id = %d AND story_id = %d", $current_uid, $story_id));
+    $is_following = muop_is_user_following_story($current_uid, $story_id);
+    $is_favorited = muop_is_user_favorited_story($current_uid, $story_id);
 
-    $post_author_id = (int) get_post_field('post_author', $story_id);
-    if (current_user_can('administrator') || ($post_author_id === $current_uid)) {
-        $can_change_status = true;
-    }
+    // Phân quyền:
+    // 1. Chỉ chính DỊCH GIẢ của truyện đó mới có quyền Thêm / Sửa / Xóa trong trang truyện của mình.
+    // 2. Dịch giả khác KHÔNG có quyền.
+    // 3. Admin trên trang của dịch giả khác chỉ có quyền XEM, KHÔNG được tác động hay chỉnh sửa.
+    // 4. Admin chỉ có quyền tác động khi chính Admin là tác giả truyện này VÀ có thêm vai trò là dịch giả.
+    $can_manage_story = muop_can_user_manage_story_frontend($story_id, $current_uid);
+    $can_change_status = $can_manage_story;
 }
 
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
 if (!$thumb_url) {
     $thumb_url = MUOP_THEME_URI . '/assets/images/default-cover.svg';
+}
+
+$from = isset($_GET['from']) ? sanitize_text_field($_GET['from']) : '';
+if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
+    if (strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false) {
+        $from = 'admin';
+    } elseif (strpos($_SERVER['HTTP_REFERER'], 'thong-tin-dich-gia') !== false) {
+        $from = 'translator';
+    }
 }
 ?>
 
@@ -58,6 +79,13 @@ if (!$thumb_url) {
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB) -->
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
+            <?php if ($from === 'admin') : ?>
+                <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
+                <a href="<?php echo esc_url(home_url('/quan-ly-admin/')); ?>">Quản Trị Hệ Thống</a>
+            <?php elseif ($from === 'translator') : ?>
+                <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
+                <a href="<?php echo esc_url(home_url('/thong-tin-dich-gia/')); ?>">Kênh Dịch Giả</a>
+            <?php endif; ?>
             <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
             <span style="color: var(--primary-green); font-weight: 600;" id="breadcrumbStoryTitle"><?php the_title(); ?></span>
         </nav>
@@ -69,7 +97,7 @@ if (!$thumb_url) {
                 <div class="story-cover-frame" id="storyCoverFrame">
                     <img id="mainStoryCoverImg" src="<?php echo esc_url($thumb_url); ?>" alt="<?php the_title_attribute(); ?>" />
                     <?php if ($can_manage_story) : ?>
-                        <button type="button" class="btn-change-cover-overlay" id="btnChangeCoverOverlay" data-story-id="<?php echo $story_id; ?>" title="Thay đổi ảnh bìa truyện (Admin & Dịch giả)">
+                        <button type="button" class="btn-change-cover-overlay" id="btnChangeCoverOverlay" data-story-id="<?php echo $story_id; ?>" title="Thay đổi ảnh bìa truyện (Dịch giả)">
                             <i class="fa-solid fa-camera"></i>
                             <span>Thay đổi ảnh bìa</span>
                         </button>
@@ -80,7 +108,7 @@ if (!$thumb_url) {
             <!-- Right: Thông tin truyện -->
             <div class="story-info-col">
                 <div class="story-title-header-wrap">
-                    <h1 class="story-info-title"><span id="storyTitleText"><?php the_title(); ?></span><?php if ($can_manage_story) : ?><button type="button" class="btn-edit-title-inline" id="btnEditTitleInline" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa tên truyện (Admin & Dịch giả)"><i class="fa-solid fa-pen-to-square"></i></button><?php endif; ?></h1>
+                    <h1 class="story-info-title"><span id="storyTitleText"><?php the_title(); ?></span><?php if ($can_manage_story) : ?><button type="button" class="btn-edit-title-inline" id="btnEditTitleInline" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa tên truyện (Dịch giả)"><i class="fa-solid fa-pen-to-square"></i></button><?php endif; ?></h1>
                 </div>
 
                 <div class="story-info-meta-list">
@@ -152,7 +180,7 @@ if (!$thumb_url) {
 
                     <div class="meta-item">
                         <span class="meta-label"><i class="fa-solid fa-book-open"></i> Số chương:</span>
-                        <span class="meta-value"><strong><?php echo $chap_count; ?></strong> chương</span>
+                        <span class="meta-value"><strong><?php echo $chap_count; ?></strong> Chương</span>
                     </div>
 
                     <div class="meta-item">
@@ -183,7 +211,8 @@ if (!$thumb_url) {
                            data-story-id="<?php echo esc_attr($story_id); ?>"
                            data-chapter-id="<?php echo esc_attr($last_chap_id); ?>"
                            data-chapter-num="<?php echo esc_attr($last_chap_num); ?>"
-                           data-is-chap1="<?php echo $is_last_chap1 ? '1' : '0'; ?>">
+                           data-total-chapters="<?php echo esc_attr($chap_count); ?>"
+                           data-is-checkpoint="<?php echo muop_is_chapter_checkpoint($last_chap_num, $chap_count) ? '1' : '0'; ?>">
                             <i class="fa-solid fa-forward-step"></i> Đọc Mới Nhất
                         </a>
                     <?php endif; ?>
@@ -193,12 +222,38 @@ if (!$thumb_url) {
                         <?php echo $is_bookmarked ? 'Đã Lưu Tủ Truyện' : 'Lưu Vào Tủ Truyện'; ?>
                     </button>
 
+                    <button type="button" 
+                            class="btn <?php echo $is_favorited ? 'btn-primary' : 'btn-secondary'; ?> btn-favorite-story" 
+                            id="btnToggleFavoriteStory" 
+                            data-story-id="<?php echo $story_id; ?>" 
+                            title="<?php echo $is_favorited ? 'Bỏ yêu thích truyện này' : 'Yêu thích truyện này'; ?>">
+                        <i class="fa-<?php echo $is_favorited ? 'solid' : 'regular'; ?> fa-heart"></i>
+                        <span class="favorite-btn-label"><?php echo $is_favorited ? 'Đã Yêu Thích' : 'Yêu Thích'; ?></span>
+                    </button>
+
+                    <button type="button" 
+                            class="btn <?php echo $is_following ? 'btn-primary' : 'btn-secondary'; ?> btn-follow-story" 
+                            id="btnToggleFollowStory" 
+                            data-story-id="<?php echo $story_id; ?>" 
+                            title="<?php echo $is_following ? 'Đang theo dõi truyện này (Bấm để hủy)' : 'Theo dõi truyện để nhận thông báo ngay khi có chương mới'; ?>">
+                        <i class="fa-<?php echo $is_following ? 'solid' : 'regular'; ?> fa-bell"></i>
+                        <span class="follow-btn-label"><?php echo $is_following ? 'Đang Theo Dõi' : 'Theo Dõi'; ?></span>
+                    </button>
+
                     <?php if ($can_manage_story) : ?>
-                        <button type="button" class="btn btn-outline btn-edit-story" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa toàn bộ thông tin truyện (Admin & Dịch giả)">
+                        <button type="button" class="btn btn-outline btn-edit-story" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa toàn bộ thông tin truyện (Dịch giả)">
                             <i class="fa-solid fa-pen-to-square"></i> Chỉnh Sửa Truyện
                         </button>
 
-                        <a href="<?php echo esc_url(add_query_arg('story_id', $story_id, home_url('/them-chuong/'))); ?>" class="btn btn-outline" style="border-style: dashed;">
+                        <?php 
+                        $add_chap_from = !empty($from) ? $from : 'story';
+                        $add_chap_args = array('story_id' => $story_id, 'from' => $add_chap_from);
+                        if ($add_chap_from === 'admin') {
+                            $add_chap_args['from_admin'] = 1;
+                        }
+                        $add_chap_url = add_query_arg($add_chap_args, home_url('/them-chuong/'));
+                        ?>
+                        <a href="<?php echo esc_url($add_chap_url); ?>" class="btn btn-outline" style="border-style: dashed;">
                             <i class="fa-solid fa-plus-circle"></i> Thêm Chương Mới
                         </a>
                     <?php endif; ?>
@@ -218,7 +273,7 @@ if (!$thumb_url) {
                     <?php 
                     $content = get_the_content();
                     if (!empty($content)) {
-                        the_content();
+                        echo muop_format_story_summary($content);
                     } else {
                         echo '<p>Câu chuyện tình yêu đầy cảm xúc được dịch và biên tập cẩn thận bởi team Mướp Đắng. Chúc các độc giả có những phút giây thư giãn ngọt ngào nhất!</p>';
                     }
@@ -254,6 +309,7 @@ if (!$thumb_url) {
                             $chap_time_ago = get_the_time('d/m/Y', $chap->ID);
                         }
                         $is_chap_1 = ((int)$chap->ID === (int)$first_chap_id || (int)$chap_num === 1);
+                        $chap_is_checkpoint = muop_is_chapter_checkpoint($chap_num, $chap_count);
                     ?>
                         <div class="chapter-item-row" id="chapterRow-<?php echo $chap->ID; ?>">
                             <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" 
@@ -261,6 +317,8 @@ if (!$thumb_url) {
                                data-story-id="<?php echo esc_attr($story_id); ?>"
                                data-chapter-id="<?php echo esc_attr($chap->ID); ?>"
                                data-chapter-num="<?php echo esc_attr($chap_num); ?>"
+                               data-total-chapters="<?php echo esc_attr($chap_count); ?>"
+                               data-is-checkpoint="<?php echo $chap_is_checkpoint ? '1' : '0'; ?>"
                                data-is-chap1="<?php echo $is_chap_1 ? '1' : '0'; ?>">
                                 <span class="chapter-item-title">
                                     <i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i>
@@ -268,7 +326,7 @@ if (!$thumb_url) {
                                 </span>
                                 <span class="chapter-item-meta">
                                     <?php if ($can_manage_story) : ?>
-                                        <span class="chapter-item-views" title="Lượt xem chương (Admin & Dịch giả)">
+                                        <span class="chapter-item-views" title="Lượt xem chương (Dịch giả)">
                                             <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
                                         </span>
                                     <?php endif; ?>
@@ -277,7 +335,7 @@ if (!$thumb_url) {
                             </a>
                             <?php if ($can_manage_story) : ?>
                                 <div class="chapter-actions-dropdown">
-                                    <button type="button" class="btn-chapter-dropdown-trigger" data-story-id="<?php echo $story_id; ?>" data-chapter-id="<?php echo $chap->ID; ?>" data-chapter-num="<?php echo esc_attr($chap_num); ?>" data-chapter-title="<?php echo esc_attr(muop_get_clean_chapter_title($chap->post_title)); ?>" title="Tùy chọn chương (Admin & Dịch giả)">
+                                    <button type="button" class="btn-chapter-dropdown-trigger" data-story-id="<?php echo $story_id; ?>" data-chapter-id="<?php echo $chap->ID; ?>" data-chapter-num="<?php echo esc_attr($chap_num); ?>" data-chapter-title="<?php echo esc_attr(muop_get_clean_chapter_title($chap->post_title)); ?>" title="Tùy chọn chương (Dịch giả)">
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
                                     </button>
                                     <div class="chapter-dropdown-menu">
@@ -311,12 +369,19 @@ if (!$thumb_url) {
                 <?php if (is_user_logged_in()) : ?>
                     <form id="formPostComment">
                         <input type="hidden" name="post_id" value="<?php echo $story_id; ?>" />
-                        <textarea name="comment" class="comment-textarea" placeholder="Chia sẻ cảm nghĩ của bạn về câu truyện này cùng Mướp nha..." required></textarea>
-                        <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+                        <div class="comment-input-wrap">
+                            <textarea name="comment" class="comment-textarea" placeholder="Chia sẻ cảm nghĩ của bạn về câu truyện này cùng Mướp nha..." required></textarea>
+                            <div class="comment-stickers-preview" style="display: none;"></div>
+                        </div>
+                        <div class="comment-form-toolbar">
+                            <button type="button" class="btn-sticker-toggle" title="Thêm Sticker">
+                                <i class="fa-regular fa-face-smile"></i> <span>Sticker</span>
+                            </button>
                             <button type="submit" class="btn btn-primary">
                                 <i class="fa-solid fa-paper-plane"></i> Gửi Bình Luận
                             </button>
                         </div>
+                        <?php muop_render_sticker_picker(); ?>
                     </form>
                 <?php else : ?>
                     <div style="background: var(--pastel-green); padding: 14px 18px; border-radius: var(--radius-md); font-size: 13.5px; display: flex; align-items: center; justify-content: space-between;">
@@ -333,14 +398,23 @@ if (!$thumb_url) {
                 if (!empty($comments)) :
                     foreach ($comments as $cmt) :
                 ?>
-                    <li class="comment-item">
+                    <li class="comment-item" id="comment-<?php echo $cmt->comment_ID; ?>">
                         <div class="comment-avatar">
                             <?php echo esc_html(strtoupper(substr($cmt->comment_author, 0, 1))); ?>
                         </div>
                         <div class="comment-body">
-                            <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
-                            <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
-                            <div class="comment-text"><?php echo esc_html($cmt->comment_content); ?></div>
+                            <div class="comment-header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                <div>
+                                    <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
+                                    <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
+                                </div>
+                                <?php if (muop_can_user_delete_comment($cmt)) : ?>
+                                    <button type="button" class="btn-delete-comment" data-comment-id="<?php echo (int) $cmt->comment_ID; ?>" title="Xóa bình luận">
+                                        <i class="fa-solid fa-trash-can"></i> Xóa
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                            <div class="comment-text"><?php echo muop_render_comment_content($cmt->comment_content); ?></div>
                         </div>
                     </li>
                 <?php 

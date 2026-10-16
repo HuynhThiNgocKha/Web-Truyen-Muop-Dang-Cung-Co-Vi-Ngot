@@ -5,8 +5,18 @@
  */
 if (!defined('ABSPATH')) exit;
 
-if (!is_user_logged_in() || (!current_user_can('dich_gia') && !current_user_can('administrator'))) {
+$current_user = wp_get_current_user();
+$is_admin = current_user_can('administrator');
+$is_translator = muop_user_is_translator($current_user->ID);
+
+if (!is_user_logged_in() || (!$is_translator && !$is_admin)) {
     wp_redirect(home_url('/dang-nhap/'));
+    exit;
+}
+
+// Nếu là Admin nhưng không có vai trò Dịch Giả thì chuyển hướng về Bảng Quản Trị Hệ Thống của Admin
+if ($is_admin && !$is_translator) {
+    wp_redirect(home_url('/quan-ly-admin/'));
     exit;
 }
 
@@ -144,7 +154,7 @@ if (!empty($story_ids)) {
                 <a href="<?php echo esc_url(home_url('/dang-truyen/')); ?>" class="btn btn-primary">
                     <i class="fa-solid fa-plus-circle"></i> Đăng Truyện Mới
                 </a>
-                <a href="<?php echo esc_url(home_url('/them-chuong/')); ?>" class="btn btn-secondary">
+                <a href="<?php echo esc_url(add_query_arg('from', 'translator', home_url('/them-chuong/'))); ?>" class="btn btn-secondary">
                     <i class="fa-solid fa-file-circle-plus"></i> Thêm Chương Mới
                 </a>
             </div>
@@ -360,7 +370,7 @@ if (!empty($story_ids)) {
                                         <?php echo esc_html($index + 1); ?>
                                     </td>
                                     <td class="col-title">
-                                        <a href="<?php echo esc_url(get_permalink($st->ID)); ?>" class="table-story-title" title="<?php echo esc_attr($st->post_title); ?>">
+                                        <a href="<?php echo esc_url(add_query_arg('from', 'translator', get_permalink($st->ID))); ?>" class="table-story-title" title="<?php echo esc_attr($st->post_title); ?>">
                                             <?php echo esc_html($st->post_title); ?>
                                         </a>
                                         <?php if ($st->post_status === 'draft') : ?>
@@ -387,21 +397,39 @@ if (!empty($story_ids)) {
                                         <?php endif; ?>
                                     </td>
                                     <td class="col-actions">
-                                        <div style="display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap;">
-                                            <?php if ($st->post_status === 'draft') : ?>
-                                                <button type="button" class="btn btn-primary btn-publish-draft" data-story-id="<?php echo $st->ID; ?>" style="padding: 4px 10px; font-size: 11.5px;" title="Đăng truyện này lên ngay">
-                                                    <i class="fa-solid fa-cloud-arrow-up"></i> Đăng Lên
+                                        <div class="story-actions-dropdown">
+                                            <button type="button" class="btn-story-dropdown-trigger" title="Tác vụ truyện" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                                            </button>
+                                            <div class="story-dropdown-menu">
+                                                <?php if ($st->post_status === 'draft') : ?>
+                                                    <button type="button" class="story-dropdown-item btn-publish-draft" data-story-id="<?php echo $st->ID; ?>">
+                                                        <i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary-green);"></i> Đăng truyện lên
+                                                    </button>
+                                                <?php endif; ?>
+
+                                                <button type="button" class="story-dropdown-item btn-action-edit-story-desc" data-story-id="<?php echo $st->ID; ?>">
+                                                    <i class="fa-solid fa-pen-to-square" style="color: var(--primary-green);"></i> Chỉnh sửa mô tả truyện
                                                 </button>
-                                            <?php endif; ?>
-                                            <a href="<?php echo esc_url(add_query_arg('story_id', $st->ID, home_url('/them-chuong/'))); ?>" class="btn btn-secondary" style="padding: 4px 10px; font-size: 12px;" title="Thêm chương">
-                                                <i class="fa-solid fa-plus"></i> Chương
-                                            </a>
-                                            <button type="button" class="btn btn-outline btn-edit-story" data-story-id="<?php echo $st->ID; ?>" style="padding: 4px 8px; font-size: 12px; cursor: pointer; color: var(--primary-green); border-color: var(--primary-green);" title="Chỉnh sửa mô tả truyện & nội dung chương">
-                                                <i class="fa-solid fa-pen"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-danger btn-delete-story" data-story-id="<?php echo $st->ID; ?>" style="padding: 4px 8px; font-size: 12px; cursor: pointer;" title="Xóa truyện">
-                                                <i class="fa-solid fa-trash"></i>
-                                            </button>
+
+                                                <button type="button" class="story-dropdown-item btn-action-edit-story-chaps" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                    <i class="fa-solid fa-file-pen" style="color: #2563eb;"></i> Chỉnh sửa chương
+                                                </button>
+
+                                                <a href="<?php echo esc_url(add_query_arg(array('story_id' => $st->ID, 'from' => 'translator'), home_url('/them-chuong/'))); ?>" class="story-dropdown-item">
+                                                    <i class="fa-solid fa-plus" style="color: #16a34a;"></i> Thêm mới chương
+                                                </a>
+
+                                                <div class="story-dropdown-divider"></div>
+
+                                                <button type="button" class="story-dropdown-item item-danger btn-delete-story" data-story-id="<?php echo $st->ID; ?>">
+                                                    <i class="fa-solid fa-trash-can" style="color: #dc2626;"></i> Xóa truyện
+                                                </button>
+
+                                                <button type="button" class="story-dropdown-item item-danger btn-action-open-delete-chaps" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                    <i class="fa-solid fa-rectangle-xmark" style="color: #dc2626;"></i> Xóa chương truyện
+                                                </button>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -441,19 +469,26 @@ if (!empty($story_ids)) {
                     <?php foreach ($comments_on_stories as $cmt) : 
                         $cmt_post = get_post($cmt->comment_post_ID);
                     ?>
-                        <li class="comment-item">
+                        <li class="comment-item" id="comment-<?php echo $cmt->comment_ID; ?>">
                             <div class="comment-avatar">
                                 <?php echo esc_html(strtoupper(substr($cmt->comment_author, 0, 1))); ?>
                             </div>
                             <div class="comment-body">
-                                <div>
-                                    <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
-                                    <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
-                                    <span style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
-                                        trong truyện: <a href="<?php echo esc_url(get_permalink($cmt->comment_post_ID)); ?>" style="font-weight: 600; color: var(--primary-green);"><?php echo esc_html($cmt_post ? $cmt_post->post_title : ''); ?></a>
-                                    </span>
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <div>
+                                        <span class="comment-author-name"><?php echo esc_html($cmt->comment_author); ?></span>
+                                        <span class="comment-time"><?php echo esc_html(muop_time_ago(strtotime($cmt->comment_date))); ?></span>
+                                        <span style="font-size: 12px; color: var(--text-muted); margin-left: 10px;">
+                                            trong truyện: <a href="<?php echo esc_url(get_permalink($cmt->comment_post_ID)); ?>" style="font-weight: 600; color: var(--primary-green);"><?php echo esc_html($cmt_post ? $cmt_post->post_title : ''); ?></a>
+                                        </span>
+                                    </div>
+                                    <?php if (muop_can_user_delete_comment($cmt)) : ?>
+                                        <button type="button" class="btn-delete-comment" data-comment-id="<?php echo (int) $cmt->comment_ID; ?>" title="Xóa bình luận">
+                                            <i class="fa-solid fa-trash-can"></i> Xóa
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="comment-text"><?php echo esc_html($cmt->comment_content); ?></div>
+                                <div class="comment-text"><?php echo muop_render_comment_content($cmt->comment_content); ?></div>
                                 <div style="margin-top: 8px;">
                                     <a href="<?php echo esc_url(get_permalink($cmt->comment_post_ID)); ?>#comments" class="btn btn-secondary" style="padding: 3px 10px; font-size: 11.5px;">
                                         <i class="fa-solid fa-reply"></i> Trả lời độc giả

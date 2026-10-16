@@ -7,14 +7,21 @@ echo           WEB DOC TRUYEN: MUOP DANG CUNG CO VI NGOT
 echo ======================================================================
 echo.
 
-:: 1. Kiem tra MySQL tren XAMPP
+:: 1. Kiem tra va khoi dong MySQL
 netstat -ano | findstr ":3306" | findstr "LISTENING" >nul
 if errorlevel 1 (
-    echo [THONG BAO] MySQL chua chay!
-    echo Vui long mo XAMPP Control Panel va nhan nut [Start] tai muc MySQL.
-    echo.
+    echo [..] Dang khoi dong MySQL Server (Port 3306)...
+    if not exist "%~dp0tmp" mkdir "%~dp0tmp"
+    start /b "" "C:\Program Files\xampp\mysql\bin\mysqld.exe" --defaults-file="C:\Program Files\xampp\mysql\bin\my.ini" --tmpdir="%~dp0tmp"
+    timeout /t 2 >nul
+    netstat -ano | findstr ":3306" | findstr "LISTENING" >nul
+    if errorlevel 1 (
+        echo [CANH BAO] Chua the khoi dong MySQL tu dong. Vui long kiem tra XAMPP.
+    ) else (
+        echo [OK] MySQL da duoc khoi dong thanh cong!
+    )
 ) else (
-    echo [OK] MySQL dang hoat dong tren XAMPP (Port 3306).
+    echo [OK] MySQL dang hoat dong (Port 3306).
 )
 
 :: 2. Kiem tra va khoi dong PHP Web Server tren 0.0.0.0:8080
@@ -40,7 +47,7 @@ echo ======================================================================
 echo.
 echo [*] Dang mo trinh duyet va ma QR...
 start http://localhost:8080/
-start http://localhost:8080/tools/mobile.html?ip=%LOCAL_IP%
+start http://localhost:8080/utilities/mobile.html?ip=%LOCAL_IP%
 
 echo.
 echo [*] Huong dan:

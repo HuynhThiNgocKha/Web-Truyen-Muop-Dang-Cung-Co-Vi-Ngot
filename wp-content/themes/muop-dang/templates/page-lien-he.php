@@ -52,39 +52,87 @@ get_header();
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
             <!-- Left: Thông tin liên hệ -->
+            <?php 
+            $c_email    = get_option('muop_contact_email', 'admin@muopdang.local');
+            $c_phone    = get_option('muop_contact_phone', '');
+            $c_facebook = get_option('muop_contact_facebook', '');
+            $c_telegram = get_option('muop_contact_telegram', '');
+            $c_address  = get_option('muop_contact_address', '');
+            $c_notes    = get_option('muop_contact_notes', 'Trong vòng 24 giờ tất cả các ngày trong tuần.');
+            ?>
             <div style="background: var(--pastel-green); padding: 22px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
                 <h3 style="color: var(--primary-green); font-size: 17px; margin-bottom: 16px;">
                     <i class="fa-solid fa-circle-info"></i> Thông Tin Ban Quản Trị
                 </h3>
 
                 <div style="display: flex; flex-direction: column; gap: 14px; font-size: 14px;">
+                    <?php if (!empty($c_email)) : ?>
                     <div style="display: flex; gap: 12px; align-items: flex-start;">
                         <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--soft-green); color: var(--primary-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                             <i class="fa-solid fa-envelope"></i>
                         </div>
                         <div>
                             <strong style="display: block;">Hòm thư hỗ trợ:</strong>
-                            <a href="mailto:admin@muopdang.local" style="color: var(--primary-green);">admin@muopdang.local</a>
+                            <a href="mailto:<?php echo esc_attr($c_email); ?>" style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html($c_email); ?></a>
                         </div>
                     </div>
+                    <?php endif; ?>
 
+                    <?php if (!empty($c_phone)) : ?>
                     <div style="display: flex; gap: 12px; align-items: flex-start;">
                         <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--soft-green); color: var(--primary-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                            <i class="fa-solid fa-feather-pointed"></i>
+                            <i class="fa-solid fa-phone"></i>
                         </div>
                         <div>
-                            <strong style="display: block;">Hợp tác dịch thuật & nhuận bút:</strong>
-                            <span style="color: var(--text-muted);">Đăng ký tài khoản dịch giả trực tiếp hoặc gửi email đăng ký.</span>
+                            <strong style="display: block;">Hotline / Zalo hỗ trợ:</strong>
+                            <a href="tel:<?php echo esc_attr(preg_replace('/[^0-9+]/', '', $c_phone)); ?>" style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html($c_phone); ?></a>
                         </div>
                     </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($c_facebook)) : ?>
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--soft-green); color: var(--primary-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fa-brands fa-facebook"></i>
+                        </div>
+                        <div>
+                            <strong style="display: block;">Fanpage Facebook:</strong>
+                            <a href="<?php echo esc_url($c_facebook); ?>" target="_blank" rel="noopener noreferrer" style="color: var(--primary-green); font-weight: 600;">Ghé thăm Fanpage Mướp Đắng <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px;"></i></a>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($c_telegram)) : ?>
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--soft-green); color: var(--primary-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fa-brands fa-telegram"></i>
+                        </div>
+                        <div>
+                            <strong style="display: block;">Kênh Telegram:</strong>
+                            <a href="<?php echo esc_url($c_telegram); ?>" target="_blank" rel="noopener noreferrer" style="color: var(--primary-green); font-weight: 600;">Nhắn tin qua Telegram <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px;"></i></a>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($c_address)) : ?>
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--soft-green); color: var(--primary-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i class="fa-solid fa-location-dot"></i>
+                        </div>
+                        <div>
+                            <strong style="display: block;">Trụ sở / Địa chỉ:</strong>
+                            <span style="color: var(--text-color);"><?php echo esc_html($c_address); ?></span>
+                        </div>
+                    </div>
+                    <?php endif; ?>
 
                     <div style="display: flex; gap: 12px; align-items: flex-start;">
                         <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--soft-green); color: var(--primary-green); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                             <i class="fa-solid fa-clock"></i>
                         </div>
                         <div>
-                            <strong style="display: block;">Thời gian phản hồi:</strong>
-                            <span style="color: var(--text-muted);">Trong vòng 24 giờ tất cả các ngày trong tuần.</span>
+                            <strong style="display: block;">Thời gian phản hồi & Làm việc:</strong>
+                            <span style="color: var(--text-muted);"><?php echo esc_html($c_notes); ?></span>
                         </div>
                     </div>
                 </div>

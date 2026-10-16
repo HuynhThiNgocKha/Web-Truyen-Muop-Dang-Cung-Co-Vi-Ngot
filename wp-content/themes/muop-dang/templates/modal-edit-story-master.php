@@ -38,6 +38,7 @@ if (is_wp_error($all_genres)) $all_genres = array();
                 <input type="hidden" name="story_id" id="editStoryId" value="" />
                 <input type="hidden" name="is_draft" id="editStoryIsDraftInput" value="0" />
                 <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+                <input type="hidden" name="is_admin_portal" value="<?php echo (is_page('quan-ly-admin') || (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'quan-ly-admin') !== false)) ? '1' : '0'; ?>" />
 
                 <!-- Tên Truyện & Trạng Thái (1 hàng dọc trên Mobile) -->
                 <div class="modal-form-grid-2-1">
@@ -106,8 +107,13 @@ if (is_wp_error($all_genres)) $all_genres = array();
 
                 <!-- Giới Thiệu / Văn Án -->
                 <div class="form-group" style="margin-bottom: 18px;">
-                    <label class="form-label" for="editStoryDescription">Giới Thiệu / Văn Án Truyện (*)</label>
-                    <textarea id="editStoryDescription" name="description" class="form-input" rows="7" required></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                        <label class="form-label" for="editStoryDescription" style="margin-bottom: 0;">Giới Thiệu / Văn Án Truyện (*)</label>
+                        <button type="button" class="btn btn-outline btn-scan-sensitive btn-sm" data-target="#editStoryDescription" style="padding: 4px 12px; font-size: 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-shield-halved" style="color: var(--primary-green);"></i> Duyệt Nội Dung
+                        </button>
+                    </div>
+                    <textarea id="editStoryDescription" name="description" class="form-input form-textarea-large" rows="10" style="min-height: 220px; font-size: 14.5px; line-height: 1.6;" required></textarea>
                 </div>
 
                 <!-- Buttons Hủy, Lưu Nháp & Cập Nhật Truyện -->
@@ -173,6 +179,7 @@ if (is_wp_error($all_genres)) $all_genres = array();
                 <input type="hidden" id="editChapterIsDraftInput" name="is_draft" value="0" />
                 <input type="hidden" name="action" value="muop_update_chapter" />
                 <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+                <input type="hidden" name="is_admin_portal" value="<?php echo (is_page('quan-ly-admin') || (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], 'quan-ly-admin') !== false)) ? '1' : '0'; ?>" />
 
                 <!-- Số Chương & Tên Chương (1 hàng dọc trên Mobile) -->
                 <div class="modal-form-grid-chap">
@@ -187,8 +194,26 @@ if (is_wp_error($all_genres)) $all_genres = array();
                 </div>
 
                 <div class="form-group" style="margin-bottom: 18px;">
-                    <label class="form-label" for="editChapterContent">Nội Dung Chương (*)</label>
-                    <textarea id="editChapterContent" name="content" class="form-input" rows="12" required placeholder="Nội dung chương truyện..."></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                        <label class="form-label" for="editChapterContent" style="margin-bottom: 0;">Nội Dung Chương (*)</label>
+                        <button type="button" class="btn btn-outline btn-scan-sensitive btn-sm" data-target="#editChapterContent" style="padding: 4px 12px; font-size: 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-shield-halved" style="color: var(--primary-green);"></i> Duyệt Nội Dung
+                        </button>
+                    </div>
+                    <textarea id="editChapterContent" name="content" class="form-input form-textarea-chapter" rows="14" style="min-height: 340px; font-size: 14.5px; line-height: 1.65; padding: 12px 14px;" required placeholder="Nội dung chương truyện..."></textarea>
+                    
+                    <!-- Thanh hiển thị số từ thời gian thực -->
+                    <div class="chapter-word-count-bar" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; flex-wrap: wrap; gap: 8px;">
+                        <span style="font-size: 12.5px; color: var(--text-muted);">
+                            <i class="fa-solid fa-circle-info" style="color: var(--primary-green);"></i> Hệ thống tự động đếm số từ khi bạn chỉnh sửa.
+                        </span>
+                        <div class="chapter-word-count-badge" style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 5px 14px; border-radius: var(--radius-full); font-size: 13px; font-weight: 600; color: var(--text-main); display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                            <i class="fa-solid fa-pen-nib" style="color: var(--primary-green);"></i>
+                            <span>Số từ: <strong id="editChapterContentWordCount" style="color: var(--primary-green); font-size: 14.5px; font-weight: 700;">0</strong> từ</span>
+                            <span style="color: var(--border-color); margin: 0 2px;">|</span>
+                            <span style="font-size: 12px; color: var(--text-muted);"><span id="editChapterContentCharCount">0</span> ký tự</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
@@ -238,3 +263,48 @@ if (is_wp_error($all_genres)) $all_genres = array();
     </div>
 </div>
 
+<!-- =========================================================================
+     POPUP 4: QUẢN LÝ DANH SÁCH XÓA CHƯƠNG TRUYỆN (#modalManageDeleteChapters)
+========================================================================== -->
+<div id="modalManageDeleteChapters" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 620px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column;">
+        <div class="modal-header-top-box">
+            <div class="modal-title-stacked">
+                <span class="modal-action-label" style="background: #fee2e2; color: #dc2626; border-color: #fecaca;">
+                    <i class="fa-solid fa-rectangle-xmark"></i> Xóa Chương Truyện
+                </span>
+                <h3 class="modal-story-title-sub" id="modalDeleteChaptersStoryTitle">...</h3>
+            </div>
+            <button type="button" id="btnCloseManageDeleteChaptersModal" class="btn-close-modal-delete-chapters" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+            <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #92400e; display: flex; align-items: flex-start; gap: 8px;">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 16px; margin-top: 1px; color: #d97706;"></i>
+                <div>
+                    Chọn chương bạn muốn xóa bên dưới. <strong>Lưu ý:</strong> Hành động xóa chương là vĩnh viễn và không thể khôi phục!
+                </div>
+            </div>
+
+            <div id="deleteChaptersLoading" style="text-align: center; padding: 30px; color: var(--text-muted); display: none;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: var(--primary-green); margin-bottom: 8px; display: block;"></i>
+                Đang tải danh sách chương...
+            </div>
+
+            <div id="deleteChaptersEmpty" style="text-align: center; padding: 30px; background: var(--pastel-green); border-radius: var(--radius-sm); color: var(--text-muted); display: none;">
+                <i class="fa-solid fa-folder-open" style="font-size: 24px; color: var(--primary-green); margin-bottom: 8px; display: block;"></i>
+                Truyện này hiện chưa có chương nào để xóa.
+            </div>
+
+            <div id="deleteChaptersList" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
+                <!-- Danh sách chương nạp động qua AJAX -->
+            </div>
+        </div>
+        <div style="padding: 12px 20px; background: var(--bg-body); border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary btn-close-modal-delete-chapters" style="padding: 6px 18px; font-size: 13px;">
+                Đóng
+            </button>
+        </div>
+    </div>
+</div>
