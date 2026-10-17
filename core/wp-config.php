@@ -97,20 +97,16 @@ $table_prefix = 'wp_';
  * @link https://wordpress.org/support/article/debugging-in-wordpress/
  */
 if ( ! defined( 'WP_DEBUG' ) ) {
-	define( 'WP_DEBUG', false );
+	define( 'WP_DEBUG', true );
+}
+if ( ! defined( 'WP_DEBUG_LOG' ) ) {
+	define( 'WP_DEBUG_LOG', true );
 }
 if ( ! defined( 'WP_DEBUG_DISPLAY' ) ) {
-	define( 'WP_DEBUG_DISPLAY', false );
+	define( 'WP_DEBUG_DISPLAY', true );
 }
-@ini_set( 'display_errors', '0' );
+@ini_set( 'display_errors', '1' );
 
-// Ensure clean output buffer for AJAX requests to prevent malformed JSON
-if ( ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( isset( $_REQUEST['action'] ) && ! empty( $_REQUEST['action'] ) ) ) {
-	while ( ob_get_level() ) {
-		@ob_end_clean();
-	}
-	ob_start();
-}
 
 // Ensure local writable upload temp directory exists to avoid PHP Request Startup notice
 $custom_tmp_dir = dirname( __DIR__ ) . DIRECTORY_SEPARATOR . 'tmp';

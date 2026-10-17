@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.81');
+define('MUOP_THEME_VERSION', '2.2.82');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -109,9 +109,8 @@ add_action('init', function() {
     $is_not_local = (!empty($host) && strpos($host, 'localhost') === false && strpos($host, '127.0.0.1') === false);
     $force_fix = (isset($_GET['muop_fix_urls']) && current_user_can('manage_options'));
 
-    if ($is_not_local || $force_fix) {
-        $has_ran = get_option('muop_db_localhost_migrated_v1', false);
-        if (!$has_ran || $force_fix) {
+    if ($force_fix) {
+        try {
             global $wpdb;
             $patterns = array(
                 'http://localhost:8080',
@@ -122,14 +121,14 @@ add_action('init', function() {
             $new_url = home_url();
 
             foreach ($patterns as $old_url) {
-                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->termmeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
-                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->usermeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
-                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->postmeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
-                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->posts} SET post_content = REPLACE(post_content, %s, %s) WHERE post_content LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+                if (!empty($wpdb->termmeta)) $wpdb->query($wpdb->prepare("UPDATE {$wpdb->termmeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+                if (!empty($wpdb->usermeta)) $wpdb->query($wpdb->prepare("UPDATE {$wpdb->usermeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+                if (!empty($wpdb->postmeta)) $wpdb->query($wpdb->prepare("UPDATE {$wpdb->postmeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+                if (!empty($wpdb->posts)) $wpdb->query($wpdb->prepare("UPDATE {$wpdb->posts} SET post_content = REPLACE(post_content, %s, %s) WHERE post_content LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
             }
 
             update_option('muop_db_localhost_migrated_v1', 1);
-        }
+        } catch (\Throwable $e) {}
     }
 });
 
@@ -849,6 +848,11 @@ add_filter('determine_current_user', function($user_id) {
         return (int) $user_id;
     }
 
+    // Bắt buộc kiểm tra hàm lõi WordPress pluggable đã nạp để tránh Fatal Error khi hook chạy sớm
+    if (!function_exists('wp_validate_auth_cookie')) {
+        return $user_id;
+    }
+
     // 1. Quét toàn bộ $_COOKIE (bất kể tiền tố hash nào do kiến trúc thư mục /core)
     if (!empty($_COOKIE) && is_array($_COOKIE)) {
         // Quét secure auth cookie trước
@@ -907,7 +911,7 @@ add_filter('determine_current_user', function($user_id) {
     if (!empty($req_nonce) && !empty($req_uid)) {
         $referer = wp_get_referer();
         $is_same_origin = $referer && strpos($referer, parse_url(home_url(), PHP_URL_HOST)) !== false;
-        if ($is_same_origin) {
+        if ($is_same_origin && function_exists('wp_nonce_tick') && function_exists('wp_hash')) {
             $tick = wp_nonce_tick('muop_ajax_nonce');
             $expected1 = substr(wp_hash($tick . '|muop_ajax_nonce|' . $req_uid . '|', 'nonce'), -12, 10);
             $expected2 = substr(wp_hash(($tick - 1) . '|muop_ajax_nonce|' . $req_uid . '|', 'nonce'), -12, 10);

@@ -25,10 +25,14 @@ spl_autoload_register(function ($class) {
 });
 
 // 2. Initialize Automatic Image Optimizer Engine
-\Muop\Core\ImageOptimizer::init();
+if (class_exists('\\Muop\\Core\\ImageOptimizer')) {
+    \Muop\Core\ImageOptimizer::init();
+}
 
 // 3. Initialize REST Server (Client - Server REST API Architecture)
-add_action('rest_api_init', array(\Muop\Api\RestServer::class, 'registerRoutes'));
+if (class_exists('\\Muop\\Api\\RestServer')) {
+    add_action('rest_api_init', array(\Muop\Api\RestServer::class, 'registerRoutes'));
+}
 
 // 3. Enqueue Client-side API Client SDK on frontend
 add_action('wp_enqueue_scripts', function() {
