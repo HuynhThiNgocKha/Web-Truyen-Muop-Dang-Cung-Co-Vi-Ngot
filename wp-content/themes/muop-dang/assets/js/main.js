@@ -45,6 +45,10 @@
     return '/core/wp-admin/admin-ajax.php';
   }
 
+  function getSafeAjaxUrl() {
+    return getAjaxUrl();
+  }
+
   // Safe helper to extract message from AJAX response or error (prevents undefined reading 'message')
   function getAjaxMsg(res, defaultMsg) {
     if (!res) return defaultMsg || 'Có lỗi xảy ra!';
@@ -116,6 +120,7 @@
     return defaultMsg || 'Không thể kết nối với máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau!';
   }
 
+  window.getAjaxUrl = getAjaxUrl;
   window.getSafeAjaxUrl = getSafeAjaxUrl;
   window.getAjaxMsg = getAjaxMsg;
   window.handleAjaxError = handleAjaxError;
@@ -9269,7 +9274,11 @@
 
   // INITIALIZE ALL
   $(document).ready(() => {
-    localStorage.removeItem('muop_accent_color');
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('muop_accent_color');
+      }
+    } catch(e) {}
 
     const safeInit = (name, fn) => {
       try {
