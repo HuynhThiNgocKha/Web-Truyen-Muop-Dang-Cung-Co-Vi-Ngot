@@ -17,6 +17,7 @@ $user_id      = $current_user->ID;
 $registered   = date('d/m/Y', strtotime($current_user->user_registered));
 $avatar_char  = strtoupper(substr($current_user->display_name, 0, 1));
 $custom_avatar = get_user_meta($user_id, 'muop_user_avatar', true);
+$custom_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($custom_avatar) : $custom_avatar;
 $user_bio     = get_user_meta($user_id, 'description', true);
 ?>
 

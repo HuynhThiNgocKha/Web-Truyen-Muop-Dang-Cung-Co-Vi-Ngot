@@ -13,6 +13,7 @@ $user_id      = $is_logged_in ? $current_user->ID : 0;
 $registered   = $is_logged_in ? date('d/m/Y', strtotime($current_user->user_registered)) : '';
 $avatar_char  = $is_logged_in ? strtoupper(substr($current_user->display_name, 0, 1)) : '';
 $custom_avatar = $is_logged_in ? get_user_meta($user_id, 'muop_user_avatar', true) : '';
+$custom_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($custom_avatar) : $custom_avatar;
 ?>
 
 <div class="container" style="padding-top: 20px; padding-bottom: 40px;">

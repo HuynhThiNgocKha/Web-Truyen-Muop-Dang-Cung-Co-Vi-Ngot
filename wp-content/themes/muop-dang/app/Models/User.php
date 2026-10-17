@@ -88,7 +88,8 @@ class User {
      * Get user custom avatar
      */
     public static function getAvatar($user_id) {
-        return get_user_meta($user_id, 'muop_user_avatar', true) ?: '';
+        $avatar = get_user_meta($user_id, 'muop_user_avatar', true) ?: '';
+        return function_exists('muop_normalize_url') ? muop_normalize_url($avatar) : $avatar;
     }
 
     /**

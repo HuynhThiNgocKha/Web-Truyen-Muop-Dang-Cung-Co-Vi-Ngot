@@ -1,29 +1,25 @@
-## ONEPANEL Force HTTPS by SSL installation
-RewriteEngine On
-RewriteCond %{HTTPS} !=on
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301,NE]
-Header always set Content-Security-Policy "upgrade-insecure-requests;"
-## ONEPANEL Force HTTPS by SSL installation end
-
-
-## ONEPANEL Force HTTPS by SSL installation
 <IfModule mod_rewrite.c>
 RewriteEngine On
-RewriteCond %{HTTPS} !=on
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301,NE]
+RewriteCond %{HTTPS} !=on [OR]
+RewriteCond %{HTTP_HOST} ^www\.muopdangcungcovingot\.io\.vn$ [NC]
+RewriteRule ^(.*)$ https://muopdangcungcovingot.io.vn/$1 [L,R=301,NE]
 </IfModule>
 
 <IfModule mod_headers.c>
-Header always set Content-Security-Policy "upgrade-insecure-requests;"
+Header unset Content-Security-Policy
+Header always set Content-Security-Policy "upgrade-insecure-requests; default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src-elem * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline'; font-src * data:; img-src * data: blob:;"
 </IfModule>
-## ONEPANEL Force HTTPS by SSL installation end
-
 
 # BEGIN WordPress
 <IfModule mod_rewrite.c>
 RewriteEngine On
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteBase /
+
+# Tự động điều hướng và phục vụ wp-admin / wp-includes / admin-ajax vào thư mục core
+RewriteRule ^wp-admin/(.*)$ core/wp-admin/$1 [L,QSA]
+RewriteRule ^wp-includes/(.*)$ core/wp-includes/$1 [L,QSA]
+
 RewriteRule ^index\.php$ - [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

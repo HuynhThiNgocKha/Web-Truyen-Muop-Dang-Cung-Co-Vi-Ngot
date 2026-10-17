@@ -220,8 +220,23 @@ if (!defined('ABSPATH')) exit;
             </button>
         </div>
 
-        <!-- Controls Bar: Chọn ký tự thay thế tự động -->
-        <div style="padding: 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <!-- Controls Bar: Tabs chuyển đổi Xem Vị Trí Đánh Dấu / Xem Danh Sách -->
+        <div style="padding: 10px 20px 0; background: var(--bg-card); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div class="sensitive-modal-tabs" style="display: flex; gap: 8px;">
+                <button type="button" class="sensitive-tab-btn active" id="tabBtnSensitivePreview" data-tab="preview">
+                    <i class="fa-solid fa-highlighter"></i> 1. Bảng Đánh Dấu Trong Bài (<span id="sensitiveTabPreviewCount">0</span>)
+                </button>
+                <button type="button" class="sensitive-tab-btn" id="tabBtnSensitiveTable" data-tab="table">
+                    <i class="fa-solid fa-list-check"></i> 2. Danh Sách & Tùy Chỉnh Thay Thế (<span id="sensitiveTabTableCount">0</span>)
+                </button>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); padding-bottom: 8px;">
+                <i class="fa-solid fa-shield-halved" style="color: var(--primary-green);"></i> Hệ thống đánh dấu trực quan vị trí vi phạm
+            </div>
+        </div>
+
+        <!-- Controls Bar: Chọn ký tự thay thế tự động (chỉ hiện khi ở Tab Table) -->
+        <div id="sensitiveDelimiterBar" style="padding: 10px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">
                     <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary-green);"></i> Ký tự phân cách:
@@ -243,7 +258,7 @@ if (!defined('ABSPATH')) exit;
             <!-- Thông báo kết quả sau khi duyệt xong -->
             <div id="sensitiveScanResultNotice" style="display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-sm); padding: 9px 14px; font-size: 13px; color: #991b1b; display: flex; align-items: center; gap: 8px;">
                 <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 16px;"></i>
-                <span><strong>Đã duyệt xong!</strong> Hệ thống phát hiện <strong id="detectedWordsCountText" style="color: #dc2626;">0</strong> từ nhạy cảm. Bạn có thể chọn cách tự động thay thế bằng ký tự hoặc tự sửa từng từ bên dưới:</span>
+                <span><strong>Đã duyệt xong!</strong> Hệ thống phát hiện <strong id="detectedWordsCountText" style="color: #dc2626;">0</strong> từ nhạy cảm. Bạn có thể xem vị trí đánh dấu trong bài hoặc tự động thay thế bằng ký tự phân cách:</span>
             </div>
 
             <!-- Message if no words found -->
@@ -253,7 +268,7 @@ if (!defined('ABSPATH')) exit;
                 <p style="margin: 0; font-size: 13.5px;">Hệ thống không tìm thấy từ ngữ nhạy cảm, thô tục hay bộ phận sinh dục nào trong văn bản này.</p>
             </div>
 
-            <!-- Table list of found words -->
+            <!-- Tab 1: Table list of found words -->
             <div id="sensitiveTableWrapper" style="overflow-x: auto;">
                 <table class="sensitive-review-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
                     <thead>
@@ -263,13 +278,27 @@ if (!defined('ABSPATH')) exit;
                             </th>
                             <th style="padding: 10px 12px;">Từ phát hiện</th>
                             <th style="padding: 10px 12px; width: 80px; text-align: center;">Số lần</th>
-                            <th style="padding: 10px 12px; min-width: 220px;">Từ thay thế (bấm vào để tự sửa)</th>
+                            <th style="padding: 10px 12px; min-width: 200px;">Từ thay thế (bấm vào để tự sửa)</th>
+                            <th style="padding: 10px 12px; width: 110px; text-align: center;">Vị trí</th>
                         </tr>
                     </thead>
                     <tbody id="sensitiveWordsListBody">
                         <!-- Đổ tự động bằng JavaScript -->
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Tab 1: Visual Highlighted Context Preview (Bảng Nội Dung Đã Đánh Dấu) -->
+            <div id="sensitivePreviewWrapper" style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12.5px; color: var(--text-muted);">
+                    <span><i class="fa-solid fa-eye" style="color: var(--primary-green);"></i> Các từ nhạy cảm được tô đỏ trực tiếp trong bảng nội dung. Bấm vào từ để cuộn đến:</span>
+                    <span style="font-weight: 600; color: #dc2626;"><i class="fa-solid fa-flag"></i> Tô màu đỏ = Từ vi phạm</span>
+                </div>
+                <!-- Dải chip nhảy nhanh đến từng từ trong bảng nội dung -->
+                <div id="modalSensitiveWordChips" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0;"></div>
+                <div id="sensitiveTextHighlightContainer" style="max-height: 420px; overflow-y: auto; background: var(--bg-body); padding: 18px 20px; border: 1.5px solid var(--border-color); border-radius: var(--radius-md); line-height: 1.85; font-size: 14.5px; white-space: pre-wrap; font-family: inherit; color: var(--text-main);">
+                    <!-- Render nội dung có thẻ <mark> highlight bằng JS -->
+                </div>
             </div>
         </div>
 

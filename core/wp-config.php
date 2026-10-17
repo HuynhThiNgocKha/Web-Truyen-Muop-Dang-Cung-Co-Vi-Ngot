@@ -19,6 +19,15 @@
  * @package WordPress
  */
 
+// Hỗ trợ HTTPS khi chạy sau Reverse Proxy (1Panel, OpenResty, Cloudflare, OneShield, Nginx, LiteSpeed)
+if ( ( isset( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) && strtolower( $_SERVER['HTTP_X_FORWARDED_PROTO'] ) === 'https' )
+  || ( isset( $_SERVER['HTTP_X_FORWARDED_SSL'] ) && strtolower( $_SERVER['HTTP_X_FORWARDED_SSL'] ) === 'on' )
+  || ( isset( $_SERVER['HTTP_CF_VISITOR'] ) && strpos( $_SERVER['HTTP_CF_VISITOR'], 'https' ) !== false )
+  || ( isset( $_SERVER['HTTP_HOST'] ) && strpos( $_SERVER['HTTP_HOST'], 'muopdangcungcovingot.io.vn' ) !== false )
+) {
+    $_SERVER['HTTPS'] = 'on';
+}
+
 // ** Database settings - You can get this info from your web host ** //
 /** The name of the database for WordPress */
 define( 'DB_NAME', 'webtruyen_zhihu' );
@@ -95,6 +104,14 @@ if ( ! defined( 'WP_DEBUG_DISPLAY' ) ) {
 }
 @ini_set( 'display_errors', '0' );
 
+// Ensure clean output buffer for AJAX requests to prevent malformed JSON
+if ( ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( isset( $_REQUEST['action'] ) && ! empty( $_REQUEST['action'] ) ) ) {
+	while ( ob_get_level() ) {
+		@ob_end_clean();
+	}
+	ob_start();
+}
+
 // Ensure local writable upload temp directory exists to avoid PHP Request Startup notice
 $custom_tmp_dir = dirname( __DIR__ ) . DIRECTORY_SEPARATOR . 'tmp';
 if ( ! is_dir( $custom_tmp_dir ) ) {
@@ -111,6 +128,10 @@ $is_ssl = ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' )
 
 $host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'muopdangcungcovingot.io.vn';
 $protocol = ( $is_ssl || strpos( $host, 'muopdangcungcovingot.io.vn' ) !== false ) ? 'https://' : 'http://';
+
+if ( $protocol === 'https://' ) {
+	$_SERVER['HTTPS'] = 'on';
+}
 
 if ( ! defined( 'WP_HOME' ) ) {
 	define( 'WP_HOME', $protocol . $host );
@@ -133,6 +154,9 @@ if ( ! defined( 'SITECOOKIEPATH' ) ) {
 }
 if ( ! defined( 'ADMIN_COOKIE_PATH' ) ) {
 	define( 'ADMIN_COOKIE_PATH', '/' );
+}
+if ( ! defined( 'COOKIE_DOMAIN' ) ) {
+	define( 'COOKIE_DOMAIN', '' );
 }
 
 /* That's all, stop editing! Happy publishing. */

@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 echo ===================================================
 echo     DANG SUA LOI MYSQL XAMPP (ARIA RECOVERY FAILED)
@@ -43,6 +43,10 @@ cd /d "%DATA_DIR%"
 
 echo 5. Cap quyen ghi cho thu muc mysql\data de tranh loi UAC...
 icacls "%DATA_DIR%" /grant "Users":(OI)(CI)F /T /Q >nul
+
+echo 6. Cap quyen ghi cho thu muc xampp\tmp de tranh loi upload...
+if not exist "C:\Program Files\xampp\tmp" mkdir "C:\Program Files\xampp\tmp" >nul 2>&1
+icacls "C:\Program Files\xampp\tmp" /grant "Users":(OI)(CI)F /T /Q >nul 2>&1
 
 echo ===================================================
 echo  HOAN TAT!

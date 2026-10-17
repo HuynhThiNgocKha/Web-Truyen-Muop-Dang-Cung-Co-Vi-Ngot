@@ -144,6 +144,7 @@ $avatar_initial = !empty($team_name) ? mb_strtoupper(mb_substr($team_name, 0, 1,
 
 // Lấy Avatar và Bio của Team
 $team_avatar_url = $team_id > 0 ? get_term_meta($team_id, '_team_avatar', true) : '';
+$team_avatar_url = function_exists('muop_normalize_url') ? muop_normalize_url($team_avatar_url) : $team_avatar_url;
 $team_bio = '';
 if ($team_term) {
     $team_bio = !empty($team_term->description) ? $team_term->description : get_term_meta($team_id, '_team_bio', true);
@@ -184,7 +185,7 @@ if (is_user_logged_in() && $team_id > 0) {
                 <div class="team-avatar-wrap">
                     <div class="team-avatar-circle" id="teamAvatarDisplay">
                         <?php if (!empty($team_avatar_url)) : ?>
-                            <img src="<?php echo esc_url($team_avatar_url); ?>" alt="<?php echo esc_attr($team_name); ?>" class="team-avatar-img" id="teamAvatarImg" />
+                            <img src="<?php echo esc_url($team_avatar_url); ?>" alt="<?php echo esc_attr($team_name); ?>" class="team-avatar-img" id="teamAvatarImg" onerror="this.style.display='none'; var c=document.getElementById('teamAvatarChar'); if(c) c.style.display='block';" />
                             <span id="teamAvatarChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
                         <?php else : ?>
                             <span id="teamAvatarChar"><?php echo esc_html($avatar_initial); ?></span>
@@ -430,7 +431,7 @@ if (is_user_logged_in() && $team_id > 0) {
                 <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
                     <div class="avatar-preview-circle" style="width: 76px; height: 76px; border-radius: 50%; border: 3px solid #ffffff; overflow: hidden; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 12px rgba(63, 117, 35, 0.3);">
                         <?php if (!empty($team_avatar_url)) : ?>
-                            <img id="singleAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                            <img id="singleAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; var c=document.getElementById('singleAvatarPreviewChar'); if(c) c.style.display='block';" />
                             <span id="singleAvatarPreviewChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
                         <?php else : ?>
                             <span id="singleAvatarPreviewChar"><?php echo esc_html($avatar_initial); ?></span>
@@ -576,9 +577,9 @@ if (is_user_logged_in() && $team_id > 0) {
                         <i class="fa-solid fa-image"></i> Ảnh Đại Diện Team (Avatar)
                     </label>
                     <div style="display: flex; gap: 16px; align-items: center;">
-                        <div class="avatar-preview-circle" style="width: 72px; height: 72px; border-radius: 50%; border: 3px solid #ffffff; overflow: hidden; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 12px rgba(63, 117, 35, 0.3);">
+                        <div class="avatar-preview-circle" style="width: 88px; height: 88px; border-radius: 50%; border: 3px solid #ffffff; overflow: hidden; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 14px rgba(63, 117, 35, 0.32);">
                             <?php if (!empty($team_avatar_url)) : ?>
-                                <img id="teamModalAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+                                <img id="teamModalAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; var c=document.getElementById('teamModalAvatarPreviewChar'); if(c) c.style.display='block';" />
                                 <span id="teamModalAvatarPreviewChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
                             <?php else : ?>
                                 <span id="teamModalAvatarPreviewChar"><?php echo esc_html($avatar_initial); ?></span>

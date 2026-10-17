@@ -5,7 +5,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-if (!is_user_logged_in() || (!current_user_can('dich_gia') && !current_user_can('administrator'))) {
+if (!is_user_logged_in() || !(function_exists('muop_is_translator_or_admin') ? muop_is_translator_or_admin() : (current_user_can('dich_gia') || current_user_can('administrator')))) {
     wp_redirect(home_url('/dang-nhap/'));
     exit;
 }
@@ -37,6 +37,7 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
         <form id="formSubmitStory" enctype="multipart/form-data">
             <input type="hidden" name="action" value="muop_submit_story" />
             <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+            <input type="hidden" name="muop_user_id" value="<?php echo esc_attr($current_user->ID); ?>" />
             <!-- CENTER 1: THÔNG TIN TRUYỆN -->
             <div style="background: var(--pastel-green); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 22px;">
                 <h3 style="font-size: 16px; font-weight: 700; color: var(--primary-green); margin-bottom: 16px;">

@@ -6,7 +6,7 @@
     'use strict';
 
     const config = window.muopConfig || {
-        ajaxUrl: '/wp-admin/admin-ajax.php',
+        ajaxUrl: '/core/wp-admin/admin-ajax.php',
         restUrl: '/wp-json/muop/v1/',
         nonce: ''
     };
@@ -25,12 +25,16 @@
             return $.ajax({
                 url: url,
                 type: method,
+                xhrFields: { withCredentials: true },
                 data: (method === 'GET') ? data : JSON.stringify(data),
                 contentType: (method === 'GET') ? 'application/x-www-form-urlencoded; charset=UTF-8' : 'application/json; charset=UTF-8',
                 dataType: 'json',
                 beforeSend: function(xhr) {
                     if (config.nonce) {
                         xhr.setRequestHeader('X-WP-Nonce', config.nonce);
+                    }
+                    if (config.userId) {
+                        xhr.setRequestHeader('X-Muop-User', config.userId);
                     }
                 }
             });
@@ -47,8 +51,17 @@
             return $.ajax({
                 url: config.ajaxUrl,
                 type: 'POST',
+                xhrFields: { withCredentials: true },
                 data: data,
-                dataType: 'json'
+                dataType: 'json',
+                beforeSend: function(xhr) {
+                    if (config.nonce) {
+                        xhr.setRequestHeader('X-WP-Nonce', config.nonce);
+                    }
+                    if (config.userId) {
+                        xhr.setRequestHeader('X-Muop-User', config.userId);
+                    }
+                }
             });
         },
 

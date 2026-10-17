@@ -15,9 +15,14 @@ get_header();
 <div class="container">
     <div class="auth-page-wrapper">
         <div class="auth-header">
-            <div class="brand-logo" style="width: 50px; height: 50px; font-size: 24px; margin: 0 auto 14px;">
-                <i class="fa-solid fa-leaf"></i>
-            </div>
+            <a href="<?php echo esc_url(home_url('/')); ?>" class="auth-brand-static" title="<?php bloginfo('name'); ?>" style="display: inline-flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 10px !important; text-decoration: none !important; margin: 0 auto 16px !important;">
+                <div class="auth-brand-logo" style="width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 50% !important; padding: 2px !important; background: #ffffff !important; border: 2px solid var(--primary-green, #3F7523) !important; box-shadow: 0 2px 8px rgba(63, 117, 35, 0.22) !important; display: flex !important; align-items: center !important; justify-content: center !important; overflow: hidden !important; flex-shrink: 0 !important; box-sizing: border-box !important;">
+                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>" alt="Logo Mướp Đắng" style="width: 100% !important; height: 100% !important; border-radius: 50% !important; object-fit: cover !important; display: block !important;" />
+                </div>
+                <div class="auth-brand-text" style="display: flex !important; align-items: center !important; flex-shrink: 0 !important;">
+                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . MUOP_THEME_VERSION); ?>" alt="<?php bloginfo('name'); ?>" style="height: 34px !important; width: auto !important; max-width: 165px !important; object-fit: contain !important; display: block !important;" />
+                </div>
+            </a>
             <h2>Đăng Ký Tài Khoản Độc Giả</h2>
             <p>Tham gia cộng đồng đọc truyện tại Mướp Đắng</p>
         </div>

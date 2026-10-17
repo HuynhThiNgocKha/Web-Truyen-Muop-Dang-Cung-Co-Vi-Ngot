@@ -58,6 +58,7 @@ $all_teams = get_terms(array(
                     $fav_count = (int) get_term_meta($team->term_id, '_team_favorite_count', true);
                     if ($fav_count < 0) $fav_count = 0;
                     $team_avatar = get_term_meta($team->term_id, '_team_avatar', true);
+                    $team_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($team_avatar) : $team_avatar;
                 ?>
                     <div class="team-list-card">
                         <div class="team-card-avatar">

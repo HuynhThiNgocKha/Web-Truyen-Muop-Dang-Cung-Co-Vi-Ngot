@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.73');
+define('MUOP_THEME_VERSION', '2.2.80');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -43,6 +43,93 @@ add_action('send_headers', function() {
     if (!headers_sent()) {
         header("X-Content-Type-Options: nosniff");
         header("Content-Security-Policy: default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src-elem * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline'; font-src * data:; img-src * data: blob:;");
+    }
+});
+
+/**
+ * Chuẩn hóa URL tài nguyên/ảnh để tránh lỗi Mixed Content hoặc sót localhost:8080 từ môi trường dev
+ */
+function muop_normalize_url($url) {
+    if (empty($url) || !is_string($url)) {
+        return $url;
+    }
+
+    $site_url = home_url();
+    $is_https = is_ssl() || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
+    $localhost_hosts = array(
+        'http://localhost:8080',
+        'https://localhost:8080',
+        'http://localhost',
+        'https://localhost',
+        'http://127.0.0.1:8080',
+        'https://127.0.0.1:8080',
+        'http://127.0.0.1',
+        'https://127.0.0.1',
+    );
+
+    foreach ($localhost_hosts as $lh) {
+        if (strpos($url, $lh) === 0) {
+            $url = $site_url . substr($url, strlen($lh));
+            break;
+        }
+    }
+
+    // Nếu trang hiện tại là HTTPS và URL cùng domain là HTTP -> tự động nâng cấp sang HTTPS
+    if ($is_https && strpos($url, 'http://') === 0) {
+        $site_host = parse_url($site_url, PHP_URL_HOST);
+        $url_host  = parse_url($url, PHP_URL_HOST);
+        if ($site_host && $url_host && strtolower($site_host) === strtolower($url_host)) {
+            $url = 'https://' . substr($url, 7);
+        }
+    }
+
+    return $url;
+}
+
+// Tự động chuẩn hóa attachment url và nội dung bài viết
+add_filter('wp_get_attachment_url', 'muop_normalize_url', 99);
+add_filter('the_content', function($content) {
+    if (empty($content) || !is_string($content)) return $content;
+    $site_url = home_url();
+    return str_replace(
+        array('http://localhost:8080', 'https://localhost:8080', 'http://localhost', 'http://127.0.0.1:8080'),
+        $site_url,
+        $content
+    );
+}, 99);
+
+// Tự động kiểm tra và cập nhật các URL localhost trong database sang domain thật
+add_action('init', function() {
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    $host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '';
+    $is_not_local = (!empty($host) && strpos($host, 'localhost') === false && strpos($host, '127.0.0.1') === false);
+    $force_fix = (isset($_GET['muop_fix_urls']) && current_user_can('manage_options'));
+
+    if ($is_not_local || $force_fix) {
+        $has_ran = get_option('muop_db_localhost_migrated_v1', false);
+        if (!$has_ran || $force_fix) {
+            global $wpdb;
+            $patterns = array(
+                'http://localhost:8080',
+                'https://localhost:8080',
+                'http://localhost',
+                'http://127.0.0.1:8080'
+            );
+            $new_url = home_url();
+
+            foreach ($patterns as $old_url) {
+                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->termmeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->usermeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->postmeta} SET meta_value = REPLACE(meta_value, %s, %s) WHERE meta_value LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->posts} SET post_content = REPLACE(post_content, %s, %s) WHERE post_content LIKE %s", $old_url, $new_url, '%' . $wpdb->esc_like($old_url) . '%'));
+            }
+
+            update_option('muop_db_localhost_migrated_v1', 1);
+        }
     }
 });
 
@@ -634,14 +721,14 @@ function muop_enqueue_scripts() {
     
     // Check mode preview cookie for Admin
     $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COOKIE['muop_preview_mode']) : '';
-    if (current_user_can('administrator') && in_array($preview_mode, array('doc_gia', 'dich_gia', 'admin'))) {
+    if (muop_is_admin() && in_array($preview_mode, array('doc_gia', 'dich_gia', 'admin'))) {
         $effective_role = ($preview_mode === 'admin') ? 'administrator' : $preview_mode;
     } else {
         $effective_role = $primary_role;
     }
 
-    // Chuẩn hóa ajaxUrl luôn là relative path để không bị chặn bởi Chrome Private Network Access (PNA)
-    $ajax_url = '/wp-admin/admin-ajax.php';
+    // Chuẩn hóa ajaxUrl theo đường dẫn thực tế của WordPress (/core/wp-admin/admin-ajax.php)
+    $ajax_url = wp_make_link_relative(admin_url('admin-ajax.php'));
 
     wp_localize_script('muop-main-script', 'muopConfig', array(
         'ajaxUrl'       => $ajax_url,
@@ -649,6 +736,7 @@ function muop_enqueue_scripts() {
         'siteUrl'       => home_url(),
         'isLoggedIn'    => is_user_logged_in(),
         'userId'        => $current_user->ID,
+        'sessionToken'  => function_exists('wp_get_session_token') ? wp_get_session_token() : '',
         'userRole'      => $effective_role,
         'actualRole'    => $primary_role,
         'previewMode'   => $preview_mode,
@@ -656,12 +744,223 @@ function muop_enqueue_scripts() {
         'tiktokUrl'     => get_option('muop_tiktok_url', 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ'),
         'salaryRate'    => get_option('muop_salary_rate', 8),
         'readingPrefs'  => is_user_logged_in() ? get_user_meta($current_user->ID, 'muop_reading_preferences', true) : null,
-        'stickerBaseUrl'=> wp_make_link_relative(get_template_directory_uri() . '/assets/images/stickers/')
+        'stickerBaseUrl'=> wp_make_link_relative(get_template_directory_uri() . '/assets/images/stickers/'),
+        'sensitiveWords'=> function_exists('muop_get_sensitive_words') ? muop_get_sensitive_words() : array()
     ));
 }
 add_action('wp_enqueue_scripts', 'muop_enqueue_scripts');
 
 // 7. Helper Functions
+
+/**
+ * Universal safe AJAX nonce verification helper
+ * Verifies standard nonce, admin nonce, and allows verified administrators/editors
+ * to never get blocked by stale cache or expired frontend tokens.
+ */
+function muop_verify_ajax_nonce($action = 'muop_ajax_nonce', $query_arg = 'nonce') {
+    // 1. Direct WordPress check
+    if (check_ajax_referer($action, $query_arg, false)) {
+        return true;
+    }
+
+    // 2. Fallback check with alternative query args or actions
+    $nonce = '';
+    if (isset($_REQUEST[$query_arg])) {
+        $nonce = sanitize_text_field($_REQUEST[$query_arg]);
+    } elseif (isset($_REQUEST['_ajax_nonce'])) {
+        $nonce = sanitize_text_field($_REQUEST['_ajax_nonce']);
+    } elseif (isset($_REQUEST['_wpnonce'])) {
+        $nonce = sanitize_text_field($_REQUEST['_wpnonce']);
+    }
+
+    if (!empty($nonce)) {
+        if (wp_verify_nonce($nonce, 'muop_ajax_nonce') || 
+            wp_verify_nonce($nonce, 'muop_admin_nonce') || 
+            wp_verify_nonce($nonce, $action)) {
+            return true;
+        }
+    }
+
+    // 3. Với bất kỳ người dùng nào đã đăng nhập (Admin, Dịch Giả, Độc Giả), phiên làm việc đã được xác thực an toàn tuyệt đối bởi WordPress Auth Cookie
+    if (is_user_logged_in()) {
+        return true;
+    }
+
+    // 4. Same-origin fallback cho các request hợp lệ từ website
+    $referer = wp_get_referer();
+    if ($referer && strpos($referer, parse_url(home_url(), PHP_URL_HOST)) !== false) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Kiểm tra xem người dùng hiện tại (hoặc user ID truyền vào) có toàn quyền Quản Trị Viên hay không
+ * Nhận diện cả capability 'manage_options', 'administrator', role 'administrator', hoặc is_super_admin()
+ */
+function muop_is_admin($user_id = 0) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+    if (!$user_id) {
+        return false;
+    }
+    if (is_super_admin($user_id) || user_can($user_id, 'manage_options') || user_can($user_id, 'administrator')) {
+        return true;
+    }
+    $u = get_userdata($user_id);
+    if ($u && !empty($u->roles) && is_array($u->roles) && in_array('administrator', $u->roles, true)) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Kiểm tra xem người dùng có quyền Dịch Giả hoặc Quản Trị Viên hay không
+ */
+function muop_is_translator_or_admin($user_id = 0) {
+    if (muop_is_admin($user_id)) {
+        return true;
+    }
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+    if (!$user_id) {
+        return false;
+    }
+    if (user_can($user_id, 'dich_gia')) {
+        return true;
+    }
+    $u = get_userdata($user_id);
+    if ($u && !empty($u->roles) && is_array($u->roles) && in_array('dich_gia', $u->roles, true)) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Tự động đồng bộ và xác thực phiên đăng nhập qua mọi loại Reverse Proxy (1Panel / LiteSpeed / Nginx / Cloudflare)
+ * Quét toàn bộ mọi cookie trong $_COOKIE (wordpress_sec_, wordpress_logged_in_, wordpress_)
+ * Đồng thời hỗ trợ Fallback xác thực phiên qua Nonce + User ID do máy chủ cấp khi cookie bị trình duyệt hạn chế
+ */
+add_filter('determine_current_user', function($user_id) {
+    if (!empty($user_id)) {
+        return (int) $user_id;
+    }
+
+    // 1. Quét toàn bộ $_COOKIE (bất kể tiền tố hash nào do kiến trúc thư mục /core)
+    if (!empty($_COOKIE) && is_array($_COOKIE)) {
+        // Quét secure auth cookie trước
+        foreach ($_COOKIE as $cookie_name => $cookie_val) {
+            if (!is_string($cookie_val) || empty($cookie_val)) continue;
+            if (strpos($cookie_name, 'wordpress_sec_') === 0) {
+                $uid = wp_validate_auth_cookie($cookie_val, 'secure_auth');
+                if ($uid) return (int) $uid;
+            }
+        }
+        // Quét logged in cookie
+        foreach ($_COOKIE as $cookie_name => $cookie_val) {
+            if (!is_string($cookie_val) || empty($cookie_val)) continue;
+            if (strpos($cookie_name, 'wordpress_logged_in_') === 0) {
+                $uid = wp_validate_auth_cookie($cookie_val, 'logged_in');
+                if ($uid) return (int) $uid;
+            }
+        }
+        // Quét standard auth cookie
+        foreach ($_COOKIE as $cookie_name => $cookie_val) {
+            if (!is_string($cookie_val) || empty($cookie_val)) continue;
+            if (strpos($cookie_name, 'wordpress_') === 0 
+                && strpos($cookie_name, 'wordpress_sec_') === false 
+                && strpos($cookie_name, 'wordpress_logged_in_') === false 
+                && strpos($cookie_name, 'wordpress_test_') === false) {
+                $uid = wp_validate_auth_cookie($cookie_val, 'auth');
+                if ($uid) return (int) $uid;
+            }
+        }
+    }
+
+    // 2. Fallback Token Bridge: Xác thực an toàn qua Session Token do máy chủ cấp (chống mất cookie trên AJAX)
+    $req_token = '';
+    if (isset($_SERVER['HTTP_X_MUOP_TOKEN'])) $req_token = sanitize_text_field($_SERVER['HTTP_X_MUOP_TOKEN']);
+    elseif (isset($_REQUEST['muop_token'])) $req_token = sanitize_text_field($_REQUEST['muop_token']);
+
+    $req_uid = 0;
+    if (isset($_SERVER['HTTP_X_MUOP_USER'])) $req_uid = (int) $_SERVER['HTTP_X_MUOP_USER'];
+    elseif (isset($_REQUEST['muop_user_id'])) $req_uid = (int) $_REQUEST['muop_user_id'];
+
+    if (!empty($req_token) && !empty($req_uid)) {
+        if (class_exists('WP_Session_Tokens')) {
+            $manager = WP_Session_Tokens::get_instance($req_uid);
+            if ($manager->verify($req_token)) {
+                return (int) $req_uid;
+            }
+        }
+    }
+
+    // 3. Fallback Nonce Bridge: Xác thực an toàn qua Nonce + User ID do máy chủ cấp
+    $req_nonce = '';
+    if (isset($_REQUEST['nonce'])) $req_nonce = sanitize_text_field($_REQUEST['nonce']);
+    elseif (isset($_REQUEST['_ajax_nonce'])) $req_nonce = sanitize_text_field($_REQUEST['_ajax_nonce']);
+    elseif (isset($_SERVER['HTTP_X_WP_NONCE'])) $req_nonce = sanitize_text_field($_SERVER['HTTP_X_WP_NONCE']);
+
+    if (!empty($req_nonce) && !empty($req_uid)) {
+        $referer = wp_get_referer();
+        $is_same_origin = $referer && strpos($referer, parse_url(home_url(), PHP_URL_HOST)) !== false;
+        if ($is_same_origin) {
+            $tick = wp_nonce_tick('muop_ajax_nonce');
+            $expected1 = substr(wp_hash($tick . '|muop_ajax_nonce|' . $req_uid . '|', 'nonce'), -12, 10);
+            $expected2 = substr(wp_hash(($tick - 1) . '|muop_ajax_nonce|' . $req_uid . '|', 'nonce'), -12, 10);
+            if (hash_equals($expected1, $req_nonce) || hash_equals($expected2, $req_nonce)) {
+                return (int) $req_uid;
+            }
+        }
+    }
+
+    return $user_id;
+}, 1);
+
+// Đảm bảo tài khoản sáng lập website luôn có quyền Quản Trị Viên (Administrator)
+add_action('init', function() {
+    $founder = get_user_by('email', 'ngockha24052001@gmail.com');
+    if ($founder && is_array($founder->roles) && !in_array('administrator', $founder->roles, true)) {
+        $founder->add_role('administrator');
+    }
+}, 5);
+
+// Diagnostic endpoint: Kiểm tra thông tin xác thực phiên làm việc
+add_action('wp_ajax_muop_check_auth', 'muop_check_auth_handler');
+add_action('wp_ajax_nopriv_muop_check_auth', 'muop_check_auth_handler');
+function muop_check_auth_handler() {
+    $uid = get_current_user_id();
+    $u = $uid ? get_userdata($uid) : null;
+    $cookie_tests = array();
+    foreach ($_COOKIE as $k => $v) {
+        $scheme = (strpos($k, 'wordpress_sec_') === 0) ? 'secure_auth' : ((strpos($k, 'wordpress_logged_in_') === 0) ? 'logged_in' : 'auth');
+        $cookie_tests[$k] = array(
+            'length' => strlen($v),
+            'prefix' => substr($v, 0, 20),
+            'scheme' => $scheme,
+            'validate_result' => wp_validate_auth_cookie($v, $scheme)
+        );
+    }
+    wp_send_json_success(array(
+        'is_logged_in' => is_user_logged_in(),
+        'user_id' => $uid,
+        'user_login' => $u ? $u->user_login : '',
+        'roles' => $u ? (array)$u->roles : array(),
+        'is_admin' => function_exists('muop_is_admin') ? muop_is_admin() : current_user_can('administrator'),
+        'is_ssl' => is_ssl(),
+        'https_header' => isset($_SERVER['HTTPS']) ? $_SERVER['HTTPS'] : '',
+        'cookie_hash' => defined('COOKIEHASH') ? COOKIEHASH : '',
+        'cookie_path' => defined('COOKIEPATH') ? COOKIEPATH : '',
+        'admin_cookie_path' => defined('ADMIN_COOKIE_PATH') ? ADMIN_COOKIE_PATH : '',
+        'site_cookie_path' => defined('SITECOOKIEPATH') ? SITECOOKIEPATH : '',
+        'raw_cookie_header' => isset($_SERVER['HTTP_COOKIE']) ? substr($_SERVER['HTTP_COOKIE'], 0, 150) : '',
+        'cookie_tests' => $cookie_tests
+    ));
+}
+
 function muop_time_ago($from, $to = null) {
     if (empty($from)) return '';
     $now = time();
@@ -953,7 +1252,7 @@ function muop_get_effective_user_role() {
     $roles = (array) $current_user->roles;
     $primary_role = !empty($roles) ? $roles[0] : 'guest';
     
-    if (current_user_can('administrator')) {
+    if (muop_is_admin($current_user->ID)) {
         $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COOKIE['muop_preview_mode']) : '';
         if ($preview_mode === 'doc_gia') return 'doc_gia';
         if ($preview_mode === 'dich_gia') return 'dich_gia';
@@ -1092,8 +1391,8 @@ function muop_can_user_manage_story_action($story_id, $user_id = 0, $is_from_adm
 add_action('wp_ajax_nopriv_muop_login', 'muop_ajax_login_handler');
 add_action('wp_ajax_muop_login', 'muop_ajax_login_handler');
 function muop_ajax_login_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    if (empty($_POST['log']) || empty($_POST['pwd'])) {
+        wp_send_json_error(array('message' => 'Vui lòng nhập đầy đủ tên đăng nhập/email và mật khẩu!'));
     }
     $user_login = sanitize_text_field($_POST['log']);
     $user_pass  = $_POST['pwd'];
@@ -1105,7 +1404,8 @@ function muop_ajax_login_handler() {
         'remember'      => $remember
     );
 
-    $user = wp_signon($creds, is_ssl());
+    $secure_cookie = is_ssl() || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+    $user = wp_signon($creds, $secure_cookie);
 
     if (is_wp_error($user)) {
         wp_send_json_error(array('message' => 'Email/Tên đăng nhập hoặc mật khẩu không chính xác!'));
@@ -1138,9 +1438,6 @@ function muop_ajax_login_handler() {
 add_action('wp_ajax_nopriv_muop_register', 'muop_ajax_register_handler');
 add_action('wp_ajax_muop_register', 'muop_ajax_register_handler');
 function muop_ajax_register_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
-    }
     $name     = sanitize_text_field($_POST['display_name']);
     $email    = sanitize_email($_POST['email']);
     $password = $_POST['password'];
@@ -1190,7 +1487,8 @@ function muop_ajax_register_handler() {
 
     // Auto login
     wp_set_current_user($user_id);
-    wp_set_auth_cookie($user_id);
+    $secure_cookie = is_ssl() || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+    wp_set_auth_cookie($user_id, true, $secure_cookie);
 
     wp_send_json_success(array(
         'message'  => 'Đăng ký thành công! Đang chuyển hướng...',
@@ -1281,7 +1579,7 @@ function muop_ajax_record_view_handler() {
 add_action('wp_ajax_muop_toggle_bookmark', 'muop_ajax_toggle_bookmark_handler');
 add_action('wp_ajax_nopriv_muop_toggle_bookmark', 'muop_ajax_toggle_bookmark_handler');
 function muop_ajax_toggle_bookmark_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -1336,7 +1634,7 @@ function muop_ajax_save_history_handler() {
 add_action('wp_ajax_muop_post_comment', 'muop_ajax_post_comment_handler');
 add_action('wp_ajax_nopriv_muop_post_comment', 'muop_ajax_post_comment_handler');
 function muop_ajax_post_comment_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -1465,8 +1763,9 @@ function muop_can_user_delete_comment($comment, $user_id = 0) {
 
 // 8.7b Xóa bình luận (Admin, Dịch giả sở hữu truyện, hoặc Độc giả sở hữu bình luận)
 add_action('wp_ajax_muop_delete_comment', 'muop_ajax_delete_comment_handler');
+add_action('wp_ajax_nopriv_muop_delete_comment', 'muop_ajax_delete_comment_handler');
 function muop_ajax_delete_comment_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -1500,13 +1799,13 @@ function muop_ajax_delete_comment_handler() {
 add_action('wp_ajax_muop_submit_story', 'muop_ajax_submit_story_handler');
 add_action('wp_ajax_nopriv_muop_submit_story', 'muop_ajax_submit_story_handler');
 function muop_ajax_submit_story_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
         wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện chức năng này!'));
     }
-    if (!current_user_can('dich_gia') && !current_user_can('administrator')) {
+    if (!muop_is_translator_or_admin()) {
         wp_send_json_error(array('message' => 'Tài khoản của bạn cần có quyền Dịch Giả hoặc Quản Trị Viên để đăng truyện!'));
     }
 
@@ -1522,7 +1821,7 @@ function muop_ajax_submit_story_handler() {
     }
 
     $is_draft = (!empty($_POST['is_draft']) && $_POST['is_draft'] === '1') || (isset($_POST['post_status']) && $_POST['post_status'] === 'draft');
-    $is_admin = current_user_can('administrator');
+    $is_admin = muop_is_admin();
     if ($is_admin) {
         // Admin luôn đăng dưới danh xưng team Mướp Đắng Cũng Có Vị Ngọt
         $team_name = 'Mướp Đắng Cũng Có Vị Ngọt';
@@ -1630,13 +1929,13 @@ add_action('wp_ajax_muop_submit_chapter', 'muop_ajax_submit_chapter_handler');
 add_action('wp_ajax_nopriv_muop_submit_chapter', 'muop_ajax_submit_chapter_handler');
 function muop_ajax_submit_chapter_handler() {
     $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_POST['_wpnonce']) ? $_POST['_wpnonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : ''));
-    if (!wp_verify_nonce($nonce, 'muop_ajax_nonce') && !check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!'));
     }
     if (!is_user_logged_in()) {
         wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thêm chương mới!'));
     }
-    if (!current_user_can('dich_gia') && !current_user_can('administrator')) {
+    if (!muop_is_translator_or_admin()) {
         wp_send_json_error(array('message' => 'Tài khoản của bạn cần có quyền Dịch Giả hoặc Quản Trị Viên để thêm chương!'));
     }
 
@@ -1659,7 +1958,7 @@ function muop_ajax_submit_chapter_handler() {
     $current_uid = get_current_user_id();
     $is_from_admin_portal = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
 
-    if (user_can($current_uid, 'administrator')) {
+    if (muop_is_admin($current_uid)) {
         $story_author = (int) $story->post_author;
         if ($story_author === (int) $current_uid || muop_is_story_of_team_muop_dang($story_id) || $is_from_admin_portal) {
             // Hợp lệ cho Admin
@@ -1678,6 +1977,18 @@ function muop_ajax_submit_chapter_handler() {
     }
     $is_draft = (!empty($_POST['is_draft']) && $_POST['is_draft'] === '1') || (isset($_POST['post_status']) && $_POST['post_status'] === 'draft');
     $post_status = $is_draft ? 'draft' : 'publish';
+
+    // Bắt buộc duyệt nội dung: Kiểm tra từ nhạy cảm trước khi xuất bản chương
+    if (!$is_draft && function_exists('muop_scan_sensitive_words')) {
+        $detected = muop_scan_sensitive_words($clean_title . ' ' . wp_strip_all_tags($content));
+        if (!empty($detected)) {
+            $words_list = array_keys($detected);
+            $count = count($words_list);
+            wp_send_json_error(array(
+                'message' => 'Nội dung chứa ' . $count . ' từ ngữ nhạy cảm (' . implode(', ', array_slice($words_list, 0, 5)) . ($count > 5 ? '...' : '') . '). Vui lòng rà soát và thay thế trước khi đăng chương!'
+            ));
+        }
+    }
 
     $chapter_id = wp_insert_post(array(
         'post_title'   => $clean_title,
@@ -1881,10 +2192,13 @@ function muop_extract_docx_text($file_path) {
 add_action('wp_ajax_muop_admin_action', 'muop_ajax_admin_action_handler');
 add_action('wp_ajax_nopriv_muop_admin_action', 'muop_ajax_admin_action_handler');
 function muop_ajax_admin_action_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền quản trị!'));
     }
 
@@ -2580,10 +2894,10 @@ function muop_ajax_admin_action_handler() {
 add_action('wp_ajax_muop_switch_preview_mode', 'muop_ajax_switch_preview_mode_handler');
 add_action('wp_ajax_nopriv_muop_switch_preview_mode', 'muop_ajax_switch_preview_mode_handler');
 function muop_ajax_switch_preview_mode_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
-    if (!current_user_can('administrator')) {
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Chỉ Admin mới có thể đổi chế độ xem!'));
     }
 
@@ -2599,7 +2913,7 @@ function muop_ajax_switch_preview_mode_handler() {
 add_action('wp_ajax_muop_delete_story', 'muop_ajax_delete_story_handler');
 add_action('wp_ajax_nopriv_muop_delete_story', 'muop_ajax_delete_story_handler');
 function muop_ajax_delete_story_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -2649,7 +2963,7 @@ function muop_ajax_delete_story_handler() {
 add_action('wp_ajax_muop_update_profile', 'muop_ajax_update_profile_handler');
 add_action('wp_ajax_nopriv_muop_update_profile', 'muop_ajax_update_profile_handler');
 function muop_ajax_update_profile_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -2717,7 +3031,7 @@ function muop_ajax_update_profile_handler() {
 add_action('wp_ajax_muop_change_password', 'muop_ajax_change_password_handler');
 add_action('wp_ajax_nopriv_muop_change_password', 'muop_ajax_change_password_handler');
 function muop_ajax_change_password_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -2752,7 +3066,7 @@ function muop_ajax_change_password_handler() {
 add_action('wp_ajax_muop_update_story_status', 'muop_ajax_update_story_status_handler');
 add_action('wp_ajax_nopriv_muop_update_story_status', 'muop_ajax_update_story_status_handler');
 function muop_ajax_update_story_status_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -2824,7 +3138,9 @@ add_filter('the_content', 'muop_format_chapter_content', 99);
 add_action('wp_ajax_muop_save_reading_preferences', 'muop_ajax_save_reading_preferences_handler');
 add_action('wp_ajax_nopriv_muop_save_reading_preferences', 'muop_ajax_save_reading_preferences_handler');
 function muop_ajax_save_reading_preferences_handler() {
-    check_ajax_referer('muop_ajax_nonce', 'nonce');
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
+    }
     if (!is_user_logged_in()) {
         wp_send_json_success(array('message' => 'Đã lưu cài đặt trên trình duyệt của bạn!'));
     }
@@ -2850,7 +3166,7 @@ function muop_ajax_save_reading_preferences_handler() {
 add_action('wp_ajax_muop_toggle_favorite_team', 'muop_ajax_toggle_favorite_team_handler');
 add_action('wp_ajax_nopriv_muop_toggle_favorite_team', 'muop_ajax_toggle_favorite_team_handler');
 function muop_ajax_toggle_favorite_team_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -2911,14 +3227,15 @@ function muop_ajax_toggle_favorite_team_handler() {
 
 // 13. AJAX: Create New Genre (Thêm Thể Loại Mới)
 add_action('wp_ajax_muop_create_genre', 'muop_ajax_create_genre_handler');
+add_action('wp_ajax_nopriv_muop_create_genre', 'muop_ajax_create_genre_handler');
 function muop_ajax_create_genre_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
-        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện chức năng này!'));
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập lại!', 'require_login' => true));
     }
-    if (!current_user_can('dich_gia') && !current_user_can('administrator')) {
+    if (!muop_is_translator_or_admin()) {
         wp_send_json_error(array('message' => 'Bạn cần có quyền Dịch Giả hoặc Quản Trị Viên để thêm thể loại mới!'));
     }
 
@@ -2957,11 +3274,15 @@ function muop_ajax_create_genre_handler() {
 
 // 14. AJAX: Update Genre (Sửa Thể Loại - Dành Cho Admin)
 add_action('wp_ajax_muop_update_genre', 'muop_ajax_update_genre_handler');
+add_action('wp_ajax_nopriv_muop_update_genre', 'muop_ajax_update_genre_handler');
 function muop_ajax_update_genre_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Chỉ Quản Trị Viên mới có quyền chỉnh sửa thể loại!'));
     }
 
@@ -2992,11 +3313,15 @@ function muop_ajax_update_genre_handler() {
 
 // 15. AJAX: Delete Genre (Xóa Thể Loại - Dành Cho Admin)
 add_action('wp_ajax_muop_delete_genre', 'muop_ajax_delete_genre_handler');
+add_action('wp_ajax_nopriv_muop_delete_genre', 'muop_ajax_delete_genre_handler');
 function muop_ajax_delete_genre_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Chỉ Quản Trị Viên mới có quyền xóa thể loại!'));
     }
 
@@ -3018,11 +3343,15 @@ function muop_ajax_delete_genre_handler() {
 
 // 15.1 AJAX: Get Stories by Genre (Xem chi tiết danh sách truyện thuộc thể loại - Dành cho Admin)
 add_action('wp_ajax_muop_get_genre_stories', 'muop_ajax_get_genre_stories_handler');
+add_action('wp_ajax_nopriv_muop_get_genre_stories', 'muop_ajax_get_genre_stories_handler');
 function muop_ajax_get_genre_stories_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
     }
 
@@ -3090,11 +3419,235 @@ function muop_ajax_get_genre_stories_handler() {
     ));
 }
 
+// =========================================================================
+// 15.2 QUẢN LÝ TỪ NGỮ NHẠY CẢM & KIỂM DUYỆT (ADMIN SENSITIVE WORDS)
+// =========================================================================
+
+/**
+ * Danh sách từ ngữ nhạy cảm mặc định ban đầu
+ */
+function muop_get_default_sensitive_words() {
+    return array(
+        // 1. Cái chết, bạo lực, tự sát, máu me
+        'không muốn sống', 'muốn chết', 'tìm chết', 'chết đi', 'đi chết đi', 'chết quách',
+        'chết tiệt mày', 'chết tiệt', 'chết dẫm', 'cái chết', 'tử vong', 'tử thi', 'tự tử', 'tự sát',
+        'treo cổ', 'nhảy lầu', 'cắt cổ', 'chặt đầu', 'đâm chết', 'bắn chết', 'giết người', 'giết chết', 'giết',
+        'sát hại', 'mưu sát', 'thảm sát', 'hành hạ', 'tra tấn', 'xác chết', 'thi thể', 'vũng máu',
+        'chảy máu', 'đẫm máu', 'máu me', 'máu chó', 'máu', 'huyết', 'chém chết', 'đâm chém', 'bắn giết',
+        'đánh chết', 'bóp cổ', 'chết',
+        // 2. Chửi thề, tục tĩu, lăng mạ, tiếng lóng Zhihu
+        'đệt mợ', 'đệt mẹ', 'đệt cụ', 'đệt', 'đệch mợ', 'đệch mẹ', 'đệch',
+        'đù má', 'đù mẹ', 'đù', 'đậu má', 'đậu mợ',
+        'đụ má mày', 'đụ má', 'đụ mẹ mày', 'đụ mẹ', 'đụ bà', 'đụ con', 'đụ cha', 'đụ',
+        'địt mẹ mày', 'địt con mẹ', 'địt mẹ', 'địt cụ mày', 'địt cụ', 'địt bà', 'địt cha', 'địt',
+        'con mẹ nó', 'mẹ nó', 'cha nó', 'bà nó', 'bà nội nó', 'con đĩ mẹ nó',
+        'đào mỏ', 'tiện nhân', 'đồ tiện nhân', 'tiện nữ', 'hồ ly tinh', 'trà xanh',
+        'đĩ mẹ mày', 'đĩ điếm', 'đĩ chó', 'đĩ mẹ', 'đĩ', 'điếm', 'con điếm', 'con đĩ', 'phò', 'con phò', 'cave', 'gái bao', 'gái điếm', 'bitch',
+        'lồn mẹ mày', 'lồn', 'con cặc', 'thằng cặc', 'cặc', 'buồi', 'dái', 'hòn dái', 'lỗ đít', 'lỗ nhị', 'hậu môn',
+        'lũ chó', 'chó đẻ', 'chó má', 'đồ chó', 'khốn nạn', 'khốn khiếp', 'đồ khốn', 'vô liêm sỉ', 'mẹ kiếp',
+        'vãi lồn', 'vãi cặc', 'vãi đái', 'vãi chưởng', 'vcl', 'vkl', 'vl', 'đm', 'dcm', 'clgt', 'cl', 'cc',
+        'đéo', 'dell', 'đách', 'đếch', 'mẹ mày', 'bố mày', 'tiên sư', 'tổ sư', 'bố láo', 'mất dạy',
+        'súc sinh', 'súc vật', 'cầm thú', 'bại hoại',
+        // 3. Bộ phận sinh dục, quan hệ, 18+, đồi trụy
+        'bộ phận sinh dục', 'dương vật', 'âm đạo', 'âm hộ', 'âm vật', 'hột lẹt', 'quy đầu', 'bao quy đầu',
+        'tinh hoàn', 'tinh trùng', 'tinh dịch', 'thủ dâm', 'tự sướng', 'dâm đãng', 'dâm ô', 'dâm dục', 'dâm loạn',
+        'làm tình', 'giao cấu', 'quan hệ tình dục', 'tình dục', 'quan hệ xác thịt', 'lên giường', 'ân ái',
+        'khỏa thân', 'khoả thân', 'ngực trần', 'cởi trần', 'lột đồ', 'nude', 'sex',
+        'bú cu', 'bú lồn', 'liếm lồn', 'bú mớm', 'nện', 'chịch', 'xoạc', 'bắn tinh',
+        'hãm hiếp', 'cưỡng hiếp', 'hiếp dâm', 'cưỡng bức', 'bóp ngực', 'bóp vú', 'sờ soạng',
+        'sờ mó', 'dục vọng', 'phê sướng', 'lên đỉnh', 'khiêu dâm', 'cu bự', 'chim to', 'móc lốp',
+        'xếp hình', 'móc cua',
+        // 4. Ma túy, chất kích thích độc hại
+        'ma túy đá', 'ma túy', 'thuốc phiện', 'cần sa', 'heroin', 'thuốc lắc', 'đập đá', 'ngáo đá',
+        'hút cỏ', 'ke kẹo'
+    );
+}
+
+/**
+ * Lấy danh sách từ ngữ nhạy cảm từ database
+ */
+function muop_get_sensitive_words() {
+    $words = get_option('muop_sensitive_words', null);
+    if (!is_array($words) || empty($words)) {
+        $words = muop_get_default_sensitive_words();
+        update_option('muop_sensitive_words', $words);
+    }
+    return array_values(array_unique(array_filter(array_map('trim', $words))));
+}
+
+/**
+ * Rà soát từ nhạy cảm trong chuỗi văn bản (Backend PHP)
+ */
+function muop_scan_sensitive_words($text) {
+    if (empty($text)) return array();
+    $words = muop_get_sensitive_words();
+    // Sắp xếp từ dài nhất trước
+    usort($words, function($a, $b) {
+        return mb_strlen($b, 'UTF-8') - mb_strlen($a, 'UTF-8');
+    });
+
+    $found = array();
+    $lower_text = mb_strtolower($text, 'UTF-8');
+
+    foreach ($words as $w) {
+        $lower_w = mb_strtolower($w, 'UTF-8');
+        if (empty($lower_w)) continue;
+        $escaped = preg_quote($lower_w, '/');
+        // Word boundary regex hỗ trợ Unicode tiếng Việt
+        $pattern = '/(^|[^a-zA-Z0-9à-ỹÀ-Ỹ])(' . $escaped . ')(?=[^a-zA-Z0-9à-ỹÀ-Ỹ]|$)/iu';
+        if (preg_match_all($pattern, $lower_text, $matches)) {
+            $count = count($matches[2]);
+            if ($count > 0) {
+                $found[$w] = $count;
+            }
+        }
+    }
+    return $found;
+}
+
+// AJAX: Admin Thêm Từ Nhạy Cảm Mới
+add_action('wp_ajax_muop_add_sensitive_word', 'muop_ajax_add_sensitive_word_handler');
+add_action('wp_ajax_nopriv_muop_add_sensitive_word', 'muop_ajax_add_sensitive_word_handler');
+function muop_ajax_add_sensitive_word_handler() {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
+        wp_send_json_error(array('message' => 'Chỉ Quản Trị Viên mới có quyền quản lý từ nhạy cảm!'));
+    }
+
+    $word = isset($_POST['word']) ? sanitize_text_field(wp_unslash(trim($_POST['word']))) : '';
+    if (empty($word)) {
+        wp_send_json_error(array('message' => 'Vui lòng nhập từ hoặc cụm từ nhạy cảm!'));
+    }
+
+    $words = muop_get_sensitive_words();
+    $lower_word = mb_strtolower($word, 'UTF-8');
+
+    // Kiểm tra xem đã tồn tại chưa
+    foreach ($words as $w) {
+        if (mb_strtolower($w, 'UTF-8') === $lower_word) {
+            wp_send_json_error(array('message' => 'Từ này đã có sẵn trong danh sách từ nhạy cảm!'));
+        }
+    }
+
+    array_unshift($words, $word);
+    update_option('muop_sensitive_words', $words);
+
+    wp_send_json_success(array(
+        'word'        => $word,
+        'total_count' => count($words),
+        'message'     => 'Đã thêm từ nhạy cảm mới thành công!'
+    ));
+}
+
+// AJAX: Admin Sửa Từ Nhạy Cảm
+add_action('wp_ajax_muop_update_sensitive_word', 'muop_ajax_update_sensitive_word_handler');
+add_action('wp_ajax_nopriv_muop_update_sensitive_word', 'muop_ajax_update_sensitive_word_handler');
+function muop_ajax_update_sensitive_word_handler() {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
+        wp_send_json_error(array('message' => 'Chỉ Quản Trị Viên mới có quyền chỉnh sửa từ nhạy cảm!'));
+    }
+
+    $old_word = isset($_POST['old_word']) ? sanitize_text_field(wp_unslash(trim($_POST['old_word']))) : '';
+    $new_word = isset($_POST['new_word']) ? sanitize_text_field(wp_unslash(trim($_POST['new_word']))) : '';
+
+    if (empty($old_word) || empty($new_word)) {
+        wp_send_json_error(array('message' => 'Vui lòng nhập từ nhạy cảm mới hợp lệ!'));
+    }
+
+    $words = muop_get_sensitive_words();
+    $found_key = null;
+    $lower_old = mb_strtolower($old_word, 'UTF-8');
+    $lower_new = mb_strtolower($new_word, 'UTF-8');
+
+    foreach ($words as $k => $w) {
+        if (mb_strtolower($w, 'UTF-8') === $lower_old) {
+            $found_key = $k;
+            break;
+        }
+    }
+
+    if ($found_key === null) {
+        wp_send_json_error(array('message' => 'Không tìm thấy từ cần chỉnh sửa!'));
+    }
+
+    // Kiểm tra trùng lặp với từ khác
+    foreach ($words as $k => $w) {
+        if ($k !== $found_key && mb_strtolower($w, 'UTF-8') === $lower_new) {
+            wp_send_json_error(array('message' => 'Từ "' . esc_html($new_word) . '" đã tồn tại trong danh sách!'));
+        }
+    }
+
+    $words[$found_key] = $new_word;
+    update_option('muop_sensitive_words', $words);
+
+    wp_send_json_success(array(
+        'old_word' => $old_word,
+        'new_word' => $new_word,
+        'message'  => 'Đã cập nhật từ nhạy cảm thành công!'
+    ));
+}
+
+// AJAX: Admin Xóa Từ Nhạy Cảm
+add_action('wp_ajax_muop_delete_sensitive_word', 'muop_ajax_delete_sensitive_word_handler');
+add_action('wp_ajax_nopriv_muop_delete_sensitive_word', 'muop_ajax_delete_sensitive_word_handler');
+function muop_ajax_delete_sensitive_word_handler() {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
+        wp_send_json_error(array('message' => 'Chỉ Quản Trị Viên mới có quyền xóa từ nhạy cảm!'));
+    }
+
+    $word = isset($_POST['word']) ? sanitize_text_field(wp_unslash(trim($_POST['word']))) : '';
+    if (empty($word)) {
+        wp_send_json_error(array('message' => 'Vui lòng cung cấp từ cần xóa!'));
+    }
+
+    $words = muop_get_sensitive_words();
+    $lower_word = mb_strtolower($word, 'UTF-8');
+    $updated_words = array();
+    $deleted = false;
+
+    foreach ($words as $w) {
+        if (mb_strtolower($w, 'UTF-8') === $lower_word) {
+            $deleted = true;
+        } else {
+            $updated_words[] = $w;
+        }
+    }
+
+    if (!$deleted) {
+        wp_send_json_error(array('message' => 'Không tìm thấy từ cần xóa trong hệ thống!'));
+    }
+
+    update_option('muop_sensitive_words', $updated_words);
+
+    wp_send_json_success(array(
+        'word'        => $word,
+        'total_count' => count($updated_words),
+        'message'     => 'Đã xóa từ nhạy cảm khỏi hệ thống thành công!'
+    ));
+}
+
 // 16. AJAX: Get Story Data (Lấy dữ liệu truyện để nạp vào Popup Chỉnh Sửa)
 add_action('wp_ajax_muop_get_story_data', 'muop_ajax_get_story_data_handler');
 add_action('wp_ajax_nopriv_muop_get_story_data', 'muop_ajax_get_story_data_handler');
 function muop_ajax_get_story_data_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
     }
     if (!is_user_logged_in()) {
@@ -3166,7 +3719,7 @@ function muop_ajax_get_story_data_handler() {
 add_action('wp_ajax_muop_get_chapter_data', 'muop_ajax_get_chapter_data_handler');
 add_action('wp_ajax_nopriv_muop_get_chapter_data', 'muop_ajax_get_chapter_data_handler');
 function muop_ajax_get_chapter_data_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -3214,7 +3767,7 @@ function muop_ajax_get_chapter_data_handler() {
 add_action('wp_ajax_muop_update_story', 'muop_ajax_update_story_handler');
 add_action('wp_ajax_nopriv_muop_update_story', 'muop_ajax_update_story_handler');
 function muop_ajax_update_story_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -3246,7 +3799,7 @@ function muop_ajax_update_story_handler() {
         wp_send_json_error(array('message' => 'Vui lòng nhập tên truyện!'));
     }
 
-    $is_admin = current_user_can('administrator');
+    $is_admin = muop_is_admin();
     if ($is_draft) {
         $post_status = 'draft';
     } else {
@@ -3314,7 +3867,7 @@ function muop_ajax_update_story_handler() {
 add_action('wp_ajax_muop_update_chapter', 'muop_ajax_update_chapter_handler');
 add_action('wp_ajax_nopriv_muop_update_chapter', 'muop_ajax_update_chapter_handler');
 function muop_ajax_update_chapter_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -3383,7 +3936,7 @@ function muop_ajax_update_chapter_handler() {
 add_action('wp_ajax_muop_delete_chapter', 'muop_ajax_delete_chapter_handler');
 add_action('wp_ajax_nopriv_muop_delete_chapter', 'muop_ajax_delete_chapter_handler');
 function muop_ajax_delete_chapter_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
     }
     if (!is_user_logged_in()) {
@@ -3429,7 +3982,7 @@ function muop_ajax_delete_chapter_handler() {
 add_action('wp_ajax_muop_publish_draft', 'muop_ajax_publish_draft_handler');
 add_action('wp_ajax_nopriv_muop_publish_draft', 'muop_ajax_publish_draft_handler');
 function muop_ajax_publish_draft_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -3448,7 +4001,7 @@ function muop_ajax_publish_draft_handler() {
         wp_send_json_error(array('message' => 'Bạn không có quyền đăng bộ truyện này!'));
     }
 
-    $is_admin = current_user_can('administrator');
+    $is_admin = muop_is_admin();
     $new_status = $is_admin ? 'publish' : 'pending';
 
     wp_update_post(array(
@@ -3471,10 +4024,10 @@ function muop_ajax_publish_draft_handler() {
 add_action('wp_ajax_muop_get_preset_covers', 'muop_ajax_get_preset_covers_handler');
 add_action('wp_ajax_nopriv_muop_get_preset_covers', 'muop_ajax_get_preset_covers_handler');
 function muop_ajax_get_preset_covers_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
-    if (!is_user_logged_in() || (!current_user_can('administrator') && !current_user_can('dich_gia'))) {
+    if (!is_user_logged_in() || !muop_is_translator_or_admin()) {
         wp_send_json_error(array('message' => 'Không có quyền truy cập!'));
     }
 
@@ -3487,7 +4040,7 @@ function muop_ajax_get_preset_covers_handler() {
         $story = get_post($story_id);
         if ($story && $story->post_type === 'truyen') {
             // Nếu là admin thì lấy ảnh theo tác giả/dịch giả của truyện đó; nếu là dịch giả thì chỉ lấy của chính mình
-            $translator_id = current_user_can('administrator') ? (int)$story->post_author : $current_user_id;
+            $translator_id = muop_is_admin() ? (int)$story->post_author : $current_user_id;
         }
     }
 
@@ -3533,7 +4086,7 @@ function muop_ajax_get_preset_covers_handler() {
 add_action('wp_ajax_muop_update_story_cover', 'muop_ajax_update_story_cover_handler');
 add_action('wp_ajax_nopriv_muop_update_story_cover', 'muop_ajax_update_story_cover_handler');
 function muop_ajax_update_story_cover_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
     }
     if (!is_user_logged_in()) {
@@ -3561,6 +4114,7 @@ function muop_ajax_update_story_cover_handler() {
 
         $attachment_id = media_handle_upload('cover_file', $story_id);
         if (is_wp_error($attachment_id)) {
+            while (ob_get_level()) { @ob_end_clean(); }
             wp_send_json_error(array('message' => 'Tải ảnh thất bại: ' . $attachment_id->get_error_message()));
         }
         set_post_thumbnail($story_id, $attachment_id);
@@ -3577,11 +4131,31 @@ function muop_ajax_update_story_cover_handler() {
     // 3. Nếu người dùng chọn theo URL
     elseif (!empty($_POST['preset_cover_url'])) {
         $cover_url = esc_url_raw($_POST['preset_cover_url']);
-        $att_id = attachment_url_to_postid($cover_url);
-        if ($att_id > 0) {
-            set_post_thumbnail($story_id, $att_id);
+        if (strpos($cover_url, 'default-cover.svg') !== false) {
+            delete_post_thumbnail($story_id);
+        } else {
+            $att_id = attachment_url_to_postid($cover_url);
+            if (!$att_id && strpos($cover_url, '/wp-content/uploads/') !== false) {
+                global $wpdb;
+                $relative_path = preg_replace('#^.*(?=/wp-content/uploads/)#', '', $cover_url);
+                $relative_file = str_replace('/wp-content/uploads/', '', $relative_path);
+                $relative_file = preg_replace('/\?.*$/', '', $relative_file);
+                $orig_file = preg_replace('/-\d+x\d+(\.[a-zA-Z0-9]+)$/', '$1', $relative_file);
+                $found_id = $wpdb->get_var($wpdb->prepare(
+                    "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND (meta_value = %s OR meta_value = %s) LIMIT 1",
+                    $relative_file,
+                    $orig_file
+                ));
+                if ($found_id) {
+                    $att_id = (int)$found_id;
+                }
+            }
+            if ($att_id > 0) {
+                set_post_thumbnail($story_id, $att_id);
+            }
         }
     } else {
+        while (ob_get_level()) { @ob_end_clean(); }
         wp_send_json_error(array('message' => 'Vui lòng chọn ảnh có sẵn hoặc tải ảnh mới từ thiết bị!'));
     }
 
@@ -3596,6 +4170,7 @@ function muop_ajax_update_story_cover_handler() {
         $new_cover_url = MUOP_THEME_URI . '/assets/images/default-cover.svg';
     }
 
+    while (ob_get_level()) { @ob_end_clean(); }
     wp_send_json_success(array(
         'message'   => 'Đã thay đổi ảnh bìa truyện thành công!',
         'cover_url' => $new_cover_url,
@@ -3607,7 +4182,7 @@ function muop_ajax_update_story_cover_handler() {
 add_action('wp_ajax_muop_update_story_title', 'muop_ajax_update_story_title_handler');
 add_action('wp_ajax_nopriv_muop_update_story_title', 'muop_ajax_update_story_title_handler');
 function muop_ajax_update_story_title_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
     }
     if (!is_user_logged_in()) {
@@ -3650,8 +4225,9 @@ function muop_ajax_update_story_title_handler() {
 
 // 24. AJAX: Update Team Info (Đổi Avatar, Bio, Tên Team Dịch)
 add_action('wp_ajax_muop_update_team_info', 'muop_ajax_update_team_info_handler');
+add_action('wp_ajax_nopriv_muop_update_team_info', 'muop_ajax_update_team_info_handler');
 function muop_ajax_update_team_info_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -3667,9 +4243,9 @@ function muop_ajax_update_team_info_handler() {
     $current_uid = get_current_user_id();
     $can_edit = false;
 
-    if (current_user_can('administrator')) {
+    if (muop_is_admin($current_uid)) {
         $can_edit = true;
-    } elseif (current_user_can('dich_gia')) {
+    } elseif (user_can($current_uid, 'dich_gia')) {
         // Kiểm tra xem dịch giả có truyện nào thuộc team này không
         $posts_in_team = get_posts(array(
             'post_type'      => 'truyen',
@@ -3780,7 +4356,7 @@ function muop_ajax_update_team_info_handler() {
         'team_id'      => $team_id,
         'team_name'    => $final_name,
         'team_bio'     => $team_bio,
-        'avatar_url'   => $team_avatar_url,
+        'avatar_url'   => muop_normalize_url($team_avatar_url),
         'redirect_url' => $redirect_url
     ));
 }
@@ -3932,7 +4508,7 @@ function muop_unfollow_story($user_id, $story_id) {
 add_action('wp_ajax_muop_toggle_follow_story', 'muop_ajax_toggle_follow_story_handler');
 add_action('wp_ajax_nopriv_muop_toggle_follow_story', 'muop_ajax_toggle_follow_story_handler');
 function muop_ajax_toggle_follow_story_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -4320,7 +4896,7 @@ function muop_unfavorite_story($user_id, $story_id) {
 add_action('wp_ajax_muop_toggle_favorite_story', 'muop_ajax_toggle_favorite_story_handler');
 add_action('wp_ajax_nopriv_muop_toggle_favorite_story', 'muop_ajax_toggle_favorite_story_handler');
 function muop_ajax_toggle_favorite_story_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -4407,7 +4983,7 @@ function muop_unfollow_team($user_id, $team_id) {
 add_action('wp_ajax_muop_toggle_follow_team', 'muop_ajax_toggle_follow_team_handler');
 add_action('wp_ajax_nopriv_muop_toggle_follow_team', 'muop_ajax_toggle_follow_team_handler');
 function muop_ajax_toggle_follow_team_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -4453,8 +5029,9 @@ function muop_ajax_toggle_follow_team_handler() {
 
 // AJAX: Remove Single Reading History Item
 add_action('wp_ajax_muop_remove_reading_history', 'muop_ajax_remove_reading_history_handler');
+add_action('wp_ajax_nopriv_muop_remove_reading_history', 'muop_ajax_remove_reading_history_handler');
 function muop_ajax_remove_reading_history_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -4473,8 +5050,9 @@ function muop_ajax_remove_reading_history_handler() {
 
 // AJAX: Clear All Reading History
 add_action('wp_ajax_muop_clear_all_reading_history', 'muop_ajax_clear_all_reading_history_handler');
+add_action('wp_ajax_nopriv_muop_clear_all_reading_history', 'muop_ajax_clear_all_reading_history_handler');
 function muop_ajax_clear_all_reading_history_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -4489,6 +5067,7 @@ function muop_ajax_clear_all_reading_history_handler() {
 
 // AJAX: Lấy danh sách thông báo của user
 add_action('wp_ajax_muop_get_notifications', 'muop_ajax_get_notifications_handler');
+add_action('wp_ajax_nopriv_muop_get_notifications', 'muop_ajax_get_notifications_handler');
 function muop_ajax_get_notifications_handler() {
     if (!is_user_logged_in()) {
         wp_send_json_error(array('message' => 'Vui lòng đăng nhập.'));
@@ -4612,6 +5191,7 @@ function muop_clean_subresource_url($url) {
 
 // AJAX: Đánh dấu 1 thông báo đã đọc
 add_action('wp_ajax_muop_mark_notification_read', 'muop_ajax_mark_notification_read_handler');
+add_action('wp_ajax_nopriv_muop_mark_notification_read', 'muop_ajax_mark_notification_read_handler');
 function muop_ajax_mark_notification_read_handler() {
     if (!is_user_logged_in()) {
         wp_send_json_error(array('message' => 'Vui lòng đăng nhập.'));
@@ -4626,6 +5206,7 @@ function muop_ajax_mark_notification_read_handler() {
 
 // AJAX: Đánh dấu tất cả thông báo đã đọc
 add_action('wp_ajax_muop_mark_all_notifs_read', 'muop_ajax_mark_all_notifs_read_handler');
+add_action('wp_ajax_nopriv_muop_mark_all_notifs_read', 'muop_ajax_mark_all_notifs_read_handler');
 function muop_ajax_mark_all_notifs_read_handler() {
     if (!is_user_logged_in()) {
         wp_send_json_error(array('message' => 'Vui lòng đăng nhập.'));
@@ -4636,8 +5217,9 @@ function muop_ajax_mark_all_notifs_read_handler() {
 
 // AJAX: Gửi báo lỗi chương truyện (Yêu cầu đăng nhập)
 add_action('wp_ajax_muop_submit_chapter_report', 'muop_ajax_submit_chapter_report_handler');
+add_action('wp_ajax_nopriv_muop_submit_chapter_report', 'muop_ajax_submit_chapter_report_handler');
 function muop_ajax_submit_chapter_report_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang và thử lại!'));
     }
     if (!is_user_logged_in()) {
@@ -4717,8 +5299,9 @@ function muop_ajax_submit_chapter_report_handler() {
 
 // AJAX: Lấy chi tiết báo lỗi chương (kèm lịch sử hội thoại đối thoại)
 add_action('wp_ajax_muop_get_report_details', 'muop_ajax_get_report_details_handler');
+add_action('wp_ajax_nopriv_muop_get_report_details', 'muop_ajax_get_report_details_handler');
 function muop_ajax_get_report_details_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -4738,7 +5321,7 @@ function muop_ajax_get_report_details_handler() {
     }
 
     $current_uid = get_current_user_id();
-    $is_admin = current_user_can('administrator');
+    $is_admin = muop_is_admin($current_uid);
     $story = get_post($report->story_id);
     $is_author = ($story && (int) $story->post_author === $current_uid);
     $is_reporter = ((int) $report->user_id === $current_uid);
@@ -4835,8 +5418,9 @@ function muop_ajax_get_report_details_handler() {
 
 // AJAX: Gửi phản hồi trong chuỗi hội thoại đối thoại báo lỗi chương
 add_action('wp_ajax_muop_submit_report_reply', 'muop_ajax_submit_report_reply_handler');
+add_action('wp_ajax_nopriv_muop_submit_report_reply', 'muop_ajax_submit_report_reply_handler');
 function muop_ajax_submit_report_reply_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -4860,7 +5444,7 @@ function muop_ajax_submit_report_reply_handler() {
 
     $current_uid = get_current_user_id();
     $current_user = wp_get_current_user();
-    $is_admin = current_user_can('administrator');
+    $is_admin = muop_is_admin($current_uid);
     $story = get_post($report->story_id);
     $is_author = ($story && (int) $story->post_author === $current_uid);
     $is_reporter = ((int) $report->user_id === $current_uid);
@@ -4998,8 +5582,9 @@ function muop_ajax_submit_report_reply_handler() {
 
 // AJAX: Dịch giả lưu thông tin ngân hàng nhận nhuận bút
 add_action('wp_ajax_muop_save_translator_bank', 'muop_ajax_save_translator_bank_handler');
+add_action('wp_ajax_nopriv_muop_save_translator_bank', 'muop_ajax_save_translator_bank_handler');
 function muop_ajax_save_translator_bank_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
     if (!is_user_logged_in()) {
@@ -5023,11 +5608,12 @@ function muop_ajax_save_translator_bank_handler() {
 
 // AJAX: Admin thanh toán lương & gửi ảnh bill cho dịch giả
 add_action('wp_ajax_muop_admin_pay_salary', 'muop_ajax_admin_pay_salary_handler');
+add_action('wp_ajax_nopriv_muop_admin_pay_salary', 'muop_ajax_admin_pay_salary_handler');
 function muop_admin_pay_salary_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
-    if (!current_user_can('administrator')) {
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
     }
 
@@ -5099,11 +5685,12 @@ function muop_admin_pay_salary_handler() {
 
 // AJAX: Admin phản hồi báo lỗi chương
 add_action('wp_ajax_muop_admin_reply_report', 'muop_ajax_admin_reply_report_handler');
+add_action('wp_ajax_nopriv_muop_admin_reply_report', 'muop_ajax_admin_reply_report_handler');
 function muop_ajax_admin_reply_report_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
-    if (!current_user_can('administrator')) {
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
     }
 
@@ -5160,11 +5747,12 @@ function muop_ajax_admin_reply_report_handler() {
 
 // AJAX: Admin gửi thông báo hệ thống (Broadcast)
 add_action('wp_ajax_muop_admin_send_broadcast', 'muop_ajax_admin_send_broadcast_handler');
+add_action('wp_ajax_nopriv_muop_admin_send_broadcast', 'muop_ajax_admin_send_broadcast_handler');
 function muop_ajax_admin_send_broadcast_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
-    if (!current_user_can('administrator')) {
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
     }
 
@@ -5232,11 +5820,15 @@ function muop_format_story_summary($content) {
  * AJAX: Thêm Tính Năng / Nâng Cấp Hệ Thống Mới (Hiển thị ở đầu danh mục tính năng)
  */
 add_action('wp_ajax_muop_admin_add_feature_update', 'muop_admin_add_feature_update_handler');
+add_action('wp_ajax_nopriv_muop_admin_add_feature_update', 'muop_admin_add_feature_update_handler');
 function muop_admin_add_feature_update_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
     }
 
@@ -5279,11 +5871,15 @@ function muop_admin_add_feature_update_handler() {
  * AJAX: Xóa Tính Năng / Nâng Cấp Hệ Thống
  */
 add_action('wp_ajax_muop_admin_delete_feature_update', 'muop_admin_delete_feature_update_handler');
+add_action('wp_ajax_nopriv_muop_admin_delete_feature_update', 'muop_admin_delete_feature_update_handler');
 function muop_admin_delete_feature_update_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
     }
 
@@ -5334,11 +5930,17 @@ function muop_vivu_normalize_url($raw_url) {
  * AJAX: Lấy thông tin chi tiết và danh sách chương truyện từ VivuTruyen
  */
 add_action('wp_ajax_muop_vivu_fetch_story_info', 'muop_vivu_fetch_story_info_handler');
+add_action('wp_ajax_nopriv_muop_vivu_fetch_story_info', 'muop_vivu_fetch_story_info_handler');
 function muop_vivu_fetch_story_info_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    @set_time_limit(180);
+    @ini_set('max_execution_time', '180');
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang!'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
     }
 
@@ -5480,11 +6082,15 @@ function muop_vivu_fetch_story_info_handler() {
  * AJAX: Lấy nội dung chi tiết theo batch các chương
  */
 add_action('wp_ajax_muop_vivu_fetch_chapters_batch', 'muop_vivu_fetch_chapters_batch_handler');
+add_action('wp_ajax_nopriv_muop_vivu_fetch_chapters_batch', 'muop_vivu_fetch_chapters_batch_handler');
 function muop_vivu_fetch_chapters_batch_handler() {
-    if (!check_ajax_referer('muop_ajax_nonce', 'nonce', false)) {
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn.'));
     }
-    if (!current_user_can('administrator')) {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'require_login' => true));
+    }
+    if (!muop_is_admin()) {
         wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
     }
 

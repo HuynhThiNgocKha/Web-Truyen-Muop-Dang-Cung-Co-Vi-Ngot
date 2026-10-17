@@ -9,6 +9,7 @@ Website đọc truyện Zhihu, ngôn tình, hiện đại, cổ trang được x
 - **Đăng nhập:** [https://muopdangcungcovingot.io.vn/dang-nhap/](https://muopdangcungcovingot.io.vn/dang-nhap/)
 - **Đăng ký:** [https://muopdangcungcovingot.io.vn/dang-ky/](https://muopdangcungcovingot.io.vn/dang-ky/)
 - **Chạy môi trường cục bộ (Local):** [http://localhost:8080/](http://localhost:8080/) (Chạy file `run.bat` trong thư mục gốc)
+- **📖 Hướng dẫn chi tiết cài đặt & chạy web (PC & Mobile từ A-Z):** [HUONG_DAN_CAI_DAT_VA_CHAY_WEB.md](HUONG_DAN_CAI_DAT_VA_CHAY_WEB.md)
 
 ---
 

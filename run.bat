@@ -28,7 +28,8 @@ if errorlevel 1 (
 netstat -ano | findstr ":8080" | findstr "LISTENING" >nul
 if errorlevel 1 (
     echo [..] Dang khoi dong PHP Web Server tren 0.0.0.0:8080...
-    start /b "" php -S 0.0.0.0:8080 router.php
+    if not exist "%~dp0tmp" mkdir "%~dp0tmp"
+    start /b "" php -d display_errors=0 -d upload_tmp_dir="%~dp0tmp" -S 0.0.0.0:8080 router.php
     timeout /t 1 >nul
     echo [OK] Web server da san sang!
 ) else (

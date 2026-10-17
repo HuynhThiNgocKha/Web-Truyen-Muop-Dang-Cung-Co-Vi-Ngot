@@ -6,8 +6,8 @@
  */
 if (!defined('ABSPATH')) exit;
 
-if (!is_user_logged_in() || !current_user_can('administrator')) {
-    wp_redirect(home_url('/dang-nhap/'));
+if (!is_user_logged_in() || (!current_user_can('administrator') && !current_user_can('manage_options') && !(function_exists('muop_is_admin') && muop_is_admin()))) {
+    wp_redirect(home_url('/dang-nhap/?redirect_to=' . urlencode(home_url('/quan-ly-admin/'))));
     exit;
 }
 
@@ -112,6 +112,9 @@ if (empty($translators)) {
 $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
 if (is_wp_error($all_genres)) $all_genres = array();
 
+// All Sensitive Words
+$all_sensitive_words = function_exists('muop_get_sensitive_words') ? muop_get_sensitive_words() : array();
+
 // All Teams
 $all_teams = get_terms(array('taxonomy' => 'team_dich', 'hide_empty' => false));
 if (is_wp_error($all_teams)) $all_teams = array();
@@ -193,6 +196,7 @@ $pending_reports_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table_repor
 // Current logged in admin
 $curr_admin = wp_get_current_user();
 $admin_avatar_custom = get_user_meta($curr_admin->ID, 'muop_user_avatar', true);
+$admin_avatar_custom = function_exists('muop_normalize_url') ? muop_normalize_url($admin_avatar_custom) : $admin_avatar_custom;
 $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COOKIE['muop_preview_mode']) : 'admin';
 ?>
 
@@ -253,6 +257,12 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                 <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabGenres" id="navItemGenres">
                     <span class="nav-item-icon"><i class="fa-solid fa-tags"></i></span>
                     <span class="nav-item-label">Thể loại truyện</span>
+                </button>
+
+                <!-- 5.1 Quản lý từ nhạy cảm (Mới) -->
+                <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabSensitiveWords" id="navItemSensitiveWords">
+                    <span class="nav-item-icon"><i class="fa-solid fa-shield-halved" style="color: #ef4444;"></i></span>
+                    <span class="nav-item-label">Từ nhạy cảm</span>
                 </button>
 
                 <!-- 6. Tách truyện tự động (Đã sắp xếp xuống dưới Thể loại truyện theo Hình 4) -->
@@ -1616,6 +1626,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                             $r = !empty($roles) ? $roles[0] : 'doc_gia';
                                             $is_locked = (bool) get_user_meta($u->ID, '_muop_account_locked', true);
                                             $u_avatar = get_user_meta($u->ID, 'muop_user_avatar', true);
+                                            $u_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($u_avatar) : $u_avatar;
                                         ?>
                                             <tr class="adm-user-row"
                                                 id="adminUserRow_<?php echo $u->ID; ?>"
@@ -2228,6 +2239,111 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                 </section>
 
                 <!-- =================================================================
+                     TAB 5.1: QUẢN LÝ TỪ NHẠY CẢM & KIỂM DUYỆT (THIẾT KẾ GIỐNG HÌNH 2)
+                     ================================================================= -->
+                <section id="admTabSensitiveWords" class="dash-tab-pane">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h3 style="font-size: 17px; font-weight: 750; color: var(--primary-green); margin: 0; display: inline-flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-shield-halved"></i> Danh Sách Từ Ngữ Nhạy Cảm & Kiểm Duyệt
+                            </h3>
+                            <span class="badge badge-hot" id="admSensitiveWordsTotalBadge" style="font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px;">
+                                <?php echo count($all_sensitive_words); ?> từ
+                            </span>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <div style="position: relative; width: 220px;">
+                                <input type="text" id="admSearchSensitiveWord" class="form-input" placeholder="Tìm kiếm từ nhạy cảm..." style="height: 36px; font-size: 13px; padding-left: 32px; width: 100%; border-radius: 6px;" />
+                                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--text-muted); pointer-events: none;"></i>
+                            </div>
+                            <button type="button" id="admBtnToggleAddWord" class="btn btn-primary" style="height: 36px; padding: 0 16px; font-size: 13px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-plus"></i> Thêm Từ Mới
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Hộp Thêm Từ Mới Cho Admin -->
+                    <div id="admBoxAddWord" style="display: none; margin-bottom: 20px; padding: 16px; background: var(--bg-card); border: 1.5px solid var(--primary-green); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+                        <div style="font-weight: 700; font-size: 13.5px; color: var(--primary-green); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-shield-plus"></i> Thêm Từ Ngữ Nhạy Cảm Mới Vào Hệ Thống
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="admInputNewWord" class="form-input" placeholder="Nhập từ hoặc cụm từ nhạy cảm mới (vd: chửi thề, 18+, bạo lực...)" style="flex: 1; min-width: 240px; height: 38px; font-size: 13.5px;" />
+                            <button type="button" id="admBtnConfirmAddWord" class="btn btn-primary" style="height: 38px; padding: 0 18px; font-size: 13px; white-space: nowrap;">
+                                <i class="fa-solid fa-check"></i> Lưu Từ Mới
+                            </button>
+                            <button type="button" id="admBtnCancelAddWord" class="btn btn-secondary" style="height: 38px; padding: 0 14px; font-size: 13px;">
+                                Hủy
+                            </button>
+                        </div>
+                        <div id="admAddWordStatus" style="font-size: 12.5px; margin-top: 8px; display: none;"></div>
+                    </div>
+
+                    <!-- Danh Sách Thẻ Từ Nhạy Cảm - THIẾT KẾ GIỐNG HỆT HÌNH 2 -->
+                    <div id="admSensitiveWordsGrid" class="adm-genres-grid">
+                        <?php if (!empty($all_sensitive_words)) : ?>
+                            <?php foreach ($all_sensitive_words as $w) : ?>
+                                <div class="adm-genre-card adm-word-card" data-word="<?php echo esc_attr(mb_strtolower($w, 'UTF-8')); ?>" style="background: var(--bg-card); padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-shadow: var(--shadow-sm); position: relative;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                        <span class="adm-genre-title adm-word-title" style="font-weight: 700; color: var(--text-main); font-size: 14.5px; word-break: break-word;"><?php echo esc_html($w); ?></span>
+                                        <span class="badge badge-hot" style="font-size: 11px; white-space: nowrap; background: #fee2e2; color: #dc2626; border: 1px solid #f87171;">Từ cấm</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; justify-content: flex-end; padding-top: 8px; border-top: 1px dashed var(--border-light);">
+                                        <div class="story-actions-dropdown genre-actions-dropdown">
+                                            <button type="button" class="btn-story-dropdown-trigger btn-genre-dropdown-trigger" title="Tác vụ từ nhạy cảm" data-word="<?php echo esc_attr($w); ?>">
+                                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                                            </button>
+                                            <div class="story-dropdown-menu">
+                                                <button type="button" class="story-dropdown-item adm-btn-edit-word" data-word="<?php echo esc_attr($w); ?>">
+                                                    <i class="fa-solid fa-pen-to-square" style="color: #0284c7;"></i> Sửa
+                                                </button>
+                                                <button type="button" class="story-dropdown-item adm-btn-delete-word" data-word="<?php echo esc_attr($w); ?>" style="color: #ef4444;">
+                                                    <i class="fa-solid fa-trash-can"></i> Xóa
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Thông báo khi không tìm thấy kết quả -->
+                    <div id="admNoWordFound" style="display: none; padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; background: var(--bg-card); border-radius: var(--radius-md); border: 1px dashed var(--border-color); margin-top: 10px;">
+                        <i class="fa-solid fa-circle-question" style="font-size: 20px; margin-bottom: 6px; display: block;"></i>
+                        Không tìm thấy từ nhạy cảm nào phù hợp với từ khóa!
+                    </div>
+
+                    <!-- Modal Sửa Từ Nhạy Cảm -->
+                    <div id="admModalEditWord" class="adm-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center; padding: 16px;">
+                        <div style="background: var(--bg-card); width: 100%; max-width: 420px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden;">
+                            <div style="padding: 14px 18px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; background: var(--pastel-green);">
+                                <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--primary-green); display: flex; align-items: center; gap: 8px;">
+                                    <i class="fa-solid fa-pen-to-square"></i> Sửa Từ Nhạy Cảm
+                                </h4>
+                                <button type="button" id="admBtnCloseEditWordModal" style="background: none; border: none; font-size: 16px; color: var(--text-muted); cursor: pointer;" title="Đóng">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <div style="padding: 18px;">
+                                <input type="hidden" id="admEditOldWord" value="" />
+                                <div class="form-group" style="margin-bottom: 14px;">
+                                    <label class="form-label" for="admEditWordInput" style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">Từ nhạy cảm:</label>
+                                    <input type="text" id="admEditWordInput" class="form-input" style="width: 100%; height: 38px; font-size: 13.5px;" />
+                                </div>
+                                <div id="admEditWordStatus" style="font-size: 12.5px; margin-bottom: 12px; display: none;"></div>
+                                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                    <button type="button" id="admBtnCancelEditWordModal" class="btn btn-secondary" style="padding: 7px 14px; font-size: 13px;">Hủy bỏ</button>
+                                    <button type="button" id="admBtnSaveEditWord" class="btn btn-primary" style="padding: 7px 18px; font-size: 13px;">
+                                        <i class="fa-solid fa-check"></i> Lưu Thay Đổi
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =================================================================
                      TAB 6: BÌNH LUẬN & ĐÁNH GIÁ
                      ================================================================= -->
                 <section id="admTabComments" class="dash-tab-pane">
@@ -2478,6 +2594,67 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                         </div>
 
                         <!-- =============================================================
+                             BỘ ĐỘNG CƠ TỐI ƯU HÓA HÌNH ẢNH TỰ ĐỘNG (AUTO IMAGE OPTIMIZER)
+                             ============================================================= -->
+                        <?php
+                        $opt_stats = get_option('muop_image_opt_stats', array(
+                            'total_files'       => 0,
+                            'total_bytes_saved' => 0,
+                            'history'           => array()
+                        ));
+                        $opt_mb_saved = round($opt_stats['total_bytes_saved'] / (1024 * 1024), 2);
+                        ?>
+                        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1.5px solid #10b981; border-radius: var(--radius-md); padding: 20px; margin-bottom: 26px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);">
+                                        <i class="fa-solid fa-file-image"></i>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #065f46; display: flex; align-items: center; gap: 8px;">
+                                            Động Cơ Tự Động Tối Ưu & Nén Hình Ảnh (Auto Image Optimizer)
+                                            <span class="badge" style="background: #059669; color: #fff; font-size: 11px;">Hoạt Động 100%</span>
+                                        </h4>
+                                        <p style="margin: 3px 0 0; font-size: 13px; color: #047857;">
+                                            Tự động nén chất lượng, xoay ảnh EXIF, xóa metadata GPS và sinh tệp WebP siêu nhẹ mỗi khi người dùng tải ảnh lên.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <button type="button" class="btn btn-primary btn-sm" id="btnScanOptimizeLibrary" style="background: #059669; border-color: #059669; display: inline-flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-bolt"></i> Quét & Nén Thư Viện Ảnh Cũ
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 4 Stats Boxes -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                                <div style="background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px;">
+                                    <span style="font-size: 11.5px; color: #64748b; font-weight: 600; display: block;">Ảnh Đã Tự Động Tối Ưu</span>
+                                    <span id="optStatFiles" style="font-size: 18px; font-weight: 800; color: #065f46;"><?php echo number_format($opt_stats['total_files']); ?> ảnh</span>
+                                </div>
+                                <div style="background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px;">
+                                    <span style="font-size: 11.5px; color: #64748b; font-weight: 600; display: block;">Dung Lượng Tiết Kiệm</span>
+                                    <span id="optStatBytes" style="font-size: 18px; font-weight: 800; color: #059669;"><?php echo $opt_mb_saved; ?> MB</span>
+                                </div>
+                                <div style="background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px;">
+                                    <span style="font-size: 11.5px; color: #64748b; font-weight: 600; display: block;">Tự Sinh Định Dạng WebP</span>
+                                    <span style="font-size: 13.5px; font-weight: 700; color: #0284c7;"><i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Sẵn Sàng (WebP 82%)</span>
+                                </div>
+                                <div style="background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px;">
+                                    <span style="font-size: 11.5px; color: #64748b; font-weight: 600; display: block;">Xoay Chiều & Xóa GPS</span>
+                                    <span style="font-size: 13.5px; font-weight: 700; color: #7c3aed;"><i class="fa-solid fa-shield-halved" style="color: #7c3aed;"></i> Tự Động EXIF Clean</span>
+                                </div>
+                            </div>
+                            
+                            <div id="scanOptimizeProgressBox" style="display: none; background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px; margin-top: 12px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12.5px;">
+                                    <span id="scanProgressMsg" style="font-weight: 600; color: #065f46;"><i class="fa-solid fa-spinner fa-spin"></i> Đang quét và tối ưu các tệp ảnh...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- =============================================================
                              1. ĐẦU MỤC: TÍNH NĂNG & NÂNG CẤP MỚI NHẤT (HIỂN THỊ Ở ĐẦU TRANG)
                              ============================================================= -->
                         <div style="margin-bottom: 30px;">
@@ -2519,15 +2696,132 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                 ?>
 
                                 <!-- Danh sách các tính năng vừa mới nâng cấp của hệ thống -->
-                                <div class="adm-feature-card" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+                                <!-- v2.2.78: Tự Động Nén & Tối Ưu Hóa Hình Ảnh Toàn Diện -->
+                                <div class="adm-feature-card" style="background: #f0fdf4; border: 1.5px solid #10b981; border-radius: var(--radius-md); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span class="badge badge-hot" style="font-size: 11px; font-weight: 800; padding: 3px 8px; background: #ef4444; color: #fff;">MỚI</span>
+                                            <span class="badge badge-approved" style="font-size: 11px; background: #10b981; color: #fff;">v2.2.78</span>
+                                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Hiệu Năng & Tối Ưu Media</span>
+                                            <h5 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-color);">Động Cơ Tự Động Tối Ưu & Nén Hình Ảnh Mỗi Khi Tải Lên (Auto Image Optimizer)</h5>
+                                        </div>
+                                        <span style="font-size: 11.5px; color: #059669; font-weight: 600;"><i class="fa-regular fa-clock"></i> Mới cập nhật</span>
+                                    </div>
+                                    <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.65;">
+                                        Tự động xử lý, nén dung lượng và tối ưu hóa 100% hình ảnh ngay khi được tải lên website (Ảnh bìa truyện mới & chỉnh sửa, ảnh đại diện Avatar người dùng / nhóm dịch, ảnh hóa đơn chuyển khoản lương, ảnh thư viện Media).
+                                        Hệ thống vận hành với <strong>4 lớp tối ưu thông minh</strong>:
+                                        (1) <em>Giới hạn kích thước tối đa</em> (Max 1600x2400px, thu nhỏ tỷ lệ mượt mà);
+                                        (2) <em>Xoay ảnh đúng chiều tự động</em> dựa trên thông tin EXIF chụp từ điện thoại iPhone/Android;
+                                        (3) <em>Xóa bỏ hoàn toàn EXIF rác & tọa độ GPS</em> bảo vệ quyền riêng tư và tiết kiệm hàng trăm KB;
+                                        (4) <em>Nén ảnh chất lượng cao</em> (Progressive JPEG 82%, PNG tối ưu, tự động sinh bản WebP đồng hành siêu nhẹ giảm tới 70-95% dung lượng).
+                                        Đồng thời hỗ trợ <em>Nén ảnh nhanh phía trình duyệt (Client-side Canvas)</em> giúp người dùng tải ảnh lên trong chớp mắt mà không tốn dung lượng 4G/Wifi.
+                                    </p>
+                                </div>
+                                <!-- v2.2.77: Kiểm Duyệt & Đánh Dấu Từ Nhạy Cảm Realtime -->
+                                <div class="adm-feature-card" style="background: #f0fdf4; border: 1.5px solid #22c55e; border-radius: var(--radius-md); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 2px 8px rgba(34, 197, 94, 0.08);">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span class="badge badge-hot" style="font-size: 11px; font-weight: 800; padding: 3px 8px; background: #ef4444; color: #fff;">MỚI</span>
+                                            <span class="badge badge-approved" style="font-size: 11px; background: #22c55e; color: #fff;">v2.2.77</span>
+                                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Kiểm Duyệt & AI Moderation</span>
+                                            <h5 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-color);">Hệ Thống Kiểm Duyệt & Đánh Dấu Từ Nhạy Cảm Trực Quan (Real-time Highlighter)</h5>
+                                        </div>
+                                        <span style="font-size: 11.5px; color: #16a34a; font-weight: 600;"><i class="fa-regular fa-clock"></i> Mới cập nhật</span>
+                                    </div>
+                                    <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.65;">
+                                        Tự động quét và phát hiện các từ nhạy cảm (18+, thô tục, bạo lực, ma túy, vi phạm chính sách) ngay khi soạn thảo hoặc tải lên chương truyện. Tích hợp bảng xem trước toàn văn <strong>đánh dấu trực tiếp (Inline Highlighted Box)</strong> với viền đỏ phát sáng và đánh số thứ tự vi phạm rõ ràng kèm thanh chip từ khóa thông minh hỗ trợ cuộn mượt (smooth scroll) & nhấp nháy phát sáng đúng vị trí. Đặc biệt, trang bị nút 1-chạm <strong>« ⚡ Sửa Hết Bằng Dấu (.) »</strong> giúp tự động mã hóa an toàn toàn bộ bài viết chỉ trong một tích tắc mà không cần sửa thủ công từng từ.
+                                    </p>
+                                </div>
+
+                                <!-- v2.2.77: Bắt Buộc Duyệt Nội Dung Trước Khi Đăng Chương -->
+                                <div class="adm-feature-card" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                             <span class="badge badge-hot" style="font-size: 11px; font-weight: 800; padding: 3px 8px;">MỚI</span>
+                                            <span class="badge badge-approved" style="font-size: 11px;">v2.2.77</span>
+                                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Bảo Mật Nội Dung CMS</span>
+                                            <h5 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-color);">Cơ Chế Bắt Buộc Duyệt Nội Dung An Toàn Trước Khi Đăng Chương (Approval Flow)</h5>
+                                        </div>
+                                        <span style="font-size: 11.5px; color: #94a3b8;"><i class="fa-regular fa-clock"></i> Mới cập nhật</span>
+                                    </div>
+                                    <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.65;">
+                                        Quy trình đăng tải chương mới được nâng cấp với cơ chế chốt chặn bảo mật 2 lớp nghiêm ngặt (Client JS & Backend PHP): Khi người dùng bấm <strong>"Thêm Chương Này"</strong> hoặc <strong>"Cập Nhật Chương"</strong>, hệ thống sẽ tự động rà soát toàn bộ nội dung. Nếu phát hiện vi phạm, hệ thống lập tức tạm dừng quá trình xuất bản và bật bảng soát lỗi trực quan để người đăng chỉnh sửa. Chỉ khi toàn bộ nội dung đã hoàn toàn sạch sẽ, hợp lệ thì chương mới được phép lưu vào cơ sở dữ liệu.
+                                    </p>
+                                </div>
+
+                                <!-- v2.2.77: Quản Lý Danh Sách Từ Nhạy Cảm Trong Admin Portal -->
+                                <div class="adm-feature-card" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span class="badge badge-hot" style="font-size: 11px; font-weight: 800; padding: 3px 8px;">MỚI</span>
+                                            <span class="badge badge-approved" style="font-size: 11px;">v2.2.77</span>
+                                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Quản Trị Admin</span>
+                                            <h5 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-color);">Giao Diện Quản Lý Danh Sách Từ Nhạy Cảm Dành Riêng Cho Quản Trị Viên</h5>
+                                        </div>
+                                        <span style="font-size: 11.5px; color: #94a3b8;"><i class="fa-regular fa-clock"></i> Mới cập nhật</span>
+                                    </div>
+                                    <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.65;">
+                                        Bổ sung phân hệ <strong>« Từ nhạy cảm »</strong> chuyên nghiệp ngay trên thanh điều hướng Admin Portal. Giao diện thiết kế dạng thẻ Card hiện đại chuẩn UX với huy hiệu "Từ cấm", phân loại theo nhóm (18+, Thô tục, Bạo lực, Khác), cùng menu nút 3 chấm dọc <code>⋮</code> cho phép chỉnh sửa hoặc xóa nhanh chóng. Tích hợp thanh tìm kiếm thời gian thực (Real-time Filter) và lưu trữ dữ liệu động trực tiếp trong Database, đồng bộ tức thì với bộ máy quét kiểm duyệt của website.
+                                    </p>
+                                </div>
+
+                                <!-- v2.2.70: Vivu Crawler Tự Động Hóa -->
+                                <div class="adm-feature-card" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span class="badge badge-green" style="font-size: 11px; font-weight: 700; padding: 3px 8px;">NÂNG CẤP</span>
+                                            <span class="badge badge-approved" style="font-size: 11px;">v2.2.70</span>
+                                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Tự Động Hóa Crawler</span>
+                                            <h5 style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-color);">Công Cụ Cào Truyện Tự Động Toàn Diện Vivu Crawler</h5>
+                                        </div>
+                                        <span style="font-size: 11.5px; color: #94a3b8;"><i class="fa-regular fa-clock"></i> Gần đây</span>
+                                    </div>
+                                    <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
+                                        Bộ công cụ cào dữ liệu truyện thông minh Vivu Crawler: Hỗ trợ cào truyện theo link nhanh chóng (cả chế độ Cào nhanh AJAX và Cào ngầm Server-side), tự động bóc tách tiêu đề, tác giả, ảnh bìa, tóm tắt và toàn bộ danh sách chương kèm bộ lọc loại bỏ rác, watermark và quảng cáo tự động.
+                                    </p>
+                                </div>
+
+                                <!-- v2.2.65: Quản Lý Thể Loại Nâng Cao & Modal Danh Sách -->
+                                <div class="adm-feature-card" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span class="badge badge-green" style="font-size: 11px; font-weight: 700; padding: 3px 8px;">NÂNG CẤP</span>
+                                            <span class="badge badge-approved" style="font-size: 11px;">v2.2.65</span>
+                                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Danh Mục & Dữ Liệu</span>
+                                            <h5 style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-color);">Quản Lý Thể Loại Nâng Cao Kèm Modal Xem Chi Tiết Toàn Bộ Truyện</h5>
+                                        </div>
+                                        <span style="font-size: 11.5px; color: #94a3b8;"><i class="fa-regular fa-clock"></i> Gần đây</span>
+                                    </div>
+                                    <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
+                                        Nâng cấp phân hệ Quản lý thể loại truyện với đầy đủ thao tác Thêm / Sửa / Xóa danh mục kèm slug tự động. Tích hợp Popup Modal xem nhanh danh sách toàn bộ truyện trực thuộc từng thể loại với đầy đủ thống kê số chương, lượt xem và trạng thái truyện.
+                                    </p>
+                                </div>
+
+                                <!-- v2.2.60: Báo Lỗi Chương & Phản Hồi Trực Tuyến -->
+                                <div class="adm-feature-card" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span class="badge badge-green" style="font-size: 11px; font-weight: 700; padding: 3px 8px;">CẢI TIẾN</span>
+                                            <span class="badge badge-approved" style="font-size: 11px;">v2.2.60</span>
+                                            <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Tương Tác & Chăm Sóc Độc Giả</span>
+                                            <h5 style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-color);">Hệ Thống Tiếp Nhận Báo Lỗi Chương Truyện & Hộp Thoại Phản Hồi Trực Tiếp</h5>
+                                        </div>
+                                        <span style="font-size: 11.5px; color: #94a3b8;"><i class="fa-regular fa-clock"></i> Gần đây</span>
+                                    </div>
+                                    <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
+                                        Phân hệ tiếp nhận và xử lý báo lỗi chương truyện trực tuyến: Cho phép độc giả báo các lỗi như chính tả, chương rỗng, lỗi hiển thị ảnh... Quản trị viên có thể theo dõi bảng danh sách chi tiết, nhập lời phản hồi gửi lại độc giả và đánh dấu trạng thái Đã xử lý / Chờ xử lý.
+                                    </p>
+                                </div>
+
+                                <div class="adm-feature-card" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <span class="badge badge-green" style="font-size: 11px; font-weight: 700; padding: 3px 8px;">ĐÃ RA MẮT</span>
                                             <span class="badge badge-approved" style="font-size: 11px;">v2.2.47</span>
                                             <span style="font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,0.04); padding: 2px 8px; border-radius: 4px;">Giao Diện & Di Động</span>
                                             <h5 style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-color);">Bộ Điều Khiển Kéo & Cuộn Ngang Cho Mọi Bảng Dữ Liệu (Scroll Controls)</h5>
                                         </div>
-                                        <span style="font-size: 11.5px; color: #94a3b8;"><i class="fa-regular fa-clock"></i> Hôm nay</span>
+                                        <span style="font-size: 11.5px; color: #94a3b8;"><i class="fa-regular fa-clock"></i> Trước đó</span>
                                     </div>
                                     <p style="margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.6;">
                                         Tích hợp nút bấm mũi tên <strong>&lt;</strong> và <strong>&gt;</strong> kèm hiệu ứng kéo chuột mượt mà cho mọi bảng dữ liệu (Quản lý truyện, Người dùng, Thể loại, Lịch sử tách chương, Doanh thu...). Tự động nhận diện khi nội dung bị tràn trên điện thoại hoặc khi thu nhỏ cửa sổ trình duyệt, giúp thao tác duyệt dữ liệu cực kỳ thuận tiện.
@@ -2665,6 +2959,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                         <li>Quản lý truyện: Duyệt truyện, đổi trạng thái, sửa mô tả, ẩn truyện.</li>
                                         <li>Quản lý người dùng: Phân quyền, Khóa/Mở khóa tài khoản an toàn.</li>
                                         <li>Quản lý Thể loại truyện kèm popup xem truyện trực thuộc.</li>
+                                        <li>Quản lý danh sách Từ nhạy cảm & thiết lập bộ từ cấm động.</li>
                                         <li>Duyệt chi lương dịch giả có tải ảnh bill chuyển khoản xác nhận.</li>
                                         <li>Phát thông báo hệ thống và xử lý báo lỗi chương truyện.</li>
                                     </ul>
@@ -2682,6 +2977,9 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                         </div>
                                     </div>
                                     <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.8;">
+                                        <li>Công cụ cào truyện tự động thông minh Vivu Crawler đa luồng.</li>
+                                        <li>Kiểm duyệt từ nhạy cảm Real-time & Sửa nhanh 1-chạm bằng dấu (.).</li>
+                                        <li>Cơ chế bắt buộc duyệt nội dung an toàn trước khi đăng chương.</li>
                                         <li>Tự động tách truyện thành các chương từ file Word/PDF/Text.</li>
                                         <li>Thuật toán random ±150 từ ngắt chuẩn tại dấu câu kết thúc.</li>
                                         <li>Lưu lịch sử tách chương với khả năng xem lại và tải file txt.</li>
@@ -2867,6 +3165,79 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
 <script>
 // Inline JS for Admin Portal interactions
 jQuery(document).ready(function($) {
+  // Đảm bảo muopConfig luôn đầy đủ ajaxUrl, nonce và userId bảo mật
+  window.muopConfig = window.muopConfig || {};
+  if (!window.muopConfig.ajaxUrl) {
+    window.muopConfig.ajaxUrl = '<?php echo esc_js(wp_make_link_relative(admin_url("admin-ajax.php"))); ?>';
+  }
+  if (!window.muopConfig.nonce) {
+    window.muopConfig.nonce = '<?php echo esc_js(wp_create_nonce("muop_ajax_nonce")); ?>';
+  }
+  if (!window.muopConfig.userId) {
+    window.muopConfig.userId = '<?php echo esc_js(get_current_user_id()); ?>';
+  }
+  if (!window.muopConfig.sessionToken) {
+    window.muopConfig.sessionToken = '<?php echo esc_js(function_exists("wp_get_session_token") ? wp_get_session_token() : ""); ?>';
+  }
+
+  // Bắt buộc gửi cookie xác thực phiên quản trị và header qua tất cả request AJAX
+  $.ajaxSetup({
+    xhrFields: {
+      withCredentials: true
+    },
+    beforeSend: function(xhr) {
+      if (window.muopConfig && window.muopConfig.userId) {
+        xhr.setRequestHeader('X-Muop-User', window.muopConfig.userId);
+      }
+      if (window.muopConfig && window.muopConfig.sessionToken) {
+        xhr.setRequestHeader('X-Muop-Token', window.muopConfig.sessionToken);
+      }
+      if (window.muopConfig && window.muopConfig.nonce) {
+        xhr.setRequestHeader('X-WP-Nonce', window.muopConfig.nonce);
+      }
+    }
+  });
+
+  // Safe helper xử lý toàn bộ các mã lỗi HTTP và phản hồi máy chủ
+  function handleAjaxError(xhr, status, error, defaultMsg) {
+    if (typeof window.handleAjaxError === 'function') {
+      return window.handleAjaxError(xhr, status, error, defaultMsg);
+    }
+    try {
+      if (xhr && xhr.responseJSON && xhr.responseJSON.data) {
+        if (xhr.responseJSON.data.require_login) {
+          setTimeout(function() {
+            window.location.href = '<?php echo esc_js(home_url("/dang-nhap/?redirect_to=" . urlencode(home_url("/quan-ly-admin/")))); ?>';
+          }, 1500);
+          return 'Phiên làm việc đã hết hạn. Đang chuyển hướng bạn đến trang đăng nhập...';
+        }
+        if (xhr.responseJSON.data.message) {
+          return xhr.responseJSON.data.message;
+        }
+      }
+      if (xhr && xhr.responseText) {
+        const raw = xhr.responseText.trim();
+        if (raw === '-1' || raw === '0') {
+          return 'Phiên làm việc đã hết hạn hoặc chưa đăng nhập. Vui lòng tải lại trang (F5)!';
+        }
+        const s = raw.indexOf('{');
+        const e = raw.lastIndexOf('}');
+        if (s !== -1 && e !== -1) {
+          const parsed = JSON.parse(raw.substring(s, e + 1));
+          if (parsed.data && parsed.data.message) return parsed.data.message;
+          if (parsed.message) return parsed.message;
+        }
+      }
+    } catch(e) {}
+    if (xhr && xhr.status === 403) return 'Yêu cầu bị từ chối (403 Forbidden). Vui lòng tải lại trang!';
+    if (xhr && xhr.status === 404) return 'Không tìm thấy máy chủ xử lý (404 Not Found).';
+    if (xhr && (xhr.status === 504 || status === 'timeout')) return 'Máy chủ phản hồi quá thời gian quy định (Timeout).';
+    if (xhr && xhr.status === 500) return 'Máy chủ gặp sự cố xử lý (500 Internal Error).';
+    if (error && typeof error === 'string' && error.trim() && error.toLowerCase() !== 'error') {
+      return 'Lỗi kết nối máy chủ: ' + error.trim();
+    }
+    return defaultMsg || 'Không thể kết nối với máy chủ. Vui lòng kiểm tra lại đường truyền mạng!';
+  }
   // 1. UNIVERSAL TAB SWITCHING (FIX HÌNH 1: ĐẢM BẢO CHUYỂN TAB 100%)
   function switchAdminTab(tabId) {
     if (!tabId) return;
@@ -2889,6 +3260,7 @@ jQuery(document).ready(function($) {
         'admTabAffiliate': 'Link Shopee & TikTok',
         'admTabSalaries': 'Tiền lương dịch giả',
         'admTabGenres': 'Thể loại truyện',
+        'admTabSensitiveWords': 'Quản lý từ nhạy cảm',
         'admTabComments': 'Bình luận & Đánh giá',
         'admTabReports': 'Báo lỗi chương',
         'admTabBroadcast': 'Thông báo hệ thống',
@@ -3002,9 +3374,9 @@ jQuery(document).ready(function($) {
           muopAlert(res.data ? res.data.message : 'Lỗi tạo nhóm dịch!', 'error');
         }
       },
-      error: function() {
+      error: function(xhr, status, error) {
         $btn.prop('disabled', false).html(originalText);
-        muopAlert('Lỗi kết nối máy chủ!', 'error');
+        muopAlert(handleAjaxError(xhr, status, error, 'Lỗi kết nối máy chủ khi tạo nhóm!'), 'error');
       }
     });
   });
@@ -3043,9 +3415,9 @@ jQuery(document).ready(function($) {
           muopAlert(res.data ? res.data.message : 'Lỗi cập nhật nhóm!', 'error');
         }
       },
-      error: function() {
+      error: function(xhr, status, error) {
         $btn.prop('disabled', false).html(originalText);
-        muopAlert('Lỗi kết nối máy chủ!', 'error');
+        muopAlert(handleAjaxError(xhr, status, error, 'Lỗi kết nối máy chủ khi tạo nhóm!'), 'error');
       }
     });
   });
@@ -3076,8 +3448,8 @@ jQuery(document).ready(function($) {
               muopAlert(res.data ? res.data.message : 'Lỗi xóa nhóm dịch!', 'error');
             }
           },
-          error: function() {
-            muopAlert('Lỗi kết nối máy chủ!', 'error');
+          error: function(xhr, status, error) {
+            muopAlert(handleAjaxError(xhr, status, error, 'Lỗi kết nối máy chủ khi xóa nhóm!'), 'error');
           }
         });
       },
@@ -3729,9 +4101,10 @@ jQuery(document).ready(function($) {
         renderVivuStoryPreview(currentVivuStory);
         muopAlert('Đã tìm thấy truyện: "' + currentVivuStory.title + '" với ' + currentVivuStory.total_chaps + ' chương!', 'success');
       },
+      timeout: 60000,
       error: function(xhr, status, error) {
         $btn.prop('disabled', false).html('<i class="fa-solid fa-magnifying-glass"></i> 1. Phân Tích & Lấy Thông Tin');
-        muopAlert('Lỗi kết nối máy chủ: ' + error, 'error');
+        muopAlert(handleAjaxError(xhr, status, error, 'Không thể kết nối đến máy chủ để lấy thông tin truyện!'), 'error');
       }
     });
   });
@@ -4122,6 +4495,9 @@ jQuery(document).ready(function($) {
       success: function(res) {
         $('#tableAdminStories .adm-story-row[data-story-id="' + storyId + '"]').data('nominate', val).attr('data-nominate', val);
         muopAlert(res.data ? res.data.message : 'Đã cập nhật đề cử!', 'success');
+      },
+      error: function(xhr, status, error) {
+        muopAlert(handleAjaxError(xhr, status, error, 'Lỗi cập nhật đề cử!'), 'error');
       }
     });
   });
@@ -4140,6 +4516,9 @@ jQuery(document).ready(function($) {
       },
       success: function(res) {
         muopAlert(res.data ? res.data.message : 'Đã đổi quyền người dùng!', 'success');
+      },
+      error: function(xhr, status, error) {
+        muopAlert(handleAjaxError(xhr, status, error, 'Lỗi đổi quyền người dùng!'), 'error');
       }
     });
   });
@@ -4159,6 +4538,9 @@ jQuery(document).ready(function($) {
         } else {
           muopAlert(res.data ? res.data.message : 'Lỗi thêm người dùng!', 'error');
         }
+      },
+      error: function(xhr, status, error) {
+        muopAlert(handleAjaxError(xhr, status, error, 'Lỗi kết nối khi thêm người dùng!'), 'error');
       }
     });
   });
@@ -4216,9 +4598,9 @@ jQuery(document).ready(function($) {
           muopAlert(res.data ? res.data.message : 'Lỗi thêm tính năng mới!', 'error');
         }
       },
-      error: function() {
+      error: function(xhr, status, error) {
         $btn.prop('disabled', false).html(orig);
-        muopAlert('Lỗi kết nối máy chủ!', 'error');
+        muopAlert(handleAjaxError(xhr, status, error, 'Lỗi kết nối máy chủ khi lưu tính năng!'), 'error');
       }
     });
   });
@@ -4247,8 +4629,8 @@ jQuery(document).ready(function($) {
               muopAlert(res.data ? res.data.message : 'Lỗi xóa tính năng!', 'error');
             }
           },
-          error: function() {
-            muopAlert('Lỗi kết nối máy chủ!', 'error');
+          error: function(xhr, status, error) {
+            muopAlert(handleAjaxError(xhr, status, error, 'Lỗi kết nối máy chủ khi xóa nhóm!'), 'error');
           }
         });
       },

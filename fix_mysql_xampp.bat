@@ -22,8 +22,10 @@ del /f /q "C:\Program Files\xampp\mysql\data\aria_log*" 2>nul
 del /f /q "C:\Program Files\xampp\mysql\data\aria_log_control" 2>nul
 del /f /q "C:\Program Files\xampp\mysql\data\*.lower-test" 2>nul
 
-echo [2/3] Cap quyen day du cho thu muc mysql/data tren Windows...
+echo [2/3] Cap quyen day du cho thu muc mysql/data va tmp tren Windows...
 icacls "C:\Program Files\xampp\mysql\data" /grant Users:(OI)(CI)F /T /C >nul 2>&1
+if not exist "C:\Program Files\xampp\tmp" mkdir "C:\Program Files\xampp\tmp" >nul 2>&1
+icacls "C:\Program Files\xampp\tmp" /grant Users:(OI)(CI)F /T /C >nul 2>&1
 
 echo [3/3] Hoan tat!
 echo.

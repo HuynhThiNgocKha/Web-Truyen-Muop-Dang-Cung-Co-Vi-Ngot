@@ -2,6 +2,12 @@
 /**
  * Router script for PHP built-in web server
  */
+// 0. Clean any output generated during PHP request startup (such as upload_tmp_dir notices)
+while (ob_get_level()) {
+    @ob_end_clean();
+}
+ob_start();
+
 @ini_set('display_errors', '0');
 @error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
 
@@ -52,6 +58,8 @@ if (preg_match('#^/(wp-admin|wp-includes|wp-login\.php|wp-cron\.php|wp-comments-
                 'woff'  => 'font/woff',
                 'woff2' => 'font/woff2',
                 'ttf'   => 'font/ttf',
+                'webp'  => 'image/webp',
+                'avif'  => 'image/avif',
                 'ico'   => 'image/x-icon',
             ];
             if (isset($mimeTypes[$ext])) {

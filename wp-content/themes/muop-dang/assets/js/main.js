@@ -10,6 +10,26 @@
 (function($) {
   'use strict';
 
+  // Bắt buộc gửi cookie xác thực phiên quản trị và header an toàn qua tất cả request AJAX của jQuery
+  $.ajaxSetup({
+    xhrFields: {
+      withCredentials: true
+    },
+    beforeSend: function(xhr, settings) {
+      if (typeof muopConfig !== 'undefined') {
+        if (muopConfig.userId && parseInt(muopConfig.userId, 10) > 0) {
+          xhr.setRequestHeader('X-Muop-User', muopConfig.userId);
+        }
+        if (muopConfig.sessionToken) {
+          xhr.setRequestHeader('X-Muop-Token', muopConfig.sessionToken);
+        }
+        if (muopConfig.nonce) {
+          xhr.setRequestHeader('X-WP-Nonce', muopConfig.nonce);
+        }
+      }
+    }
+  });
+
   // Chuẩn hóa AJAX URL luôn là relative path trên cùng origin để tránh mất cookie do domain/port mismatch
   function getAjaxUrl() {
     if (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) {
@@ -22,7 +42,7 @@
       } catch (e) {}
       return u;
     }
-    return '/wp-admin/admin-ajax.php';
+    return '/core/wp-admin/admin-ajax.php';
   }
 
   // Safe helper to extract message from AJAX response or error (prevents undefined reading 'message')
@@ -34,8 +54,8 @@
       if (clean.indexOf('PHP Request Startup') !== -1 || clean.indexOf('<b>Notice</b>') !== -1 || clean.indexOf('<b>Warning</b>') !== -1) {
         clean = clean.replace(/<br\s*\/?>\s*<b>(?:Notice|Warning|Deprecated)<\/b>:.*?<br\s*\/?>/gi, '').trim();
       }
-      if (clean === '-1') return 'Phiên bảo mật (nonce) đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
-      if (clean === '0' || clean.endsWith(' 0') || clean === '0') return 'Phiên làm việc hoặc bảo mật đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
+      if (clean === '-1') return 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5) và thử lại!';
+      if (clean === '0' || clean.endsWith(' 0') || clean === '0') return 'Phiên đăng nhập đã hết hạn hoặc chưa đăng nhập. Vui lòng tải lại trang (F5)!';
       try {
         const json = JSON.parse(clean);
         return getAjaxMsg(json, defaultMsg);
@@ -50,6 +70,55 @@
     if (res.message) return res.message;
     return defaultMsg || 'Có lỗi xảy ra!';
   }
+
+  // Universal AJAX error handler for all network/HTTP failures
+  function handleAjaxError(xhr, status, error, defaultMsg) {
+    try {
+      if (xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.require_login) {
+        setTimeout(function() {
+          const siteUrl = (typeof muopConfig !== 'undefined' && muopConfig.siteUrl) ? muopConfig.siteUrl : '';
+          window.location.href = siteUrl + '/dang-nhap/?redirect_to=' + encodeURIComponent(window.location.href);
+        }, 1500);
+        return 'Phiên làm việc đã hết hạn. Đang chuyển hướng bạn đến trang đăng nhập...';
+      }
+      if (xhr && xhr.responseJSON) {
+        return getAjaxMsg(xhr.responseJSON, defaultMsg);
+      }
+      if (xhr && xhr.responseText) {
+        const raw = xhr.responseText.trim();
+        if (raw === '-1' || raw === '0') {
+          return 'Phiên làm việc hoặc bảo mật đã hết hạn. Vui lòng tải lại trang (F5)!';
+        }
+        const s = raw.indexOf('{');
+        const e = raw.lastIndexOf('}');
+        if (s !== -1 && e !== -1) {
+          const parsed = JSON.parse(raw.substring(s, e + 1));
+          return getAjaxMsg(parsed, defaultMsg);
+        }
+      }
+    } catch(e) {}
+
+    if (xhr && xhr.status === 403) {
+      return 'Yêu cầu bị từ chối (403 Forbidden). Vui lòng tải lại trang hoặc kiểm tra quyền tài khoản!';
+    }
+    if (xhr && xhr.status === 404) {
+      return 'Không tìm thấy máy chủ xử lý (404 Not Found). Vui lòng thử lại sau!';
+    }
+    if (xhr && (xhr.status === 504 || status === 'timeout')) {
+      return 'Máy chủ phản hồi quá thời gian quy định (Timeout). Vui lòng thử lại!';
+    }
+    if (xhr && xhr.status === 500) {
+      return 'Máy chủ gặp sự cố xử lý (500 Internal Error). Vui lòng thử lại sau!';
+    }
+    if (error && typeof error === 'string' && error.trim() && error.toLowerCase() !== 'error') {
+      return 'Lỗi kết nối máy chủ: ' + error.trim();
+    }
+    return defaultMsg || 'Không thể kết nối với máy chủ. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau!';
+  }
+
+  window.getSafeAjaxUrl = getSafeAjaxUrl;
+  window.getAjaxMsg = getAjaxMsg;
+  window.handleAjaxError = handleAjaxError;
 
   // Helper tính số từ & số ký tự dùng chung toàn website
   function countTextWordsAndChars(text) {
@@ -166,6 +235,12 @@
     open(options) {
       this.ensureElements();
       this.currentOptions = options;
+
+      if (options.maxWidth) {
+        this.$overlay.find('.muop-popup-card').css('max-width', options.maxWidth);
+      } else {
+        this.$overlay.find('.muop-popup-card').css('max-width', '');
+      }
 
       const type = options.type || this.detectType(options.message);
       const isConfirm = !!options.isConfirm;
@@ -2082,6 +2157,31 @@
         const isDraft = $('#isChapterDraftInput').val() === '1';
         const $btn = isDraft ? $('#btnSaveDraftNewChapter') : $('#btnSubmitPublishChapter');
 
+        // BẮT BUỘC DUYỆT NỘI DUNG KHI BẤM "THÊM CHƯƠNG NÀY" (NỘI DUNG OKE MỚI ĐƯỢC ĐĂNG)
+        if (!isDraft && typeof SensitiveWordModerator !== 'undefined') {
+          const $chapContent = $('#chapContent');
+          const $chapTitle = $('#chapTitle');
+          const fullText = ($chapTitle.val() || '') + '\n' + ($chapContent.val() || '');
+
+          const scanResult = SensitiveWordModerator.quickScan(fullText);
+          if (scanResult.foundMap.size > 0) {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-cloud-arrow-up"></i> Thêm Chương Này');
+
+            // Kích hoạt ngay bộ duyệt nội dung và hiển thị bảng đánh dấu trực tiếp
+            SensitiveWordModerator.scanAndOpen($chapContent);
+
+            $alert.removeClass('alert-success').addClass('alert-error').html(
+              '<i class="fa-solid fa-triangle-exclamation"></i> <strong>Chưa thể đăng chương!</strong> Phát hiện <strong>' + 
+              scanResult.foundMap.size + ' từ nhạy cảm (' + scanResult.totalMatches + ' vị trí vi phạm)</strong> trong bài. Vui lòng xem bảng đánh dấu bên dưới và sửa trước khi đăng!'
+            ).fadeIn();
+
+            if ($chapContent.length) {
+              $('html, body').animate({ scrollTop: $chapContent.offset().top - 140 }, 300);
+            }
+            return false;
+          }
+        }
+
         $btn.prop('disabled', true).text(isDraft ? 'Đang lưu bản nháp...' : 'Đang thêm chương...');
         $alert.hide();
 
@@ -2999,6 +3099,303 @@
         if (e.target === this) {
           $(this).hide();
         }
+      });
+
+      // =========================================================================
+      // === QUẢN LÝ TỪ NHẠY CẢM (ADMIN SENSITIVE WORDS MANAGEMENT) ===
+      // =========================================================================
+
+      // 1. Tìm kiếm từ nhạy cảm realtime
+      $('#admSearchSensitiveWord').on('input', function() {
+        const q = $(this).val().toLowerCase().trim();
+        let matched = 0;
+        $('#admSensitiveWordsGrid .adm-word-card').each(function() {
+          const word = ($(this).data('word') || $(this).find('.adm-word-title').text()).toLowerCase();
+          if (!q || word.indexOf(q) !== -1) {
+            $(this).show();
+            matched++;
+          } else {
+            $(this).hide();
+          }
+        });
+        if (matched === 0) {
+          $('#admNoWordFound').show();
+        } else {
+          $('#admNoWordFound').hide();
+        }
+      });
+
+      // 2. Toggle Box Thêm Từ Mới
+      $('#admBtnToggleAddWord').on('click', function(e) {
+        e.preventDefault();
+        const $box = $('#admBoxAddWord');
+        $box.slideToggle(180, function() {
+          if ($box.is(':visible')) {
+            $('#admInputNewWord').focus();
+          }
+        });
+      });
+
+      $('#admBtnCancelAddWord').on('click', function(e) {
+        e.preventDefault();
+        $('#admBoxAddWord').slideUp(180);
+        $('#admInputNewWord').val('');
+        $('#admAddWordStatus').hide();
+      });
+
+      // 3. Admin Thêm Từ Nhạy Cảm Mới
+      const handleAdminAddWord = () => {
+        const $input = $('#admInputNewWord');
+        const word = $.trim($input.val());
+        const $btn = $('#admBtnConfirmAddWord');
+        const $status = $('#admAddWordStatus');
+
+        if (!word) {
+          $status.css('color', '#ef4444').text('Vui lòng nhập từ nhạy cảm!').fadeIn();
+          $input.focus();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $status.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_add_sensitive_word',
+            nonce: muopConfig.nonce,
+            word: word
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Từ Mới');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const safeWord = $('<div>').text(res.data.word).html();
+              const cardHtml = `
+                <div class="adm-genre-card adm-word-card" data-word="${safeWord.toLowerCase()}" style="background: var(--bg-card); padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: space-between; gap: 10px; box-shadow: var(--shadow-sm); position: relative; animation: admModalFadeIn 0.3s ease;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                        <span class="adm-genre-title adm-word-title" style="font-weight: 700; color: var(--text-main); font-size: 14.5px; word-break: break-word;">${safeWord}</span>
+                        <span class="badge badge-hot" style="font-size: 11px; white-space: nowrap; background: #fee2e2; color: #dc2626; border: 1px solid #f87171;">Từ cấm</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: flex-end; padding-top: 8px; border-top: 1px dashed var(--border-light);">
+                        <div class="story-actions-dropdown genre-actions-dropdown">
+                            <button type="button" class="btn-story-dropdown-trigger btn-genre-dropdown-trigger" title="Tác vụ từ nhạy cảm" data-word="${safeWord}">
+                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                            </button>
+                            <div class="story-dropdown-menu">
+                                <button type="button" class="story-dropdown-item adm-btn-edit-word" data-word="${safeWord}">
+                                    <i class="fa-solid fa-pen-to-square" style="color: #0284c7;"></i> Sửa
+                                </button>
+                                <button type="button" class="story-dropdown-item adm-btn-delete-word" data-word="${safeWord}" style="color: #ef4444;">
+                                    <i class="fa-solid fa-trash-can"></i> Xóa
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+              `;
+              $('#admSensitiveWordsGrid').prepend(cardHtml);
+              $('#admNoWordFound').hide();
+              if (res.data.total_count) {
+                $('#admSensitiveWordsTotalBadge').text(res.data.total_count + ' từ');
+              }
+              // Cập nhật ngay vào dictionary của bộ kiểm duyệt client
+              if (typeof SensitiveWordModerator !== 'undefined' && Array.isArray(SensitiveWordModerator.dictionary)) {
+                if (SensitiveWordModerator.dictionary.indexOf(word) === -1) {
+                  SensitiveWordModerator.dictionary.unshift(word);
+                  SensitiveWordModerator.dictionary.sort((a, b) => b.length - a.length);
+                }
+              }
+              $status.css('color', '#3F7523').text('Đã thêm từ nhạy cảm mới thành công!').fadeIn();
+              $input.val('');
+              setTimeout(() => {
+                $('#admBoxAddWord').slideUp(180);
+                $status.hide();
+              }, 1000);
+            } else {
+              $status.css('color', '#ef4444').text(getAjaxMsg(res, 'Lỗi thêm từ nhạy cảm!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Từ Mới');
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $status.css('color', '#ef4444').text(errorMsg).fadeIn();
+          }
+        });
+      };
+
+      $('#admBtnConfirmAddWord').on('click', function(e) {
+        e.preventDefault();
+        handleAdminAddWord();
+      });
+
+      $('#admInputNewWord').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAdminAddWord();
+        }
+      });
+
+      // 4. Mở Modal Chỉnh Sửa Từ Nhạy Cảm
+      $(document).on('click', '.adm-btn-edit-word', function(e) {
+        e.preventDefault();
+        const word = $(this).data('word') || $(this).closest('.adm-word-card').find('.adm-word-title').text().trim();
+        $('#admEditOldWord').val(word);
+        $('#admEditWordInput').val(word);
+        $('#admEditWordStatus').hide();
+        $('#admModalEditWord').css('display', 'flex');
+        setTimeout(() => $('#admEditWordInput').focus().select(), 50);
+      });
+
+      $('#admBtnCloseEditWordModal, #admBtnCancelEditWordModal').on('click', function(e) {
+        e.preventDefault();
+        $('#admModalEditWord').hide();
+      });
+
+      $('#admModalEditWord').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      // 5. Lưu Chỉnh Sửa Từ Nhạy Cảm
+      const handleAdminSaveEditWord = () => {
+        const oldWord = $('#admEditOldWord').val();
+        const newWord = $.trim($('#admEditWordInput').val());
+        const $btn = $('#admBtnSaveEditWord');
+        const $status = $('#admEditWordStatus');
+
+        if (!newWord) {
+          $status.css('color', '#ef4444').text('Vui lòng nhập từ nhạy cảm mới!').fadeIn();
+          $('#admEditWordInput').focus();
+          return;
+        }
+
+        if (newWord.toLowerCase() === oldWord.toLowerCase()) {
+          $('#admModalEditWord').hide();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+        $status.hide();
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_update_sensitive_word',
+            nonce: muopConfig.nonce,
+            old_word: oldWord,
+            new_word: newWord
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thay Đổi');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const $card = $(`#admSensitiveWordsGrid .adm-word-card[data-word="${oldWord.toLowerCase()}"]`);
+              if ($card.length) {
+                $card.attr('data-word', newWord.toLowerCase());
+                $card.find('.adm-word-title').text(newWord);
+                $card.find('.btn-story-dropdown-trigger').data('word', newWord).attr('data-word', newWord);
+                $card.find('.adm-btn-edit-word').data('word', newWord).attr('data-word', newWord);
+                $card.find('.adm-btn-delete-word').data('word', newWord).attr('data-word', newWord);
+              }
+              // Cập nhật vào dictionary
+              if (typeof SensitiveWordModerator !== 'undefined' && Array.isArray(SensitiveWordModerator.dictionary)) {
+                const idx = SensitiveWordModerator.dictionary.indexOf(oldWord);
+                if (idx !== -1) {
+                  SensitiveWordModerator.dictionary[idx] = newWord;
+                  SensitiveWordModerator.dictionary.sort((a, b) => b.length - a.length);
+                }
+              }
+              $status.css('color', '#3F7523').text('Đã cập nhật từ nhạy cảm thành công!').fadeIn();
+              setTimeout(() => {
+                $('#admModalEditWord').hide();
+                $status.hide();
+              }, 800);
+            } else {
+              $status.css('color', '#ef4444').text(getAjaxMsg(res, 'Lỗi cập nhật từ nhạy cảm!')).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Thay Đổi');
+            let errorMsg = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+            $status.css('color', '#ef4444').text(errorMsg).fadeIn();
+          }
+        });
+      };
+
+      $('#admBtnSaveEditWord').on('click', function(e) {
+        e.preventDefault();
+        handleAdminSaveEditWord();
+      });
+
+      $('#admEditWordInput').on('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleAdminSaveEditWord();
+        }
+      });
+
+      // 6. Xóa Từ Nhạy Cảm
+      $(document).on('click', '.adm-btn-delete-word', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const word = $btn.data('word') || $btn.closest('.adm-word-card').find('.adm-word-title').text().trim();
+        const $card = $btn.closest('.adm-word-card');
+
+        muopConfirm(`Bạn có chắc chắn muốn xóa từ nhạy cảm "<strong>${word}</strong>" khỏi hệ thống kiểm duyệt không?`, () => {
+          $btn.prop('disabled', true);
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_delete_sensitive_word',
+              nonce: muopConfig.nonce,
+              word: word
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                $card.fadeOut(250, function() {
+                  $(this).remove();
+                  if ($('#admSensitiveWordsGrid .adm-word-card').length === 0) {
+                    $('#admNoWordFound').show();
+                  }
+                });
+                if (res.data && res.data.total_count !== undefined) {
+                  $('#admSensitiveWordsTotalBadge').text(res.data.total_count + ' từ');
+                }
+                // Xóa khỏi dictionary
+                if (typeof SensitiveWordModerator !== 'undefined' && Array.isArray(SensitiveWordModerator.dictionary)) {
+                  const idx = SensitiveWordModerator.dictionary.indexOf(word);
+                  if (idx !== -1) {
+                    SensitiveWordModerator.dictionary.splice(idx, 1);
+                  }
+                }
+                muopAlert(`Đã xóa từ nhạy cảm "${word}" thành công!`, 'success');
+              } else {
+                $btn.prop('disabled', false);
+                muopAlert(getAjaxMsg(res, 'Lỗi xóa từ nhạy cảm!'), 'error');
+              }
+            },
+            error: (xhr) => {
+              $btn.prop('disabled', false);
+              let errorMsg = 'Lỗi kết nối máy chủ!';
+              if (xhr && xhr.responseJSON) errorMsg = getAjaxMsg(xhr.responseJSON, errorMsg);
+              muopAlert(errorMsg, 'error');
+            }
+          });
+        }, null, { isDanger: true, confirmText: 'Xóa Từ', title: 'Xác Nhận Xóa Từ Nhạy Cảm' });
       });
 
       // =========================================================================
@@ -5218,6 +5615,27 @@
         const isDraft = $('#editChapterIsDraftInput').val() === '1';
         const $btn = isDraft ? $('#btnSaveDraftChapterAction') : $('#btnUpdateChapterAction');
 
+        // BẮT BUỘC DUYỆT NỘI DUNG KHI CẬP NHẬT CHƯƠNG (NỘI DUNG OKE MỚI ĐƯỢC LƯU)
+        if (!isDraft && typeof SensitiveWordModerator !== 'undefined') {
+          const $editContent = $('#editChapterContent');
+          const $editTitle = $('#editChapterTitle');
+          const fullText = ($editTitle.val() || '') + '\n' + ($editContent.val() || '');
+
+          const scanResult = SensitiveWordModerator.quickScan(fullText);
+          if (scanResult.foundMap.size > 0) {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Cập Nhật Chương');
+
+            SensitiveWordModerator.scanAndOpen($editContent);
+
+            $alert.removeClass('alert-success').addClass('alert-error').html(
+              '<i class="fa-solid fa-triangle-exclamation"></i> <strong>Chưa thể lưu chương!</strong> Phát hiện <strong>' + 
+              scanResult.foundMap.size + ' từ nhạy cảm (' + scanResult.totalMatches + ' vị trí vi phạm)</strong>. Vui lòng xem bảng đánh dấu bên dưới và sửa trước khi lưu!'
+            ).fadeIn();
+
+            return false;
+          }
+        }
+
         $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
         $alert.hide();
 
@@ -6904,6 +7322,10 @@
         $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang cập nhật...');
 
         const formData = new FormData(this);
+        const fileInput = document.getElementById('inputDirectCoverFile');
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+          formData.delete('cover_file');
+        }
 
         $.ajax({
           url: muopConfig.ajaxUrl,
@@ -6935,8 +7357,31 @@
           },
           error: (xhr) => {
             $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Cập Nhật Ảnh Bìa');
+            let parsed = null;
+            if (xhr && xhr.responseText) {
+              const jsonMatch = xhr.responseText.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try { parsed = JSON.parse(jsonMatch[0]); } catch (e) {}
+              }
+            }
+            if (parsed && parsed.success) {
+              const newUrl = parsed.data && parsed.data.cover_url;
+              if (newUrl) {
+                $('#mainStoryCoverImg').attr('src', newUrl);
+                $('#editStoryCoverPreview').attr('src', newUrl).show();
+              }
+              if (parsed.data && parsed.data.updated && parsed.data.updated.display) {
+                $('#storyUpdatedMeta').text(parsed.data.updated.display).attr('title', parsed.data.updated.formatted);
+              }
+              $alert.removeClass('alert-error').addClass('alert-success').text(getAjaxMsg(parsed, 'Thay đổi ảnh bìa thành công!')).fadeIn();
+              setTimeout(() => {
+                $('#modalChangeCoverDirect').hide();
+              }, 1000);
+              return;
+            }
             let msg = 'Lỗi kết nối máy chủ!';
-            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            if (parsed) msg = getAjaxMsg(parsed, msg);
+            else if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
             $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
           }
         });
@@ -7209,17 +7654,16 @@
       const $container = $('#notifListContainer');
       $container.html('<div class="notif-loading"><i class="fa-solid fa-spinner fa-spin" style="font-size:24px;margin-bottom:8px;color:var(--primary-green);"></i><div>Đang tải thông báo...</div></div>');
 
-      let endpoint = '/wp-admin/admin-ajax.php';
+      let endpoint = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php';
       if (window.muopConfig && window.muopConfig.ajaxUrl) {
         endpoint = window.muopConfig.ajaxUrl;
-        // Nếu ajaxUrl khác hostname hiện tại (ví dụ truy cập IP LAN mà siteurl là domain), fallback về relative path
         try {
           const parsed = new URL(endpoint, window.location.origin);
           if (parsed.host !== window.location.host) {
-            endpoint = '/wp-admin/admin-ajax.php';
+            endpoint = parsed.pathname;
           }
         } catch (e) {
-          endpoint = '/wp-admin/admin-ajax.php';
+          endpoint = window.muopConfig.ajaxUrl;
         }
       }
 
@@ -7840,6 +8284,44 @@
       return word.split(/\s+/).map(part => Array.from(part).join(delim)).join(' ');
     },
 
+    quickScan(rawText) {
+      if (!rawText) return { foundMap: new Map(), totalMatches: 0 };
+      const text = rawText.normalize('NFC');
+      const sortedWords = [...this.dictionary]
+        .map(w => (w || '').normalize('NFC').trim())
+        .filter(w => w.length > 0)
+        .sort((a, b) => b.length - a.length);
+
+      if (!sortedWords.length) return { foundMap: new Map(), totalMatches: 0 };
+
+      const pattern = sortedWords.map(w => this.escapeRegex(w)).join('|');
+      let regex;
+      try {
+        regex = new RegExp('(?<![\\p{L}\\p{N}])(' + pattern + ')(?![\\p{L}\\p{N}])', 'gui');
+      } catch (regErr) {
+        regex = new RegExp('(^|[^a-zA-Z0-9à-ỹÀ-Ỹ])(' + pattern + ')(?=[^a-zA-Z0-9à-ỹÀ-Ỹ]|$)', 'gi');
+      }
+
+      const foundMap = new Map();
+      let match;
+      let totalMatches = 0;
+
+      while ((match = regex.exec(text)) !== null) {
+        const raw = match[1] || match[0];
+        const lower = raw.toLowerCase().trim();
+        if (lower) {
+          if (!foundMap.has(lower)) {
+            foundMap.set(lower, { sample: raw.trim(), count: 0 });
+          }
+          foundMap.get(lower).count++;
+          totalMatches++;
+        }
+        if (match.index === regex.lastIndex) regex.lastIndex++;
+      }
+
+      return { foundMap, totalMatches };
+    },
+
     scanAndOpen($target) {
       if (!$target || !$target.length) {
         // Fallback: tìm ô nội dung chương hoặc văn án trên trang
@@ -7932,16 +8414,57 @@
           }
 
           // B. NẾU PHÁT HIỆN TỪ NHẠY CẢM:
-          // B1. Hiện popup thông báo phát hiện từ nhạy cảm
+          this.lastFoundMap = foundMap;
+          this.lastTotalMatches = totalMatches;
+
+          // B1. Đánh dấu trực tiếp lên bảng nội dung và tạo bộ công cụ rà soát
+          this.renderDetectedSuite(this.$currentTarget, foundMap, totalMatches);
+
+          // B2. Xây dựng danh sách các từ vi phạm dạng thẻ tag nổi bật màu đỏ
+          let wordsBadgesHtml = '';
+          foundMap.forEach((info) => {
+            wordsBadgesHtml += `
+              <span class="badge" style="display: inline-flex; align-items: center; gap: 6px; background: #fee2e2; border: 1.5px solid #ef4444; color: #991b1b; font-weight: 700; font-size: 13.5px; padding: 5px 12px; border-radius: 20px; box-shadow: 0 1px 3px rgba(220, 38, 38, 0.15);">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 12px;"></i>
+                <span>${this.escapeHtml(info.sample)}</span>
+                <span style="background: #dc2626; color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px;">${info.count} lần</span>
+              </span>
+            `;
+          });
+
+          // B3. Hiện popup thông báo phát hiện từ nhạy cảm với danh sách từ rõ ràng
           setTimeout(() => {
             PopupManager.open({
               title: 'Phát Hiện Từ Nhạy Cảm!',
               type: 'warning',
               icon: 'fa-triangle-exclamation',
-              message: '<strong>Đã duyệt xong!</strong> Hệ thống phát hiện <strong style="color: #dc2626; font-size: 15.5px;">' + foundMap.size + ' từ nhạy cảm</strong> (' + totalMatches + ' vị trí vi phạm) trong nội dung.<br><br><span style="font-size: 13px; color: var(--text-muted);">Vui lòng nhấn <strong>"Chỉnh Sửa Ngay"</strong> để xem danh sách từ và tự động thay thế bằng ký tự ( . * / - ) hoặc chỉnh sửa theo ý bạn.</span>',
-              confirmText: 'Chỉnh Sửa Ngay',
+              maxWidth: '560px',
+              message: `
+                <div style="font-size: 14.5px; margin-bottom: 12px; line-height: 1.5;">
+                  <strong>Đã duyệt xong!</strong> Hệ thống phát hiện <strong style="color: #dc2626; font-size: 16px;">${foundMap.size} từ nhạy cảm</strong> (<strong style="color: #dc2626;">${totalMatches} vị trí vi phạm</strong>) trong bài viết.
+                </div>
+                <div style="background: #fff5f5; border: 1.5px dashed #f87171; border-radius: 10px; padding: 12px 14px; margin: 12px 0 14px; text-align: left;">
+                  <div style="font-size: 12.5px; font-weight: 700; color: #991b1b; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-list-check" style="color: #dc2626;"></i> Các từ nhạy cảm được đánh dấu trong bảng nội dung:
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; max-height: 140px; overflow-y: auto; padding: 2px;">
+                    ${wordsBadgesHtml}
+                  </div>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+                  Các từ trên đã được <strong>tô đỏ trực tiếp trong bảng nội dung</strong> bên dưới. Bạn có thể xem ngay, bấm vào từng từ để nhảy đến vị trí hoặc mở bảng thay thế tự động.
+                </div>
+              `,
+              confirmText: 'Xem Bảng Đánh Dấu',
+              cancelText: 'Mở Bảng Thay Thế',
               onConfirm: () => {
-                SensitiveWordModerator.openReviewModal(foundMap, totalMatches);
+                // Đảm bảo bảng nội dung đánh dấu hiển thị và cuộn tới
+                if (this.$currentTarget && this.$currentTarget.length) {
+                  const $banner = $('.sensitive-detected-banner');
+                  if ($banner.length) {
+                    $('html, body').animate({ scrollTop: $banner.offset().top - 80 }, 300);
+                  }
+                }
               },
               onCancel: () => {
                 SensitiveWordModerator.openReviewModal(foundMap, totalMatches);
@@ -7959,14 +8482,318 @@
       }, 1000);
     },
 
+    renderHighlightedPreview(rawText, foundMap) {
+      if (!rawText) return '<div style="color: var(--text-muted); text-align: center; padding: 20px;">Nội dung trống.</div>';
+      
+      const words = Array.from(foundMap.keys()).sort((a, b) => b.length - a.length);
+      if (!words.length) return this.escapeHtml(rawText);
+
+      const pattern = words.map(w => this.escapeRegex(w)).join('|');
+      let regex;
+      try {
+        regex = new RegExp('(?<![\\p{L}\\p{N}])(' + pattern + ')(?![\\p{L}\\p{N}])', 'gui');
+      } catch (e) {
+        regex = new RegExp('(^|[^a-zA-Z0-9à-ỹÀ-Ỹ])(' + pattern + ')(?=[^a-zA-Z0-9à-ỹÀ-Ỹ]|$)', 'gi');
+      }
+
+      let count = 0;
+      let lastIndex = 0;
+      let html = '';
+      let match;
+      const text = rawText.normalize('NFC');
+
+      while ((match = regex.exec(text)) !== null) {
+        const raw = match[1] || match[0];
+        const matchStart = match.index + (match[0].indexOf(raw));
+        const matchEnd = matchStart + raw.length;
+
+        html += this.escapeHtml(text.substring(lastIndex, matchStart));
+
+        count++;
+        const lower = raw.toLowerCase().trim();
+        html += `<mark class="sensitive-mark-highlight" data-word="${this.escapeHtml(lower)}" id="sensitiveMark_${count}" title="Vị trí vi phạm #${count}: ${this.escapeHtml(raw)} (Bấm để nhảy tới vị trí hoặc sửa)">${this.escapeHtml(raw)} <span style="font-size: 10px; opacity: 0.85; padding-left: 2px;">#${count}</span></mark>`;
+
+        lastIndex = matchEnd;
+        if (match.index === regex.lastIndex) {
+          regex.lastIndex++;
+        }
+      }
+      html += this.escapeHtml(text.substring(lastIndex));
+      return html;
+    },
+
+    renderDetectedSuite($target, foundMap, totalMatches) {
+      if (!$target || !$target.length) return;
+      
+      // Xóa các thanh và bảng đánh dấu cũ nếu có
+      $('.sensitive-detected-banner, .sensitive-inline-content-box').remove();
+
+      let chipsHtml = '';
+      foundMap.forEach((info, lowerWord) => {
+        chipsHtml += `
+          <button type="button" class="btn-jump-sensitive-word" data-word="${this.escapeHtml(lowerWord)}" title="Nhấn để cuộn đến và đánh dấu từ này trong bảng nội dung">
+            <span>📍 ${this.escapeHtml(info.sample)}</span>
+            <span style="background: #dc2626; color: #fff; border-radius: 10px; padding: 1px 6px; font-size: 10.5px;">${info.count} lần</span>
+          </button>
+        `;
+      });
+
+      const bannerHtml = `
+        <div class="sensitive-detected-banner">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <div style="font-size: 13.5px; font-weight: 700; color: #991b1b; display: flex; align-items: center; gap: 6px;">
+              <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 16px;"></i>
+              <span>Phát hiện <strong style="color: #dc2626; font-size: 14.5px;">${foundMap.size} từ nhạy cảm</strong> (${totalMatches} vị trí vi phạm) trong bảng nội dung:</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn-quick-auto-replace" title="Tự động thay thế toàn bộ từ nhạy cảm bằng dấu chấm (.) ngay lập tức">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Sửa Hết Bằng Dấu (.)
+              </button>
+              <button type="button" class="btn btn-sm btn-reopen-sensitive-modal" style="background: #dc2626; color: #fff; border: none; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                <i class="fa-solid fa-sliders"></i> Tùy Chọn Chi Tiết
+              </button>
+              <button type="button" class="btn-close-sensitive-banner" style="background: none; border: none; color: #991b1b; font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;" title="Đóng thanh thông báo này">&times;</button>
+            </div>
+          </div>
+
+          <!-- Thanh chuyển đổi chế độ xem giữa Bảng Đánh Dấu & Ô Soạn Thảo -->
+          <div class="sensitive-view-switcher">
+            <div class="sensitive-view-tabs">
+              <button type="button" class="sensitive-view-tab-btn active" data-view="highlight" title="Xem bảng nội dung với toàn bộ từ vi phạm được tô đỏ nổi bật">
+                <i class="fa-solid fa-highlighter" style="color: #dc2626;"></i>
+                <span>1. Bảng Đánh Dấu Trong Bài</span>
+                <span style="background: #dc2626; color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px;">${totalMatches} vi phạm</span>
+              </button>
+              <button type="button" class="sensitive-view-tab-btn" data-view="edit" title="Chuyển về ô soạn thảo thông thường để tự gõ hoặc sửa văn bản">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>2. Ô Soạn Thảo (Tự sửa bằng tay)</span>
+              </button>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted);">
+              <i class="fa-solid fa-circle-info" style="color: var(--primary-green);"></i> Nhấn vào từ bên dưới để cuộn đến vị trí đánh dấu trong bảng:
+            </div>
+          </div>
+
+          <!-- Dải chip danh sách các từ vi phạm -->
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+            ${chipsHtml}
+          </div>
+        </div>
+      `;
+
+      // 1. Chèn banner lên trước ô textarea
+      $target.before(bannerHtml);
+
+      // 2. Tạo khung Bảng Nội Dung Đã Đánh Dấu (Inline Highlighted Box) nằm ngay vị trí textarea
+      const rawText = $target.val() || '';
+      const previewHtml = this.renderHighlightedPreview(rawText, foundMap);
+      const highlightBoxHtml = `
+        <div class="sensitive-inline-content-box" id="sensitiveInlineContentBox" title="Bảng nội dung đã đánh dấu từ nhạy cảm. Bấm vào từ bất kỳ để sửa hoặc thay thế.">
+          ${previewHtml}
+        </div>
+      `;
+      $target.before(highlightBoxHtml);
+
+      // 3. Mặc định: Hiện Bảng Đánh Dấu và ẩn tạm ô textarea để người dùng thấy ngay từ vi phạm được tô đỏ
+      $target.hide();
+    },
+
+    jumpToWordInTextarea($target, word) {
+      if (!$target || !$target.length) return;
+      const textarea = $target[0];
+      const text = textarea.value || '';
+      const lowerText = text.toLowerCase();
+      const searchWord = (word || '').toLowerCase();
+      if (!searchWord) return;
+
+      if (!this.cycleIndices) this.cycleIndices = {};
+      const lastPos = this.cycleIndices[searchWord] !== undefined ? this.cycleIndices[searchWord] : -1;
+      let nextIdx = lowerText.indexOf(searchWord, lastPos + 1);
+      if (nextIdx === -1) {
+        nextIdx = lowerText.indexOf(searchWord, 0);
+      }
+      if (nextIdx === -1) return;
+      this.cycleIndices[searchWord] = nextIdx;
+
+      // Đảm bảo ô soạn thảo hiển thị
+      $target.show();
+      $('#sensitiveInlineContentBox').hide();
+      $('.sensitive-view-tab-btn[data-view="edit"]').addClass('active');
+      $('.sensitive-view-tab-btn[data-view="highlight"]').removeClass('active');
+
+      textarea.focus();
+      textarea.setSelectionRange(nextIdx, nextIdx + searchWord.length);
+
+      // Đo chính xác tọa độ pixel theo dòng của từ (Pixel Mirror Technique)
+      try {
+        const computed = window.getComputedStyle(textarea);
+        const mirror = document.createElement('div');
+        const stylesToCopy = [
+          'boxSizing', 'width', 'fontFamily', 'fontSize', 'fontWeight',
+          'lineHeight', 'letterSpacing', 'wordSpacing', 'paddingTop',
+          'paddingBottom', 'paddingLeft', 'paddingRight', 'borderTopWidth',
+          'borderLeftWidth', 'borderRightWidth', 'whiteSpace', 'wordBreak',
+          'overflowWrap'
+        ];
+        stylesToCopy.forEach(prop => { mirror.style[prop] = computed[prop]; });
+        mirror.style.position = 'absolute';
+        mirror.style.top = '-99999px';
+        mirror.style.left = '-99999px';
+        mirror.style.visibility = 'hidden';
+        mirror.style.height = 'auto';
+        mirror.style.width = textarea.clientWidth + 'px';
+        mirror.style.whiteSpace = 'pre-wrap';
+        mirror.style.wordBreak = 'break-word';
+
+        mirror.appendChild(document.createTextNode(text.substring(0, nextIdx)));
+        const span = document.createElement('span');
+        span.textContent = text.substring(nextIdx, nextIdx + searchWord.length);
+        mirror.appendChild(span);
+
+        document.body.appendChild(mirror);
+        const targetTop = span.offsetTop;
+        document.body.removeChild(mirror);
+
+        const scrollTarget = Math.max(0, targetTop - (textarea.clientHeight / 2));
+        textarea.scrollTop = scrollTarget;
+      } catch (e) {
+        const linesBefore = text.substring(0, nextIdx).split('\n').length;
+        textarea.scrollTop = Math.max(0, (linesBefore - 3) * 24);
+      }
+    },
+
+    scrollToWordInHighlightBox($box, word) {
+      if (!$box || !$box.length) return;
+      const lowerWord = (word || '').toLowerCase();
+      const $marks = $box.find(`.sensitive-mark-highlight[data-word="${this.escapeHtml(lowerWord)}"]`);
+      if (!$marks.length) return;
+
+      if (!this.cycleBoxIndices) this.cycleBoxIndices = {};
+      const lastIdx = this.cycleBoxIndices[lowerWord] !== undefined ? this.cycleBoxIndices[lowerWord] : -1;
+      let nextIdx = (lastIdx + 1) % $marks.length;
+      this.cycleBoxIndices[lowerWord] = nextIdx;
+
+      const targetMark = $marks.get(nextIdx);
+      if (targetMark) {
+        $marks.removeClass('active-target');
+        $(targetMark).addClass('active-target');
+
+        const boxElem = $box[0];
+        const markTop = targetMark.offsetTop;
+        const boxTop = boxElem.offsetTop;
+        const targetScroll = Math.max(0, (markTop - boxTop) - (boxElem.clientHeight / 2) + 20);
+
+        $box.stop().animate({ scrollTop: targetScroll }, 250);
+
+        setTimeout(() => {
+          $(targetMark).removeClass('active-target');
+        }, 2500);
+      }
+    },
+
+    scrollToWordInModal(word) {
+      const $container = $('#sensitiveTextHighlightContainer');
+      if (!$container.length) return;
+      const lowerWord = (word || '').toLowerCase();
+      const $marks = $container.find(`.sensitive-mark-highlight[data-word="${this.escapeHtml(lowerWord)}"]`);
+      if (!$marks.length) return;
+
+      if (!this.cycleModalIndices) this.cycleModalIndices = {};
+      const lastIdx = this.cycleModalIndices[lowerWord] !== undefined ? this.cycleModalIndices[lowerWord] : -1;
+      let nextIdx = (lastIdx + 1) % $marks.length;
+      this.cycleModalIndices[lowerWord] = nextIdx;
+
+      const targetMark = $marks.get(nextIdx);
+      if (targetMark) {
+        $marks.removeClass('active-target');
+        $(targetMark).addClass('active-target');
+
+        const cElem = $container[0];
+        const markTop = targetMark.offsetTop;
+        const cTop = cElem.offsetTop;
+        const targetScroll = Math.max(0, (markTop - cTop) - (cElem.clientHeight / 2) + 20);
+
+        $container.stop().animate({ scrollTop: targetScroll }, 250);
+
+        setTimeout(() => {
+          $(targetMark).removeClass('active-target');
+        }, 2500);
+      }
+    },
+
+    autoReplaceAll($target, foundMap, delim) {
+      if (!$target || !$target.length || !foundMap || foundMap.size === 0) return;
+      delim = delim || this.currentDelim || '.';
+      let text = ($target.val() || '').normalize('NFC');
+      let count = 0;
+
+      const words = Array.from(foundMap.keys()).sort((a, b) => b.length - a.length);
+      words.forEach(word => {
+        let regex;
+        try {
+          regex = new RegExp('(?<![\\p{L}\\p{N}])(' + this.escapeRegex(word) + ')(?![\\p{L}\\p{N}])', 'gui');
+        } catch (e) {
+          regex = new RegExp('(^|[^a-zA-Z0-9à-ỹÀ-Ỹ])(' + this.escapeRegex(word) + ')(?=[^a-zA-Z0-9à-ỹÀ-Ỹ]|$)', 'gi');
+        }
+        text = text.replace(regex, (match) => {
+          count++;
+          return SensitiveWordModerator.obfuscate(match, delim);
+        });
+      });
+
+      $target.val(text);
+      $target.show();
+      $target.trigger('input').trigger('change');
+
+      // Đồng bộ bộ đếm số từ & ký tự
+      if (typeof window.muopUpdateWordCounter === 'function') {
+        if ($target.is('#chapContent')) {
+          window.muopUpdateWordCounter($('#chapContent'), $('#chapContentWordCount'), $('#chapContentCharCount'));
+        } else if ($target.is('#editChapterContent')) {
+          window.muopUpdateWordCounter($('#editChapterContent'), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
+        }
+      }
+
+      // Xóa bỏ thanh cảnh báo và khung highlight
+      $('.sensitive-detected-banner, .sensitive-inline-content-box').remove();
+
+      PopupManager.open({
+        title: 'Đã Tự Động Thay Thế!',
+        type: 'success',
+        icon: 'fa-circle-check',
+        message: '<strong>Thành công!</strong> Đã tự động thay thế an toàn <strong>' + count + ' vị trí</strong> từ nhạy cảm trong bảng nội dung bằng ký tự phân cách (' + delim + ').',
+        confirmText: 'Tuyệt Vời'
+      });
+    },
+
     openReviewModal(foundMap, totalMatches) {
       $('#sensitiveNoneFound').hide();
-      $('#sensitiveTableWrapper').show();
+      $('#sensitiveTableWrapper').hide();
+      $('#sensitiveDelimiterBar').show();
+      $('#sensitivePreviewWrapper').show();
+      $('#tabBtnSensitivePreview').addClass('active');
+      $('#tabBtnSensitiveTable').removeClass('active');
+
       $('#btnApplySensitiveReplacements').show();
       $('#sensitiveCountBadge').text(foundMap.size + ' từ (' + totalMatches + ' vị trí)');
       $('#detectedWordsCountText').text(foundMap.size + ' từ (' + totalMatches + ' vị trí)');
+      $('#sensitiveTabTableCount').text(foundMap.size + ' từ');
+      $('#sensitiveTabPreviewCount').text(totalMatches + ' vị trí');
       $('#sensitiveScanResultNotice').show();
 
+      // Đổ danh sách chip nhảy nhanh trong modal
+      let modalChipsHtml = '';
+      foundMap.forEach((info, lowerWord) => {
+        modalChipsHtml += `
+          <button type="button" class="btn-jump-sensitive-word modal-jump-chip" data-word="${this.escapeHtml(lowerWord)}" title="Nhấn để cuộn đến từ này trong bài">
+            <span>📍 ${this.escapeHtml(info.sample)}</span>
+            <span style="background: #dc2626; color: #fff; border-radius: 10px; padding: 1px 6px; font-size: 10.5px;">${info.count} lần</span>
+          </button>
+        `;
+      });
+      $('#modalSensitiveWordChips').html(modalChipsHtml);
+
+      // Đổ bảng thay thế chi tiết ở Tab 2
       let rowsHtml = '';
       foundMap.forEach((info, lowerWord) => {
         const defaultReplacement = this.obfuscate(info.sample, this.currentDelim);
@@ -7984,16 +8811,30 @@
             <td style="padding: 10px 12px;">
               <input type="text" class="form-input sensitive-replace-input" data-word="${this.escapeHtml(lowerWord)}" value="${this.escapeHtml(defaultReplacement)}" style="width: 100%; font-size: 13.5px; font-weight: 600; padding: 6px 10px; border-radius: 6px; box-sizing: border-box;" />
             </td>
+            <td style="padding: 10px 12px; text-align: center;">
+              <button type="button" class="btn btn-sm btn-outline btn-view-word-in-preview" data-word="${this.escapeHtml(lowerWord)}" style="font-size: 11.5px; padding: 4px 10px; border-radius: 6px; white-space: nowrap; border-color: #f87171; color: #dc2626; font-weight: 600; cursor: pointer;">
+                <i class="fa-solid fa-eye"></i> Xem vị trí
+              </button>
+            </td>
           </tr>
         `;
       });
 
       $('#sensitiveWordsListBody').html(rowsHtml);
       $('#checkAllSensitiveWords').prop('checked', true);
+
+      // Render nội dung văn bản kèm thẻ đánh dấu highlight
+      const previewHtml = this.renderHighlightedPreview(this.$currentTarget ? this.$currentTarget.val() : '', foundMap);
+      $('#sensitiveTextHighlightContainer').html(previewHtml);
+
       $('#modalSensitiveWordReview').css({ 'display': 'flex', 'z-index': 999999999 }).hide().fadeIn(200);
     },
 
     init() {
+      // Tải từ điển nhạy cảm từ Database nếu có
+      if (typeof muopConfig !== 'undefined' && Array.isArray(muopConfig.sensitiveWords) && muopConfig.sensitiveWords.length > 0) {
+        this.dictionary = [...muopConfig.sensitiveWords];
+      }
       // Đảm bảo từ điển được sắp xếp theo độ dài giảm dần
       this.dictionary.sort((a, b) => b.length - a.length);
 
@@ -8023,7 +8864,6 @@
           const $row = $(this);
           const sample = $row.data('sample');
           const $input = $row.find('.sensitive-replace-input');
-          // Nếu người dùng chưa gõ từ hoàn toàn khác (hoặc vẫn là dạng phân cách ký tự), tự động cập nhật
           const currentVal = $input.val().trim();
           const lettersVal = currentVal.replace(/[^a-zA-ZÀ-ỹ0-9]/g, '').toLowerCase();
           const lettersSample = String(sample).replace(/[^a-zA-ZÀ-ỹ0-9]/g, '').toLowerCase();
@@ -8059,6 +8899,114 @@
       $(document).on('click', '#modalSensitiveWordReview', function(e) {
         if (e.target === this) {
           $(this).fadeOut(180);
+        }
+      });
+
+      // Tab switcher in Sensitive Word Review Modal
+      $(document).on('click', '.sensitive-tab-btn', function(e) {
+        e.preventDefault();
+        const tab = $(this).data('tab');
+        $('.sensitive-tab-btn').removeClass('active');
+        $(this).addClass('active');
+
+        if (tab === 'preview') {
+          $('#sensitiveTableWrapper').hide();
+          $('#sensitivePreviewWrapper').fadeIn(150);
+        } else {
+          $('#sensitivePreviewWrapper').hide();
+          $('#sensitiveTableWrapper').fadeIn(150);
+        }
+      });
+
+      // Chuyển đổi qua lại giữa [Bảng Đánh Dấu] và [Ô Soạn Thảo] trên trang chính
+      $(document).on('click', '.sensitive-view-tab-btn', function(e) {
+        e.preventDefault();
+        const view = $(this).data('view');
+        $('.sensitive-view-tab-btn').removeClass('active');
+        $(this).addClass('active');
+
+        const $target = SensitiveWordModerator.$currentTarget;
+        const $box = $('#sensitiveInlineContentBox');
+
+        if (view === 'highlight') {
+          // Cập nhật lại nội dung đánh dấu từ ô textarea mới nhất
+          if ($target && $target.length && SensitiveWordModerator.lastFoundMap) {
+            const rawText = $target.val() || '';
+            const previewHtml = SensitiveWordModerator.renderHighlightedPreview(rawText, SensitiveWordModerator.lastFoundMap);
+            $box.html(previewHtml);
+          }
+          $target.hide();
+          $box.fadeIn(150);
+        } else {
+          // Chuyển sang ô soạn thảo để người dùng tự sửa
+          $box.hide();
+          $target.fadeIn(150).focus();
+        }
+      });
+
+      // Nút sửa nhanh toàn bộ bằng dấu chấm (.) ngay trên banner
+      $(document).on('click', '.btn-quick-auto-replace', function(e) {
+        e.preventDefault();
+        SensitiveWordModerator.autoReplaceAll(
+          SensitiveWordModerator.$currentTarget,
+          SensitiveWordModerator.lastFoundMap,
+          '.'
+        );
+      });
+
+      // Click chip từ khóa trên banner trang chính
+      $(document).on('click', '.btn-jump-sensitive-word:not(.modal-jump-chip)', function(e) {
+        e.preventDefault();
+        const word = $(this).data('word');
+        const isHighlightView = $('.sensitive-view-tab-btn[data-view="highlight"]').hasClass('active');
+        const $box = $('#sensitiveInlineContentBox');
+
+        if (isHighlightView && $box.is(':visible')) {
+          SensitiveWordModerator.scrollToWordInHighlightBox($box, word);
+        } else {
+          SensitiveWordModerator.jumpToWordInTextarea(SensitiveWordModerator.$currentTarget, word);
+        }
+      });
+
+      // Click chip từ khóa trong modal review
+      $(document).on('click', '.modal-jump-chip', function(e) {
+        e.preventDefault();
+        const word = $(this).data('word');
+        SensitiveWordModerator.scrollToWordInModal(word);
+      });
+
+      // Click vào từ đánh dấu trong bảng nội dung inline
+      $(document).on('click', '#sensitiveInlineContentBox .sensitive-mark-highlight', function(e) {
+        e.preventDefault();
+        const word = $(this).data('word');
+        // Chuyển sang ô soạn thảo và chọn ngay từ đó
+        SensitiveWordModerator.jumpToWordInTextarea(SensitiveWordModerator.$currentTarget, word);
+      });
+
+      // Click "Xem vị trí" in table row (Tab 2 Modal)
+      $(document).on('click', '.btn-view-word-in-preview', function(e) {
+        e.preventDefault();
+        const word = $(this).data('word');
+        $('#tabBtnSensitivePreview').trigger('click');
+        setTimeout(() => {
+          SensitiveWordModerator.scrollToWordInModal(word);
+        }, 120);
+      });
+
+      // Đóng banner và hiển thị lại ô soạn thảo
+      $(document).on('click', '.btn-close-sensitive-banner', function(e) {
+        e.preventDefault();
+        $('.sensitive-detected-banner, #sensitiveInlineContentBox').remove();
+        if (SensitiveWordModerator.$currentTarget) {
+          SensitiveWordModerator.$currentTarget.show();
+        }
+      });
+
+      // Mở lại modal rà soát từ banner
+      $(document).on('click', '.btn-reopen-sensitive-modal', function(e) {
+        e.preventDefault();
+        if (SensitiveWordModerator.lastFoundMap) {
+          SensitiveWordModerator.openReviewModal(SensitiveWordModerator.lastFoundMap, SensitiveWordModerator.lastTotalMatches || 0);
         }
       });
 
@@ -8116,7 +9064,6 @@
             if (item.isCustom) {
               return item.val;
             } else {
-              // Tìm delimiter có trong item.val
               const nonAlpha = item.val.match(/[^a-zA-ZÀ-ỹ0-9\s]/);
               const delim = nonAlpha ? nonAlpha[0] : SensitiveWordModerator.currentDelim;
               return SensitiveWordModerator.obfuscate(match, delim);
@@ -8124,9 +9071,12 @@
           });
         });
 
-        // Cập nhật lại vào textarea
-        this.$currentTarget.val(currentText);
+        // Cập nhật lại vào textarea và hiển thị lại ô soạn thảo
+        this.$currentTarget.val(currentText).show();
         this.$currentTarget.trigger('input').trigger('change');
+
+        // Xóa thanh banner và bảng đánh dấu vì các từ nhạy cảm đã được thay thế an toàn
+        $('.sensitive-detected-banner, .sensitive-inline-content-box').remove();
 
         // Đồng bộ số từ & số ký tự
         if (typeof window.muopUpdateWordCounter === 'function') {
@@ -8150,6 +9100,169 @@
             confirmText: 'Đã Hiểu'
           });
         }, 200);
+      });
+    }
+  };
+
+  // =========================================================================
+  // IMAGE OPTIMIZER MANAGER (Tối ưu hóa & nén ảnh thông minh phía client + admin)
+  // =========================================================================
+  const ImageOptimizerManager = {
+    init: function() {
+      // 1. Cung cấp hàm toàn cục cho website
+      window.muopCompressImage = this.compressImage;
+
+      // 2. Tự động lắng nghe sự kiện chọn ảnh trên mọi input file ảnh
+      $(document).on('change', 'input[type="file"]', async function(e) {
+        const input = this;
+        const accept = (input.getAttribute('accept') || '').toLowerCase();
+        const inputName = (input.name || '').toLowerCase();
+        const inputId = (input.id || '').toLowerCase();
+
+        const isImageInput = accept.indexOf('image') !== -1 || 
+                             ['cover', 'avatar', 'bill', 'photo', 'thumb', 'image'].some(key => inputName.indexOf(key) !== -1 || inputId.indexOf(key) !== -1);
+
+        if (!isImageInput) return;
+        if (!input.files || !input.files.length) return;
+
+        const file = input.files[0];
+        if (!file.type || !file.type.startsWith('image/') || file.type === 'image/gif') return;
+
+        // Nếu ảnh lớn hơn 300KB, tiến hành tối ưu nhanh qua Canvas
+        if (file.size > 300 * 1024) {
+          try {
+            const originalKb = Math.round(file.size / 1024);
+            const compressedFile = await ImageOptimizerManager.compressImage(file, {
+              maxWidth: 1600,
+              maxHeight: 2400,
+              quality: 0.82
+            });
+
+            if (compressedFile && compressedFile.size < file.size) {
+              const newKb = Math.round(compressedFile.size / 1024);
+              const percent = Math.round((1 - compressedFile.size / file.size) * 100);
+
+              if (window.DataTransfer) {
+                const dt = new DataTransfer();
+                dt.items.add(compressedFile);
+                input.files = dt.files;
+              }
+
+              console.log(`[MuopImageOptimizer] Đã tối ưu ảnh "${file.name}": ${originalKb}KB -> ${newKb}KB (Giảm ${percent}%)`);
+
+              // Hiển thị huy hiệu đã nén cạnh tên file
+              const $container = $(input).closest('.form-group, .cover-upload-box, .profile-avatar-wrap, form, td');
+              const $info = $container.find('#coverFileName, .upload-size-badge, .file-name-preview, .custom-file-label');
+              if ($info.length && !$container.find('.muop-opt-badge').length) {
+                $info.append(`<span class="muop-opt-badge" style="font-size: 11px; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 600;"><i class="fa-solid fa-bolt"></i> Đã nén -${percent}% (${newKb}KB)</span>`);
+              }
+            }
+          } catch (err) {
+            console.warn('[MuopImageOptimizer] Lỗi nén ảnh phía client:', err);
+          }
+        }
+      });
+
+      // 3. Xử lý nút Quét & Nén Thư Viện Ảnh Cũ trong Admin Portal
+      $(document).on('click', '#btnScanOptimizeLibrary', function() {
+        const $btn = $(this);
+        const $box = $('#scanOptimizeProgressBox');
+        const $msg = $('#scanProgressMsg');
+        
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang nén ảnh...');
+        $box.slideDown(200);
+        $msg.html('<i class="fa-solid fa-spinner fa-spin"></i> Đang quét và tối ưu các tệp ảnh trong thư viện uploads...');
+
+        const adminNonce = $('input[name="admin_nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+
+        $.ajax({
+          url: (typeof muopConfig !== 'undefined' ? muopConfig.ajaxUrl : '/core/wp-admin/admin-ajax.php'),
+          type: 'POST',
+          data: {
+            action: 'muop_optimize_existing_library',
+            nonce: adminNonce
+          },
+          success: function(res) {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-bolt"></i> Quét & Nén Thư Viện Ảnh Cũ');
+            if (res && res.success) {
+              if (res.data.total_files) $('#optStatFiles').text(res.data.total_files + ' ảnh');
+              if (res.data.mb_saved) $('#optStatBytes').text(res.data.mb_saved);
+              $msg.html('<i class="fa-solid fa-circle-check" style="color: #16a34a;"></i> ' + res.data.message + ' (Tiết kiệm +' + res.data.batch_saved_kb + ' KB)');
+              setTimeout(() => { $box.slideUp(300); }, 6000);
+            } else {
+              $msg.html('<i class="fa-solid fa-circle-exclamation" style="color: #ef4444;"></i> ' + (res.data ? res.data.message : 'Có lỗi xảy ra khi nén thư viện.'));
+            }
+          },
+          error: function() {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-bolt"></i> Quét & Nén Thư Viện Ảnh Cũ');
+            $msg.html('<i class="fa-solid fa-circle-exclamation" style="color: #ef4444;"></i> Lỗi kết nối tới máy chủ khi nén ảnh.');
+          }
+        });
+      });
+    },
+
+    /**
+     * Nén tệp hình ảnh sử dụng Canvas API chất lượng cao
+     */
+    compressImage: function(file, options) {
+      options = options || {};
+      const maxWidth = options.maxWidth || 1600;
+      const maxHeight = options.maxHeight || 2400;
+      const quality = options.quality || 0.82;
+
+      return new Promise((resolve) => {
+        if (!file || !file.type || !file.type.startsWith('image/') || file.type === 'image/gif') {
+          return resolve(file);
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            let width = img.naturalWidth || img.width;
+            let height = img.naturalHeight || img.height;
+
+            if (width <= maxWidth && height <= maxHeight && file.size < 350 * 1024) {
+              return resolve(file);
+            }
+
+            if (width > maxWidth || height > maxHeight) {
+              const ratio = Math.min(maxWidth / width, maxHeight / height);
+              width = Math.max(1, Math.round(width * ratio));
+              height = Math.max(1, Math.round(height * ratio));
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const mime = (file.type === 'image/png') ? 'image/png' : 'image/jpeg';
+            canvas.toBlob((blob) => {
+              if (!blob || blob.size >= file.size) {
+                return resolve(file);
+              }
+              const compressed = new File([blob], file.name, {
+                type: mime,
+                lastModified: Date.now()
+              });
+              resolve(compressed);
+            }, mime, quality);
+          };
+          img.onerror = function() {
+            resolve(file);
+          };
+          img.src = e.target.result;
+        };
+        reader.onerror = function() {
+          resolve(file);
+        };
+        reader.readAsDataURL(file);
       });
     }
   };
@@ -8193,6 +9306,7 @@
     safeInit('TranslatorBankManager', () => TranslatorBankManager.init());
     safeInit('AdminExtraManager', () => AdminExtraManager.init());
     safeInit('SensitiveWordModerator', () => SensitiveWordModerator.init());
+    safeInit('ImageOptimizerManager', () => ImageOptimizerManager.init());
   });
 
 })(jQuery);

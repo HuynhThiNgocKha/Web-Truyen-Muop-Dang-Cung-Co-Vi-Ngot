@@ -24,7 +24,10 @@ spl_autoload_register(function ($class) {
     }
 });
 
-// 2. Initialize REST Server (Client - Server REST API Architecture)
+// 2. Initialize Automatic Image Optimizer Engine
+\Muop\Core\ImageOptimizer::init();
+
+// 3. Initialize REST Server (Client - Server REST API Architecture)
 add_action('rest_api_init', array(\Muop\Api\RestServer::class, 'registerRoutes'));
 
 // 3. Enqueue Client-side API Client SDK on frontend
@@ -38,9 +41,10 @@ add_action('wp_enqueue_scripts', function() {
     );
 
     wp_localize_script('muop-api-client', 'muopConfig', array(
-        'ajaxUrl' => '/wp-admin/admin-ajax.php',
+        'ajaxUrl' => wp_make_link_relative(admin_url('admin-ajax.php')),
         'restUrl' => esc_url_raw(rest_url('muop/v1/')),
-        'nonce'   => wp_create_nonce('muop_ajax_nonce')
+        'nonce'   => wp_create_nonce('muop_ajax_nonce'),
+        'userId'  => get_current_user_id()
     ));
 }, 5);
 

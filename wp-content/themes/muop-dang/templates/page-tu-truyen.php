@@ -358,6 +358,7 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
                         if (!$team_term || is_wp_error($team_term)) continue;
 
                         $team_avatar = get_term_meta($tid, '_team_avatar', true);
+                        $team_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($team_avatar) : $team_avatar;
                         $team_bio = !empty($team_term->description) ? $team_term->description : get_term_meta($tid, '_team_bio', true);
                         if (empty($team_bio)) {
                             $team_bio = 'Nhóm dịch nhiệt huyết tại Mướp Đắng Cũng Có Vị Ngọt.';
@@ -422,6 +423,7 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
                         if (!$team_term || is_wp_error($team_term)) continue;
 
                         $team_avatar = get_term_meta($tid, '_team_avatar', true);
+                        $team_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($team_avatar) : $team_avatar;
                         $team_bio = !empty($team_term->description) ? $team_term->description : get_term_meta($tid, '_team_bio', true);
                         if (empty($team_bio)) {
                             $team_bio = 'Nhóm dịch nhiệt huyết tại Mướp Đắng Cũng Có Vị Ngọt.';

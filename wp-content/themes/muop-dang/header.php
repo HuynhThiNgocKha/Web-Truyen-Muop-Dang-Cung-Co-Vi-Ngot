@@ -122,6 +122,7 @@ $genres = get_terms(array(
                 <!-- User Account / Login / Register -->
                 <?php if ($is_logged_in) : 
                     $user_custom_avatar = get_user_meta($current_user->ID, 'muop_user_avatar', true);
+                    $user_custom_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($user_custom_avatar) : $user_custom_avatar;
                 ?>
                     <div class="user-menu-wrapper" id="userMenuWrapper">
                         <div class="user-profile-badge" id="userProfileToggle" role="button" tabindex="0" onclick="" aria-haspopup="true" aria-expanded="false" title="Tài khoản cá nhân">

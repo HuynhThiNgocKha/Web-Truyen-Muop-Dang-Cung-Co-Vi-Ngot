@@ -17,12 +17,8 @@ $user_id      = $current_user->ID;
 $registered   = date('d/m/Y', strtotime($current_user->user_registered));
 $avatar_char  = strtoupper(substr($current_user->display_name, 0, 1));
 $custom_avatar = get_user_meta($user_id, 'muop_user_avatar', true);
+$custom_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($custom_avatar) : $custom_avatar;
 $user_bio     = get_user_meta($user_id, 'description', true);
-
-global $wpdb;
-// Get Reading History
-$table_hist = $wpdb->prefix . 'reading_history';
-$history_rows = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_hist WHERE user_id = %d ORDER BY updated_at DESC LIMIT 20", $user_id)) ?: array();
 
 // Preset avatars
 $preset_avatars = array(
@@ -246,59 +242,6 @@ $preset_avatars = array(
         </div>
         <?php endif; ?>
 
-        <!-- LỊCH SỬ ĐỌC GẦN ĐÂY -->
-        <div class="profile-form-card" style="margin-top: 24px;">
-            <div class="form-section-header">
-                <h3><i class="fa-solid fa-clock-rotate-left"></i> Lịch Sử Đọc Gần Đây</h3>
-                <p>Theo dõi tiến độ đọc các bộ truyện bạn đã mở xem gần đây</p>
-            </div>
-
-            <?php if (!empty($history_rows)) : ?>
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Tên Truyện</th>
-                                <th>Chương Đã Đọc</th>
-                                <th>Thời Gian</th>
-                                <th>Hành Động</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($history_rows as $row) : 
-                                $story_post = get_post($row->story_id);
-                                $chap_post  = get_post($row->chapter_id);
-                                if (!$story_post) continue;
-                            ?>
-                                <tr>
-                                    <td>
-                                        <a href="<?php echo esc_url(get_permalink($story_post->ID)); ?>" style="font-weight: 700; color: var(--primary-green);">
-                                            <?php echo esc_html($story_post->post_title); ?>
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <?php echo $chap_post ? esc_html($chap_post->post_title) : ('Chương ' . esc_html($row->chapter_num)); ?>
-                                    </td>
-                                    <td style="color: var(--text-muted); font-size: 12px;">
-                                        <?php echo date('d/m/Y H:i', strtotime($row->updated_at)); ?>
-                                    </td>
-                                    <td>
-                                        <a href="<?php echo esc_url($chap_post ? get_permalink($chap_post->ID) : get_permalink($story_post->ID)); ?>" class="btn btn-primary" style="padding: 4px 12px; font-size: 12px;">
-                                            <i class="fa-solid fa-play"></i> Đọc Tiếp
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php else : ?>
-                <div style="text-align: center; padding: 40px; background: var(--pastel-green); border-radius: var(--radius-md); color: var(--text-muted);">
-                    <i class="fa-solid fa-book-open" style="font-size: 36px; color: var(--avocado-green); margin-bottom: 10px;"></i>
-                    <p>Bạn chưa đọc chương truyện nào. Cùng khám phá truyện hay ngay thôi!</p>
-                </div>
-            <?php endif; ?>
-        </div>
     </div>
 </div>
 
