@@ -41,10 +41,21 @@ $chap_order         = ($total_chapters > 0) ? ($current_index + 1) : $chap_num;
 $next_chap_order    = $chap_order + 1;
 $next_is_checkpoint = muop_is_chapter_checkpoint($next_chap_order, $total_chapters);
 
+$current_uid        = get_current_user_id();
+$story_post_author  = $story ? (int) $story->post_author : 0;
+$is_admin_user      = muop_is_admin();
+$is_own_story       = ($current_uid > 0 && ($current_uid === $story_post_author || ($story_id && muop_can_user_manage_story_frontend($story_id, $current_uid))));
+
 // Quy tắc hiển thị link Shopee Gatekeeper:
+// - Nếu là Admin HOẶC Dịch giả đọc truyện của chính mình: MIỄN NHIỄM HOÀN TOÀN (không khóa chương, không popup Shopee)
 // - Truyện có 3 hoặc 4 chương: Xuất hiện ở chương 1 và chương 3
 // - Truyện >= 5 chương: Xuất hiện ở chương 2, 5, 8, 11... (cứ cách 3 chương 1 lần)
-$is_checkpoint  = muop_is_chapter_checkpoint($chap_order, $total_chapters);
+if ($is_admin_user || $is_own_story) {
+    $is_checkpoint      = false;
+    $next_is_checkpoint = false;
+} else {
+    $is_checkpoint = muop_is_chapter_checkpoint($chap_order, $total_chapters);
+}
 $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
 ?>
 
@@ -54,7 +65,8 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
          data-chapter-id="<?php echo esc_attr($chapter_id); ?>" 
          data-chapter-num="<?php echo esc_attr($chap_order); ?>"
          data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
-         data-is-checkpoint="<?php echo $is_checkpoint ? '1' : '0'; ?>">
+         data-is-checkpoint="<?php echo $is_checkpoint ? '1' : '0'; ?>"
+         data-is-own-story="<?php echo $is_own_story ? '1' : '0'; ?>">
 
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB DẠNG NGANG TRÊN WEB) -->
         <nav class="breadcrumbs reading-chapter-breadcrumbs">
@@ -89,7 +101,8 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                        data-chapter-id="<?php echo esc_attr(!empty($next_chap_id) ? $next_chap_id : 0); ?>"
                        data-chapter-num="<?php echo esc_attr($next_chap_order); ?>"
                        data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
-                       data-is-checkpoint="<?php echo $next_is_checkpoint ? '1' : '0'; ?>">
+                       data-is-checkpoint="<?php echo $next_is_checkpoint ? '1' : '0'; ?>"
+                       data-is-own-story="<?php echo $is_own_story ? '1' : '0'; ?>">
                         Chương Sau <i class="fa-solid fa-arrow-right"></i>
                     </a>
                 <?php else : ?>
@@ -152,7 +165,8 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                    data-chapter-id="<?php echo esc_attr(!empty($next_chap_id) ? $next_chap_id : 0); ?>"
                    data-chapter-num="<?php echo esc_attr($next_chap_order); ?>"
                    data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
-                   data-is-checkpoint="<?php echo $next_is_checkpoint ? '1' : '0'; ?>">
+                   data-is-checkpoint="<?php echo $next_is_checkpoint ? '1' : '0'; ?>"
+                   data-is-own-story="<?php echo $is_own_story ? '1' : '0'; ?>">
                     Chương Sau <i class="fa-solid fa-arrow-right"></i>
                 </a>
             <?php else : ?>
@@ -268,7 +282,7 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 $is_current = ($c->ID == $chapter_id);
                 $chap_clean_title = muop_get_clean_chapter_title($c->post_title);
                 $drawer_chap_order = $idx + 1;
-                $drawer_is_checkpoint = muop_is_chapter_checkpoint($drawer_chap_order, $total_chapters);
+                $drawer_is_checkpoint = ($is_admin_user || $is_own_story) ? false : muop_is_chapter_checkpoint($drawer_chap_order, $total_chapters);
             ?>
                 <li class="chapter-drawer-item <?php echo $is_current ? 'is-current-chapter' : ''; ?>" data-title="<?php echo esc_attr(mb_strtolower($chap_clean_title)); ?>">
                     <a href="<?php echo esc_url(get_permalink($c->ID)); ?>" 
@@ -277,7 +291,8 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                        data-chapter-id="<?php echo esc_attr($c->ID); ?>"
                        data-chapter-num="<?php echo esc_attr($drawer_chap_order); ?>"
                        data-total-chapters="<?php echo esc_attr($total_chapters); ?>"
-                       data-is-checkpoint="<?php echo $drawer_is_checkpoint ? '1' : '0'; ?>">
+                       data-is-checkpoint="<?php echo $drawer_is_checkpoint ? '1' : '0'; ?>"
+                       data-is-own-story="<?php echo $is_own_story ? '1' : '0'; ?>">
                         <span class="chapter-drawer-name">
                             <?php if ($is_current) : ?>
                                 <i class="fa-solid fa-book-open current-icon"></i>

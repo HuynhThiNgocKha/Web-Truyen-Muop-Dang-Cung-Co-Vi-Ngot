@@ -42,6 +42,7 @@ $current_uid = get_current_user_id();
 $is_own_story = ($current_uid > 0 && $current_uid === $story_post_author);
 $can_show_follow = !$is_own_story; // Không hiển thị nếu là chính dịch giả của truyện
 $can_show_favorite = !$is_own_story;
+$is_admin_user = muop_is_admin();
 
 if (is_user_logged_in()) {
     global $wpdb;
@@ -58,6 +59,7 @@ if (is_user_logged_in()) {
     $can_manage_story = muop_can_user_manage_story_frontend($story_id, $current_uid);
     $can_change_status = $can_manage_story;
 }
+$is_exempt = ($is_admin_user || $is_own_story || !empty($can_manage_story));
 
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
 if (!$thumb_url) {
@@ -75,7 +77,7 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
 ?>
 
 <div class="container">
-    <div class="story-detail-wrapper">
+    <div class="story-detail-wrapper" data-story-id="<?php echo esc_attr($story_id); ?>" data-is-own-story="<?php echo ($is_own_story || !empty($can_manage_story)) ? '1' : '0'; ?>">
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB) -->
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
@@ -212,7 +214,8 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                            data-chapter-id="<?php echo esc_attr($last_chap_id); ?>"
                            data-chapter-num="<?php echo esc_attr($last_chap_num); ?>"
                            data-total-chapters="<?php echo esc_attr($chap_count); ?>"
-                           data-is-checkpoint="<?php echo muop_is_chapter_checkpoint($last_chap_num, $chap_count) ? '1' : '0'; ?>">
+                           data-is-checkpoint="<?php echo ($is_exempt ? 0 : (muop_is_chapter_checkpoint($last_chap_num, $chap_count) ? 1 : 0)); ?>"
+                           data-is-own-story="<?php echo ($is_own_story || !empty($can_manage_story)) ? '1' : '0'; ?>">
                             <i class="fa-solid fa-forward-step"></i> Đọc Mới Nhất
                         </a>
                     <?php endif; ?>
@@ -309,7 +312,7 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                             $chap_time_ago = get_the_time('d/m/Y', $chap->ID);
                         }
                         $is_chap_1 = ((int)$chap->ID === (int)$first_chap_id || (int)$chap_num === 1);
-                        $chap_is_checkpoint = muop_is_chapter_checkpoint($chap_num, $chap_count);
+                        $chap_is_checkpoint = $is_exempt ? false : muop_is_chapter_checkpoint($chap_num, $chap_count);
                     ?>
                         <div class="chapter-item-row" id="chapterRow-<?php echo $chap->ID; ?>">
                             <a href="<?php echo esc_url(get_permalink($chap->ID)); ?>" 
@@ -319,6 +322,7 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                                data-chapter-num="<?php echo esc_attr($chap_num); ?>"
                                data-total-chapters="<?php echo esc_attr($chap_count); ?>"
                                data-is-checkpoint="<?php echo $chap_is_checkpoint ? '1' : '0'; ?>"
+                               data-is-own-story="<?php echo ($is_own_story || !empty($can_manage_story)) ? '1' : '0'; ?>"
                                data-is-chap1="<?php echo $is_chap_1 ? '1' : '0'; ?>">
                                 <span class="chapter-item-title">
                                     <i class="fa-regular fa-file-lines" style="color: var(--avocado-green); margin-right: 6px;"></i>

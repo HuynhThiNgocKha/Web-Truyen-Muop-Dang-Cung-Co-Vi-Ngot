@@ -48,10 +48,14 @@ $user_ids = array();
 foreach ($users_to_create as $u) {
     $existing = get_user_by('login', $u['user_login']);
     if (!$existing) {
-        $uid = wp_create_user($u['user_login'], $u['user_pass'], $u['user_email']);
-        $new_u = new WP_User($uid);
-        $new_u->set_role($u['role']);
-        wp_update_user(array('ID' => $uid, 'display_name' => $u['display_name']));
+        $uid = wp_insert_user(array(
+            'user_login'   => $u['user_login'],
+            'user_pass'    => $u['user_pass'],
+            'user_email'   => $u['user_email'],
+            'display_name' => $u['display_name'],
+            'nickname'     => $u['display_name'],
+            'role'         => $u['role']
+        ));
         $user_ids[$u['user_login']] = $uid;
         echo "Created user: {$u['user_login']} ({$u['role']})\n";
     } else {

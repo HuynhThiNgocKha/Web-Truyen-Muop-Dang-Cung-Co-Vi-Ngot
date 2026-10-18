@@ -430,6 +430,7 @@
     // - Nếu truyện có 3 hoặc 4 chương (hoặc <= 4): Xuất hiện ở chương 1 và chương 3
     // - Nếu truyện có từ 5 chương trở lên: Xuất hiện ở chương 2, 5, 8, 11... (cứ cách 3 chương 1 lần)
     isCheckpoint(chapNum, totalChapters) {
+      if (typeof muopConfig !== 'undefined' && muopConfig.isAdmin) return false;
       chapNum = parseInt(chapNum, 10) || 1;
       totalChapters = parseInt(totalChapters, 10) || 1;
 
@@ -442,6 +443,7 @@
     // Kiểm tra xem chương đã được mở khóa trước đó chưa (trong localStorage hoặc sessionStorage)
     // Đã nhấn 1 lần rồi thì không cần nhấn lần 2
     isUnlocked(storyId, chapterId, chapNum) {
+      if (typeof muopConfig !== 'undefined' && muopConfig.isAdmin) return true;
       try {
         if (chapterId) {
           if (localStorage.getItem(`muop_unlocked_chap_${chapterId}`) || sessionStorage.getItem(`muop_unlocked_chap_${chapterId}`)) {
@@ -472,6 +474,13 @@
     },
 
     init() {
+      // 1. ADMIN: Tuyệt đối không bao giờ hiển thị popup Shopee hay khóa chương
+      if (typeof muopConfig !== 'undefined' && muopConfig.isAdmin) {
+        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
+        $('#shopeeGatekeeperModal').remove();
+        return;
+      }
+
       this.bindChapterListInterceptors();
       this.bindUnlockButton();
       this.checkChapterLock();
@@ -480,15 +489,29 @@
     // Bắt sự kiện khi click vào link chương trên trang truyện hoặc thanh điều hướng
     bindChapterListInterceptors() {
       $(document).on('click', '.chapter-item, .btn-read-latest, .chapter-drawer-link, .btn-next-chapter', function(e) {
+        // 1. Admin hoàn toàn không bao giờ bị chặn Shopee
+        if (typeof muopConfig !== 'undefined' && muopConfig.isAdmin) return;
+
         const $el = $(this);
         const href = $el.attr('href');
         if (!href || href === '#' || href.startsWith('javascript:')) return;
 
-        const storyId = parseInt($el.data('story-id'), 10) || 0;
+        const storyId = parseInt($el.data('story-id'), 10) || parseInt($('.chapter-reading-wrapper').data('story-id'), 10) || 0;
         const chapterId = parseInt($el.data('chapter-id'), 10) || 0;
         const chapNum = parseInt($el.data('chapter-num'), 10) || 1;
         const totalChapters = parseInt($el.data('total-chapters'), 10) || 0;
         const checkpointAttr = $el.data('is-checkpoint');
+
+        // 2. Dịch giả xem/đọc truyện của CHÍNH MÌNH: không bao giờ bị khóa hoặc chặn Shopee
+        const isOwnStory = ($el.data('is-own-story') == 1 || $el.data('is-own-story') === '1' || $el.data('is-own-story') === true) ||
+                           ($el.closest('[data-is-own-story="1"]').length > 0) ||
+                           ($('.chapter-reading-wrapper[data-is-own-story="1"]').length > 0) ||
+                           ($('.story-detail-wrapper[data-is-own-story="1"], .single-story-wrapper[data-is-own-story="1"], .story-detail-container[data-is-own-story="1"]').length > 0) ||
+                           (typeof muopConfig !== 'undefined' && Array.isArray(muopConfig.userStoryIds) && storyId && muopConfig.userStoryIds.indexOf(storyId) !== -1);
+
+        if (isOwnStory) {
+          return;
+        }
 
         // Xác định xem chương này có phải là checkpoint có link Shopee không:
         // 1. Ưu tiên thuộc tính data-is-checkpoint từ server
@@ -599,6 +622,13 @@
 
     // Kiểm tra trạng thái khóa khi vừa tải trang đọc chương (single-chuong.php)
     checkChapterLock() {
+      // 1. Admin không bao giờ bị khóa
+      if (typeof muopConfig !== 'undefined' && muopConfig.isAdmin) {
+        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
+        $('#shopeeGatekeeperModal').hide();
+        return;
+      }
+
       const $readingWrapper = $('.chapter-reading-wrapper');
       if (!$readingWrapper.length) return;
 
@@ -607,6 +637,16 @@
       const chapNum = parseInt($readingWrapper.data('chapter-num'), 10) || 1;
       const totalChapters = parseInt($readingWrapper.data('total-chapters'), 10) || 0;
       const checkpointAttr = $readingWrapper.data('is-checkpoint');
+
+      // 2. Dịch giả xem/đọc truyện của CHÍNH MÌNH: không bao giờ bị khóa
+      const isOwnStory = ($readingWrapper.data('is-own-story') == 1 || $readingWrapper.data('is-own-story') === '1' || $readingWrapper.data('is-own-story') === true) ||
+                         (typeof muopConfig !== 'undefined' && Array.isArray(muopConfig.userStoryIds) && storyId && muopConfig.userStoryIds.indexOf(storyId) !== -1);
+
+      if (isOwnStory) {
+        $('.chapter-content-box').removeClass('chapter-locked chapter-locked-init');
+        $('#shopeeGatekeeperModal').hide();
+        return;
+      }
 
       // Xác định chương này có phải checkpoint cần link Shopee không
       let isChk = false;
@@ -670,8 +710,28 @@
     },
 
     init() {
-      // Chỉ bỏ qua khi đang ở bên trong trang quản lý /quan-ly-admin/ để không ảnh hưởng đến việc quản trị
-      if (window.location.pathname.indexOf('/quan-ly-admin/') !== -1) {
+      // 1. ADMIN: Tuyệt đối không bao giờ xuất hiện quảng cáo hay nhảy link TikTok Shop ở bất kỳ đâu
+      if (typeof muopConfig !== 'undefined' && muopConfig.isAdmin) {
+        return;
+      }
+
+      // 2. Không bao giờ kích hoạt trên trang Quản lý Admin
+      if (window.location.pathname.indexOf('/quan-ly-admin') !== -1) {
+        return;
+      }
+
+      // 3. Không kích hoạt trên trang Đăng Truyện (/dang-truyen)
+      if (window.location.pathname.indexOf('/dang-truyen') !== -1) {
+        return;
+      }
+
+      // 4. Không kích hoạt trên trang Thêm Chương (/them-chuong)
+      if (window.location.pathname.indexOf('/them-chuong') !== -1) {
+        return;
+      }
+
+      // 5. Không kích hoạt trên Kênh Dịch Giả / Thông tin dịch giả (/thong-tin-dich-gia)
+      if (window.location.pathname.indexOf('/thong-tin-dich-gia') !== -1) {
         return;
       }
 
@@ -776,6 +836,20 @@
         if (e._ttJumpHandled) return;
         e._ttJumpHandled = true;
 
+        // 1. ADMIN: Tuyệt đối không bao giờ kích hoạt nhảy link TikTok Shop ở bất kỳ đâu
+        if (typeof muopConfig !== 'undefined' && muopConfig.isAdmin) {
+          return;
+        }
+
+        // 2. Không kích hoạt trên các trang công việc của Dịch Giả / Admin
+        const currentPath = window.location.pathname;
+        if (currentPath.indexOf('/dang-truyen') !== -1 ||
+            currentPath.indexOf('/them-chuong') !== -1 ||
+            currentPath.indexOf('/thong-tin-dich-gia') !== -1 ||
+            currentPath.indexOf('/quan-ly-admin') !== -1) {
+          return;
+        }
+
         const $el = $(this);
 
         // Bỏ qua nếu button đang bị vô hiệu hóa
@@ -793,9 +867,54 @@
           return;
         }
 
+        // 3. DUYỆT NỘI DUNG: Không bao giờ nhảy link khi bấm nút Duyệt Nội Dung
+        if ($el.hasClass('btn-scan-sensitive') || $el.closest('.btn-scan-sensitive').length > 0 || $el.is('[data-target*="Description"], [data-target*="Content"]')) {
+          return;
+        }
+
+        // 4. ĐĂNG TRUYỆN, THÊM CHƯƠNG, CHỈNH SỬA TRUYỆN: Không bao giờ nhảy link khi đang thao tác trong form hoặc modal
+        if ($el.closest('#formSubmitStory, #formAddChapter, #formEditStoryMaster, #formEditChapterModal, #formQuickEditStory, #adminQuickEditForm').length > 0) {
+          return;
+        }
+
+        if ($el.closest('#modalEditStoryInfo, #modalEditChapterContent, #modalQuickEditStory, #modalDeleteChapterConfirm, #adminQuickEditModal, #modalSensitiveWordReview, .custom-modal-backdrop, .modal-backdrop, .translator-dashboard-wrap, .author-manage-box, .chapter-actions-dropdown, .custom-cover-upload-area, #boxAddNewGenre').length > 0) {
+          return;
+        }
+
+        if ($el.is('.btn-trigger-edit-chapter, .btn-trigger-delete-chapter, .btn-chapter-dropdown-trigger, .btn-edit-story, .btn-quick-edit, #btnSaveDraftNewStory, #btnSubmitPublishStory, #btnUploadCover, #btnRemoveCover, #btnToggleAddNewGenre, #btnConfirmAddGenre, #btnCancelAddGenre, #btnSaveDraftChapterAction, #btnUpdateChapterAction, #btnConfirmDeleteChapter, #btnCancelDeleteChapter')) {
+          return;
+        }
+
         // Bỏ qua nếu là link dẫn trực tiếp tới shopee hoặc tiktok
         const href = $el.attr('href') || '';
         if (href.indexOf('shopee.vn') !== -1 || href.indexOf('tiktok.com') !== -1) {
+          return;
+        }
+
+        // 5. TRUYỆN CỦA CHÍNH DỊCH GIẢ: Dịch giả đọc, xem hoặc thao tác trên truyện của mình KHÔNG BAO GIỜ bị nhảy link
+        let storyId = parseInt($el.data('story-id'), 10) || 0;
+        let chapterNum = parseInt($el.data('chapter-num'), 10) || 0;
+        if (!storyId) {
+          const $rw = $('.chapter-reading-wrapper');
+          if ($rw.length) {
+            storyId = parseInt($rw.data('story-id'), 10) || 0;
+            chapterNum = parseInt($rw.data('chapter-num'), 10) || 0;
+          }
+        }
+        if (!storyId) {
+          const $sw = $('.story-detail-wrapper, .story-detail-container, .single-story-wrapper');
+          if ($sw.length) {
+            storyId = parseInt($sw.data('story-id'), 10) || 0;
+          }
+        }
+
+        const isOwnStory = ($el.data('is-own-story') == 1 || $el.data('is-own-story') === '1' || $el.data('is-own-story') === true) ||
+                           ($el.closest('[data-is-own-story="1"]').length > 0) ||
+                           ($('.chapter-reading-wrapper[data-is-own-story="1"]').length > 0) ||
+                           ($('.story-detail-wrapper[data-is-own-story="1"], .single-story-wrapper[data-is-own-story="1"], .story-detail-container[data-is-own-story="1"]').length > 0) ||
+                           (typeof muopConfig !== 'undefined' && Array.isArray(muopConfig.userStoryIds) && storyId && muopConfig.userStoryIds.indexOf(storyId) !== -1);
+
+        if (isOwnStory) {
           return;
         }
 
@@ -818,16 +937,6 @@
 
         // Kiểm tra điều kiện mở TikTok
         if (self.shouldTrigger(isChapterNav)) {
-          let storyId = parseInt($el.data('story-id'), 10) || 0;
-          let chapterNum = parseInt($el.data('chapter-num'), 10) || 0;
-          if (!storyId) {
-            const $rw = $('.chapter-reading-wrapper');
-            if ($rw.length) {
-              storyId = parseInt($rw.data('story-id'), 10) || 0;
-              chapterNum = parseInt($rw.data('chapter-num'), 10) || 0;
-            }
-          }
-
           // Nếu là thẻ <a> có link chuyển trang (như Chương trước / Chương sau):
           // Cần mở tab TikTok trước rồi hoãn chuyển trang 250ms để trình duyệt di động không hủy tab mới
           if ($el.is('a') && href && !href.startsWith('#') && !href.startsWith('javascript:')) {

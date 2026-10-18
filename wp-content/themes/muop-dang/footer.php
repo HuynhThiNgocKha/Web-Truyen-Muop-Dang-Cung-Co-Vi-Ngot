@@ -54,7 +54,8 @@ if (!defined('ABSPATH')) exit;
     </div>
 </div>
 
-<!-- POPUP SHOPEE GATEKEEPER MODAL TOÀN TRANG -->
+<!-- POPUP SHOPEE GATEKEEPER MODAL TOÀN TRANG (KHÔNG XUẤT HIỆN CHO ADMIN) -->
+<?php if (!muop_is_admin()) : ?>
 <?php $global_shopee_url = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'); ?>
 <div id="shopeeGatekeeperModal" class="shopee-gatekeeper-overlay" style="display: none;" aria-hidden="true">
     <div class="shopee-modal-card">
@@ -82,6 +83,7 @@ if (!defined('ABSPATH')) exit;
         </p>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- MODAL CHI TIẾT & ĐỐI THOẠI BÁO LỖI CHƯƠNG (HỖ TRỢ ĐỘC GIẢ, DỊCH GIẢ, ADMIN) -->
 <div class="modal-backdrop" id="reportDialogueModal" style="display: none;" aria-hidden="true">

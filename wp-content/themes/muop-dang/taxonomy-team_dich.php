@@ -153,15 +153,33 @@ if (empty($team_bio)) {
     $team_bio = 'Chào mừng bạn đến với trang tác phẩm của ' . $team_name . '. Chúc các bạn độc giả có những giây phút đọc truyện ngọt ngào và thư giãn nhất!';
 }
 
-// Quyền quản lý và chỉnh sửa Team Dịch: Chỉ chính tác giả/dịch giả của team đó mới có quyền sửa trên frontend
+// Quyền quản lý và chỉnh sửa Team Dịch: Chỉ chính tác giả/dịch giả của team đó hoặc Admin mới có quyền sửa trên frontend
 $can_edit_team = false;
 if (is_user_logged_in() && $team_id > 0) {
     $current_uid = get_current_user_id();
-    if (muop_user_is_translator($current_uid)) {
-        foreach ($all_team_stories as $st) {
-            if ((int)$st->post_author === $current_uid) {
-                $can_edit_team = true;
-                break;
+    $curr_user = wp_get_current_user();
+    $norm_team = mb_strtolower(trim($team_name), 'UTF-8');
+    if (muop_is_admin($current_uid)) {
+        if (strpos($norm_team, 'mướp đắng') !== false || strpos($norm_team, 'muop dang') !== false) {
+            $can_edit_team = true;
+        } else {
+            foreach ($all_team_stories as $st) {
+                if ((int)$st->post_author === $current_uid) {
+                    $can_edit_team = true;
+                    break;
+                }
+            }
+        }
+    } elseif (muop_user_is_translator($current_uid)) {
+        $norm_display = mb_strtolower(trim($curr_user->display_name), 'UTF-8');
+        if ($norm_team === $norm_display) {
+            $can_edit_team = true;
+        } else {
+            foreach ($all_team_stories as $st) {
+                if ((int)$st->post_author === $current_uid) {
+                    $can_edit_team = true;
+                    break;
+                }
             }
         }
     }

@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.2.82');
+define('MUOP_THEME_VERSION', '2.2.85');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -729,6 +729,33 @@ function muop_enqueue_scripts() {
     // Chuẩn hóa ajaxUrl theo đường dẫn thực tế của WordPress (/core/wp-admin/admin-ajax.php)
     $ajax_url = wp_make_link_relative(admin_url('admin-ajax.php'));
 
+    $is_admin = muop_is_admin();
+    $is_translator = (function_exists('muop_user_is_translator') ? muop_user_is_translator($current_user->ID) : false) || current_user_can('dich_gia') || in_array('dich_gia', (array)$current_user->roles, true);
+
+    $user_story_ids = array();
+    if (!empty($current_user->ID)) {
+        if ($is_admin) {
+            $all_admin_stories = get_posts(array(
+                'post_type'      => 'truyen',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+                'post_status'    => array('publish', 'pending', 'draft')
+            ));
+            $user_story_ids = array_values(array_filter((array)$all_admin_stories, function($sid) use ($current_user) {
+                $post = get_post($sid);
+                return ($post && ((int)$post->post_author === (int)$current_user->ID || muop_is_story_of_team_muop_dang($sid)));
+            }));
+        } elseif ($is_translator) {
+            $user_story_ids = get_posts(array(
+                'post_type'      => 'truyen',
+                'author'         => $current_user->ID,
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+                'post_status'    => array('publish', 'pending', 'draft')
+            ));
+        }
+    }
+
     wp_localize_script('muop-main-script', 'muopConfig', array(
         'ajaxUrl'       => $ajax_url,
         'nonce'         => wp_create_nonce('muop_ajax_nonce'),
@@ -739,6 +766,9 @@ function muop_enqueue_scripts() {
         'userRole'      => $effective_role,
         'actualRole'    => $primary_role,
         'previewMode'   => $preview_mode,
+        'isAdmin'       => $is_admin,
+        'isTranslator'  => $is_translator,
+        'userStoryIds'  => !empty($user_story_ids) ? array_values(array_map('intval', (array)$user_story_ids)) : array(),
         'shopeeUrl'     => get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'),
         'tiktokUrl'     => get_option('muop_tiktok_url', 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ'),
         'salaryRate'    => get_option('muop_salary_rate', 8),
@@ -1335,6 +1365,90 @@ function muop_is_story_of_team_muop_dang($story_id) {
 }
 
 /**
+ * Lấy URL trực tiếp tới trang Team Dịch cụ thể của người dùng (Dịch Giả hoặc Admin).
+ * Sẽ dẫn thẳng tới kênh team dịch (/team-dich/{slug}/), không phải là trang danh sách tổng hợp (/team-dich/).
+ */
+function muop_get_user_team_url($user_id = 0) {
+    if (!$user_id) {
+        $user_id = get_current_user_id();
+    }
+    if (!$user_id) {
+        return home_url('/team-dich/');
+    }
+
+    $is_admin = muop_is_admin($user_id);
+    
+    // 1. Nếu là Admin: Kênh team mặc định là "Mướp Đắng Cũng Có Vị Ngọt"
+    if ($is_admin) {
+        $admin_term = get_term_by('slug', 'muop-dang-cung-co-vi-ngot', 'team_dich');
+        if (!$admin_term) {
+            $admin_term = get_term_by('name', 'Mướp Đắng Cũng Có Vị Ngọt', 'team_dich');
+        }
+        if ($admin_term && !is_wp_error($admin_term)) {
+            $link = get_term_link($admin_term);
+            if (!is_wp_error($link)) return $link;
+        }
+        return home_url('/team-dich/muop-dang-cung-co-vi-ngot/');
+    }
+
+    // 2. Nếu là Dịch Giả: Tìm team từ các truyện dịch giả đã đăng
+    $user_stories = get_posts(array(
+        'post_type'      => 'truyen',
+        'author'         => $user_id,
+        'posts_per_page' => 5,
+        'post_status'    => array('publish', 'pending', 'draft')
+    ));
+
+    if (!empty($user_stories)) {
+        foreach ($user_stories as $st) {
+            $terms = get_the_terms($st->ID, 'team_dich');
+            if (!empty($terms) && !is_wp_error($terms)) {
+                $link = get_term_link($terms[0]);
+                if (!is_wp_error($link)) return $link;
+            }
+            $team_name_meta = get_post_meta($st->ID, '_truyen_team', true);
+            if (!empty($team_name_meta)) {
+                $term = get_term_by('name', $team_name_meta, 'team_dich');
+                if (!$term) {
+                    $term = get_term_by('slug', sanitize_title($team_name_meta), 'team_dich');
+                }
+                if ($term && !is_wp_error($term)) {
+                    $link = get_term_link($term);
+                    if (!is_wp_error($link)) return $link;
+                }
+                return home_url('/team-dich/' . sanitize_title($team_name_meta) . '/');
+            }
+        }
+    }
+
+    // 3. Nếu chưa đăng truyện: Tên team mặc định chính là display_name của dịch giả
+    $user = get_userdata($user_id);
+    $team_name = ($user && !empty($user->display_name)) ? $user->display_name : 'Team Dịch';
+    $term = get_term_by('name', $team_name, 'team_dich');
+    if (!$term) {
+        $term = get_term_by('slug', sanitize_title($team_name), 'team_dich');
+    }
+    
+    // Nếu chưa tồn tại trong taxonomy, tự động khởi tạo term để trang team hoạt động ngay lập tức
+    if (!$term) {
+        $inserted = wp_insert_term($team_name, 'team_dich', array(
+            'slug'        => sanitize_title($team_name),
+            'description' => 'Chào mừng bạn đến với kênh Team Dịch của ' . $team_name . '!'
+        ));
+        if (!is_wp_error($inserted) && isset($inserted['term_id'])) {
+            $term = get_term($inserted['term_id'], 'team_dich');
+        }
+    }
+
+    if ($term && !is_wp_error($term)) {
+        $link = get_term_link($term);
+        if (!is_wp_error($link)) return $link;
+    }
+
+    return home_url('/team-dich/' . sanitize_title($team_name) . '/');
+}
+
+/**
  * Kiểm tra xem người dùng hiện tại có quyền thêm/sửa/xóa trên trang chi tiết truyện (Frontend) hay không:
  * - Admin có vai trò dịch giả của team "Mướp Đắng Cũng Có Vị Ngọt" => Có quyền trên TẤT CẢ truyện thuộc team Mướp Đắng.
  * - Trên trang của dịch giả khác: Admin chỉ có quyền XEM, KHÔNG được can thiệp hay sửa xóa trên Frontend.
@@ -1468,19 +1582,18 @@ function muop_ajax_register_handler() {
         $username .= '_' . wp_rand(100, 999);
     }
 
-    $user_id = wp_create_user($username, $password, $email);
-
-    if (is_wp_error($user_id)) {
-        wp_send_json_error(array('message' => $user_id->get_error_message()));
-    }
-
-    // Set display name and doc_gia role
-    wp_update_user(array(
-        'ID'           => $user_id,
+    $user_id = wp_insert_user(array(
+        'user_login'   => $username,
+        'user_pass'    => $password,
+        'user_email'   => $email,
         'display_name' => $name,
         'nickname'     => $name,
         'role'         => 'doc_gia'
     ));
+
+    if (is_wp_error($user_id)) {
+        wp_send_json_error(array('message' => $user_id->get_error_message()));
+    }
 
     // Lưu mật khẩu khởi tạo phục vụ quản trị viên
     update_user_meta($user_id, '_admin_temp_password', $password);
@@ -2328,10 +2441,15 @@ function muop_ajax_admin_action_handler() {
         case 'change_user_role':
             $target_user_id = intval($_POST['user_id']);
             $new_role       = sanitize_text_field($_POST['new_role']);
-            if (in_array($new_role, array('doc_gia', 'dich_gia', 'administrator'))) {
-                $u = new WP_User($target_user_id);
-                $u->set_role($new_role);
+            $allowed_roles  = array('doc_gia', 'dich_gia', 'administrator');
+            if (in_array($new_role, $allowed_roles, true)) {
+                wp_update_user(array(
+                    'ID'   => $target_user_id,
+                    'role' => $new_role
+                ));
                 wp_send_json_success(array('message' => 'Đã thay đổi vai trò người dùng thành ' . $new_role));
+            } else {
+                wp_send_json_error(array('message' => 'Vai trò người dùng không hợp lệ!'));
             }
             break;
 
@@ -2370,14 +2488,14 @@ function muop_ajax_admin_action_handler() {
                 update_user_meta($target_user_id, '_admin_temp_password', $new_pass);
             }
 
+            $allowed_roles = array('doc_gia', 'dich_gia', 'administrator');
+            if (in_array($role, $allowed_roles, true)) {
+                $update_data['role'] = $role;
+            }
+
             $res = wp_update_user($update_data);
             if (is_wp_error($res)) {
                 wp_send_json_error(array('message' => $res->get_error_message()));
-            }
-
-            if (in_array($role, array('doc_gia', 'dich_gia', 'administrator'), true)) {
-                $u_obj = new WP_User($target_user_id);
-                $u_obj->set_role($role);
             }
 
             wp_send_json_success(array(
@@ -2463,13 +2581,21 @@ function muop_ajax_admin_action_handler() {
             }
             $username = sanitize_user(current(explode('@', $u_email)));
             if (username_exists($username)) $username .= '_' . wp_rand(10, 99);
-            $new_uid = wp_create_user($username, $u_pass, $u_email);
+
+            $allowed_roles = array('doc_gia', 'dich_gia', 'administrator');
+            $assigned_role = in_array($u_role, $allowed_roles, true) ? $u_role : 'doc_gia';
+
+            $new_uid = wp_insert_user(array(
+                'user_login'   => $username,
+                'user_pass'    => $u_pass,
+                'user_email'   => $u_email,
+                'display_name' => $u_name,
+                'nickname'     => $u_name,
+                'role'         => $assigned_role,
+            ));
             if (is_wp_error($new_uid)) {
                 wp_send_json_error(array('message' => $new_uid->get_error_message()));
             }
-            $u = new WP_User($new_new = $new_uid);
-            $u->set_role($u_role);
-            wp_update_user(array('ID' => $new_uid, 'display_name' => $u_name));
             update_user_meta($new_uid, '_admin_temp_password', $u_pass);
             update_user_meta($new_uid, '_last_password_reset_by_admin', current_time('mysql'));
             wp_send_json_success(array('message' => 'Thêm người dùng mới thành công!'));

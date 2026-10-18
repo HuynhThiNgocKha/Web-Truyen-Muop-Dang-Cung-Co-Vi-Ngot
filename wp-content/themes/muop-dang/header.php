@@ -169,6 +169,12 @@ $genres = get_terms(array(
                                 </a>
                             <?php endif; ?>
 
+                            <?php if (muop_user_is_translator($current_user->ID) || current_user_can('administrator')) : ?>
+                                <a href="<?php echo esc_url(muop_get_user_team_url($current_user->ID)); ?>">
+                                    <i class="fa-solid fa-users"></i> <span>Kênh Team Dịch</span>
+                                </a>
+                            <?php endif; ?>
+
                             <?php if (current_user_can('administrator')) : ?>
                                 <a href="<?php echo esc_url(home_url('/quan-ly-admin/')); ?>">
                                     <i class="fa-solid fa-sliders"></i> <span>Quản Trị Hệ Thống</span>
