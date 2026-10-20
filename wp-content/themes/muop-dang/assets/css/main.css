@@ -11792,10 +11792,8 @@ html[data-theme="dark"] .genre-box-btn.is-active {
   width: 100%;
   background: rgba(46, 125, 50, 0.05);
   border: 1.5px solid rgba(46, 125, 50, 0.16);
-  border-radius: 0 !important;
-  padding: 16px 0 14px 0;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border-radius: 8px !important;
+  padding: 24px 0 20px 0;
   box-shadow: 
     0 4px 20px rgba(46, 125, 50, 0.04),
     inset 0 0 35px rgba(46, 125, 50, 0.03);
@@ -11809,12 +11807,18 @@ html[data-theme="dark"] .genre-box-btn.is-active {
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding: 8px calc(50% - 95px) 14px calc(50% - 95px);
+  padding: 12px calc(50% - 95px) 16px calc(50% - 95px);
   margin: 0;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   cursor: grab;
   user-select: none;
+  transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+.story-carousel-track.is-animating {
+  scroll-snap-type: none !important;
 }
 
 .story-carousel-track:active {
@@ -11830,69 +11834,75 @@ html[data-theme="dark"] .genre-box-btn.is-active {
 /* Khung truyện trong thanh kéo: Kích thước lớn hơn, rõ ràng và cân đối */
 .story-carousel-track .story-card {
   flex: 0 0 calc((100% - (18px * 4)) / 5);
-  min-width: 185px;
-  max-width: 240px;
+  min-width: 190px;
+  max-width: 245px;
   scroll-snap-align: center;
   scroll-snap-stop: normal;
   position: relative;
-  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.35s ease, border-color 0.35s ease;
-  will-change: transform, box-shadow;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+  will-change: transform;
 }
 
-/* Card active chính giữa: phóng to nhẹ và viền xanh thương hiệu sắc nét */
+/* Card active chính giữa: phóng to nhẹ vừa vặn, không bị cắt mép trên/dưới */
 .story-carousel-track .story-card.is-active {
-  transform: scale(1.06) translateY(-4px);
+  transform: scale(1.04);
   z-index: 5;
   border-color: var(--primary-green, #2e7d32) !important;
   box-shadow: 
-    0 0 0 2.5px var(--primary-green, #2e7d32),
-    0 10px 24px rgba(46, 125, 50, 0.22) !important;
+    0 0 0 2px var(--primary-green, #2e7d32),
+    0 8px 22px rgba(46, 125, 50, 0.2) !important;
 }
 
 @media (max-width: 1200px) {
   .story-carousel-track .story-card {
     flex: 0 0 calc((100% - (16px * 3)) / 4);
-    min-width: 180px;
+    min-width: 185px;
   }
 }
 
 @media (max-width: 992px) {
   .story-carousel-track .story-card {
     flex: 0 0 calc((100% - (14px * 2)) / 3);
-    min-width: 175px;
+    min-width: 180px;
   }
 }
 
 @media (max-width: 768px) {
   .story-carousel-wrap {
-    padding: 14px 0 12px 0;
+    padding: 20px 0 16px 0;
+    border-radius: 8px !important;
   }
   .story-carousel-track {
     gap: 14px;
+    padding-top: 10px;
+    padding-bottom: 14px;
   }
   .story-carousel-track .story-card {
-    flex: 0 0 calc((100% - 14px) / 2.3);
-    min-width: 165px;
+    flex: 0 0 calc((100% - 14px) / 2.2);
+    min-width: 175px;
   }
 }
 
 @media (max-width: 640px) {
   .story-carousel-track .story-card.is-active {
-    transform: scale(1.05) translateY(-3px);
+    transform: scale(1.035);
   }
 }
 
 @media (max-width: 520px) {
   .story-carousel-wrap {
-    padding: 12px 0 10px 0;
+    padding: 18px 0 14px 0;
+    border-radius: 8px !important;
   }
   .story-carousel-track {
     gap: 12px;
+    padding-top: 8px;
+    padding-bottom: 12px;
   }
   .story-carousel-track .story-card {
-    flex: 0 0 min(210px, 58vw);
-    min-width: 160px;
-    max-width: 220px;
+    flex: 0 0 min(220px, 64vw);
+    min-width: 170px;
+    max-width: 235px;
   }
 }
 
@@ -11924,8 +11934,8 @@ html[data-theme="dark"] .story-carousel-track::-webkit-scrollbar {
 html[data-theme="dark"] .story-carousel-track .story-card.is-active {
   border-color: #10b981 !important;
   box-shadow: 
-    0 0 0 2.5px #10b981,
-    0 10px 24px rgba(0, 0, 0, 0.6) !important;
+    0 0 0 2px #10b981,
+    0 8px 22px rgba(0, 0, 0, 0.6) !important;
 }
 
 /* Các dấu chấm màu xanh chỉ báo vị trí truyện đề cử */

@@ -10242,6 +10242,24 @@
       let isScrolling = false;
       let scrollResetTimeout = null;
 
+      let cachedStep = 0;
+      let cachedFirstCenter = 0;
+      let lastActiveGlobalIdx = -1;
+
+      // Tính toán vị trí và bước nhảy của card (tính 1 lần và khi resize để tối ưu cực độ hiệu năng)
+      const refreshCardMetrics = () => {
+        if (!allCards.length) return;
+        const c0 = allCards[0];
+        const c1 = allCards[1];
+        if (c0 && c1) {
+          cachedStep = c1.offsetLeft - c0.offsetLeft;
+          cachedFirstCenter = c0.offsetLeft + (c0.offsetWidth / 2);
+        } else if (c0) {
+          cachedStep = c0.offsetWidth;
+          cachedFirstCenter = c0.offsetLeft + (c0.offsetWidth / 2);
+        }
+      };
+
       // Khoảng cách cuộn trọn vẹn 1 vòng 360 độ (chiều rộng đúng 1 set truyện)
       const getSetDistance = () => {
         if (originalCount < 2 || allCards.length < 3 * originalCount) return 0;
@@ -10266,21 +10284,28 @@
         track.style.paddingRight = padRight + 'px';
       };
 
-      // Xác định card trong toàn bộ danh sách đang nằm gần tâm giữa màn hình nhất
+      // Xác định card trong toàn bộ danh sách đang nằm gần tâm giữa màn hình nhất (O(1) toán học, 60fps mượt mà)
       const getActiveGlobalIndex = () => {
+        if (!allCards.length) return 0;
         const trackCenter = track.scrollLeft + (track.clientWidth / 2);
-        let minDiff = Infinity;
-        let activeIdx = 0;
 
-        allCards.forEach((card, idx) => {
-          const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
-          const diff = Math.abs(cardCenter - trackCenter);
-          if (diff < minDiff) {
-            minDiff = diff;
-            activeIdx = idx;
+        if (cachedStep > 0) {
+          const estimatedIdx = Math.round((trackCenter - cachedFirstCenter) / cachedStep);
+          return Math.max(0, Math.min(allCards.length - 1, estimatedIdx));
+        }
+
+        // Tự phục hồi tính toán nếu chưa có cache
+        const c0 = allCards[0];
+        if (c0) {
+          const step = allCards[1] ? (allCards[1].offsetLeft - c0.offsetLeft) : c0.offsetWidth;
+          if (step > 0) {
+            cachedStep = step;
+            cachedFirstCenter = c0.offsetLeft + (c0.offsetWidth / 2);
+            const estimatedIdx = Math.round((trackCenter - cachedFirstCenter) / cachedStep);
+            return Math.max(0, Math.min(allCards.length - 1, estimatedIdx));
           }
-        });
-        return activeIdx;
+        }
+        return 0;
       };
 
       // Chuẩn hóa vị trí vòng lặp về lại Set 1 (giữa) mượt mà không hề giật
@@ -10297,10 +10322,10 @@
           const targetCard = allCards[normalizedIdx];
           if (targetCard) {
             const targetLeft = targetCard.offsetLeft + (targetCard.offsetWidth / 2) - (track.clientWidth / 2);
-            track.style.scrollSnapType = 'none';
+            track.classList.add('is-animating');
             track.scrollLeft = targetLeft;
-            void track.offsetWidth;
-            track.style.scrollSnapType = 'x mandatory';
+            track.classList.remove('is-animating');
+            lastActiveGlobalIdx = -1;
             updateActiveCard();
           }
         }
@@ -10310,10 +10335,10 @@
           const targetCard = allCards[normalizedIdx];
           if (targetCard) {
             const targetLeft = targetCard.offsetLeft + (targetCard.offsetWidth / 2) - (track.clientWidth / 2);
-            track.style.scrollSnapType = 'none';
+            track.classList.add('is-animating');
             track.scrollLeft = targetLeft;
-            void track.offsetWidth;
-            track.style.scrollSnapType = 'x mandatory';
+            track.classList.remove('is-animating');
+            lastActiveGlobalIdx = -1;
             updateActiveCard();
           }
         }
@@ -10332,18 +10357,19 @@
 
         if (behavior === 'smooth') {
           isScrolling = true;
+          track.classList.add('is-animating');
           track.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
 
           if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
           scrollResetTimeout = setTimeout(() => {
+            track.classList.remove('is-animating');
             isScrolling = false;
             normalizeLoopPosition();
           }, 460);
         } else {
-          track.style.scrollSnapType = 'none';
+          track.classList.add('is-animating');
           track.scrollLeft = targetScrollLeft;
-          void track.offsetWidth;
-          track.style.scrollSnapType = 'x mandatory';
+          track.classList.remove('is-animating');
           normalizeLoopPosition();
         }
       };
@@ -10383,18 +10409,21 @@
         if (isHoveringCard) return;
 
         const activeGlobalIdx = getActiveGlobalIndex();
+        if (activeGlobalIdx === lastActiveGlobalIdx) return;
+        lastActiveGlobalIdx = activeGlobalIdx;
+
         const activeCard = allCards[activeGlobalIdx];
         if (!activeCard) return;
 
         const activeRealIdx = parseInt(activeCard.dataset.realIndex, 10) || 0;
 
-        allCards.forEach((card, idx) => {
-          if (idx === activeGlobalIdx) {
-            card.classList.add('is-active');
+        for (let i = 0; i < allCards.length; i++) {
+          if (i === activeGlobalIdx) {
+            allCards[i].classList.add('is-active');
           } else {
-            card.classList.remove('is-active');
+            allCards[i].classList.remove('is-active');
           }
-        });
+        }
 
         if (dotsContainer) {
           const dots = dotsContainer.querySelectorAll('.story-carousel-dot');
@@ -10448,15 +10477,17 @@
       }, { passive: true });
 
       // Hover trên desktop: phóng to ngay truyện được rê chuột vào
-      allCards.forEach((card) => {
+      allCards.forEach((card, idx) => {
         card.addEventListener('mouseenter', () => {
           isHoveringCard = true;
+          lastActiveGlobalIdx = idx;
           allCards.forEach(c => c.classList.remove('is-active'));
           card.classList.add('is-active');
         });
 
         card.addEventListener('mouseleave', () => {
           isHoveringCard = false;
+          lastActiveGlobalIdx = -1;
           updateActiveCard();
         });
       });
@@ -10553,9 +10584,11 @@
         }
       });
 
-      // Cập nhật padding để căn giữa và định vị lại khi đổi kích thước màn hình
+      // Cập nhật padding và kích thước card để căn giữa và định vị lại khi đổi kích thước màn hình
+      refreshCardMetrics();
       updateTrackPadding();
       window.addEventListener('resize', () => {
+        refreshCardMetrics();
         updateTrackPadding();
         const activeIdx = getActiveGlobalIndex();
         scrollToCard(activeIdx, 'auto');
