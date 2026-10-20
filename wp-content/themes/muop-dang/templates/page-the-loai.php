@@ -80,8 +80,8 @@ $page_heading = !empty($current_genre_slug) ? ('TRUYỆN ' . mb_strtoupper($genr
             </h1>
         </div>
 
-        <!-- Khung Menu Thể Loại (Mặc định ẩn đi để hiện danh sách truyện, bấm vào mới hiện menu theo yêu cầu) -->
-        <div class="genre-selector-card is-collapsed" id="genreSelectorCard">
+        <!-- Khung Menu Thể Loại (Mặc định hiển thị đầy đủ toàn bộ khung theo yêu cầu) -->
+        <div class="genre-selector-card" id="genreSelectorCard">
             <div class="genre-selector-header" id="genreSelectorHeader" role="button" tabindex="0" aria-label="Đóng mở danh sách thể loại">
                 <span class="genre-selector-title">
                     <i class="fa-solid fa-layer-group" style="font-size: 14px; color: var(--primary-green);"></i> Thể Loại

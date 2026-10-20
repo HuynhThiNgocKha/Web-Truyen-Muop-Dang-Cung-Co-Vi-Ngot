@@ -11518,12 +11518,12 @@ html[data-theme="dark"] .input-user-pass-inline {
   }
 }
 
-/* Khung chứa Menu Thể Loại (Chuẩn Ảnh 1) */
+/* Khung chứa Menu Thể Loại (Hiển thị đầy đủ trọn vẹn toàn bộ khung) */
 .genre-selector-card {
   background: var(--pastel-green, #f0f7f2);
   border: 1px solid #d8e8dc;
   border-radius: 12px;
-  padding: 14px 14px 16px;
+  padding: 16px 18px 18px;
   margin-bottom: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   transition: all 0.2s ease;
@@ -11535,7 +11535,8 @@ html[data-theme="dark"] .input-user-pass-inline {
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 2px;
 }
 
 .genre-selector-title {
@@ -11570,6 +11571,7 @@ html[data-theme="dark"] .input-user-pass-inline {
 
 .genre-selector-card.is-collapsed .genre-selector-header {
   margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .genre-selector-card.is-collapsed .genre-selector-arrow-btn i {
@@ -11580,58 +11582,22 @@ html[data-theme="dark"] .input-user-pass-inline {
   display: none;
 }
 
-/* Khung danh sách thể loại đứng yên & kéo cuộn lên xuống mượt mà */
+/* Khung danh sách thể loại: Hiển thị đầy đủ tất cả các thể loại, không bị cắt xén hay giới hạn chiều cao */
 .genre-selector-body {
-  max-height: 295px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary-green, #2e7d32) rgba(0, 0, 0, 0.05);
-  cursor: grab;
-}
-
-.genre-selector-body:active {
-  cursor: grabbing;
-}
-
-.genre-selector-body::-webkit-scrollbar {
-  width: 6px;
-}
-
-.genre-selector-body::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 999px;
-  margin: 4px 0;
-}
-
-.genre-selector-body::-webkit-scrollbar-thumb {
-  background: var(--primary-green, #2e7d32);
-  border-radius: 999px;
-}
-
-.genre-selector-body::-webkit-scrollbar-thumb:hover {
-  background: #1b5e20;
+  height: auto;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0;
+  cursor: default;
 }
 
 @media (max-width: 640px) {
-  .genre-selector-body {
-    max-height: 245px;
+  .genre-selector-card {
+    padding: 14px 12px 14px;
   }
-}
-
-html[data-theme="dark"] .genre-selector-body {
-  scrollbar-color: #10b981 rgba(255, 255, 255, 0.08);
-}
-
-html[data-theme="dark"] .genre-selector-body::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-html[data-theme="dark"] .genre-selector-body::-webkit-scrollbar-thumb {
-  background: #10b981;
+  .genre-selector-body {
+    max-height: none !important;
+  }
 }
 
 /* Lưới Thể Loại: Ảnh 1 chia 2 cột trên điện thoại; trên PC mở rộng 4 hoặc 5 cột (sổ hết và rộng như Ảnh 3) */
