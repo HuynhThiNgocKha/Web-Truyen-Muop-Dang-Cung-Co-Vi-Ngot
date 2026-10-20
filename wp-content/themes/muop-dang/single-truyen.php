@@ -61,6 +61,30 @@ if (is_user_logged_in()) {
 }
 $is_exempt = ($is_admin_user || $is_own_story || !empty($can_manage_story));
 
+$story_post = get_post($story_id);
+$story_post_status = $story_post ? $story_post->post_status : 'publish';
+$is_story_hidden = (bool) get_post_meta($story_id, '_truyen_is_hidden', true);
+
+// Nếu truyện chưa công khai (future, draft, trash hoặc bị ẩn) mà người xem KHÔNG PHẢI là Admin và KHÔNG PHẢI tác giả truyện:
+if (!$is_exempt && ($story_post_status === 'future' || $story_post_status === 'draft' || $story_post_status === 'trash' || $is_story_hidden)) {
+    status_header(404);
+    nocache_headers();
+    ?>
+    <div class="container" style="padding: 60px 16px; text-align: center;">
+        <div style="max-width: 500px; margin: 0 auto; background: var(--bg-card); padding: 40px 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
+            <div style="font-size: 64px; color: var(--text-muted); margin-bottom: 16px;"><i class="fa-solid fa-file-circle-question"></i></div>
+            <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">Không tìm thấy truyện</h1>
+            <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6; margin-bottom: 24px;">Truyện này hiện không tồn tại, đã bị ẩn hoặc chưa đến thời gian phát hành công khai.</p>
+            <a href="<?php echo esc_url(home_url('/')); ?>" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-house"></i> Về Trang Chủ
+            </a>
+        </div>
+    </div>
+    <?php
+    get_footer();
+    exit;
+}
+
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
 if (!$thumb_url) {
     $thumb_url = MUOP_THEME_URI . '/assets/images/default-cover.svg';
@@ -78,6 +102,64 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
 
 <div class="container">
     <div class="story-detail-wrapper" data-story-id="<?php echo esc_attr($story_id); ?>" data-is-own-story="<?php echo ($is_own_story || !empty($can_manage_story)) ? '1' : '0'; ?>">
+        
+        <!-- BANNER TRẠNG THÁI CHO QUẢN TRỊ VIÊN & DỊCH GIẢ KHI TRUYỆN ĐANG HẸN GIỜ HOẶC ẨN -->
+        <?php if ($story_post_status === 'future') : 
+            $sched_time = get_post_meta($story_id, '_truyen_scheduled_time', true) ?: $story_post->post_date;
+            $sched_ts   = strtotime($sched_time);
+            $sched_fmt  = date_i18n('H:i - d/m/Y', $sched_ts);
+        ?>
+            <div class="alert-scheduled-banner" style="background: linear-gradient(135deg, #f5f3ff, #faf5ff); border: 1.5px solid #c4b5fd; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.08);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #ede9fe; color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700; color: #5b21b6;">
+                            Truyện đang trong trạng thái Hẹn Giờ Công Khai
+                        </div>
+                        <div style="font-size: 13px; color: #6d28d9; margin-top: 2px;">
+                            Lịch phát hành dự kiến: <strong><?php echo esc_html($sched_fmt); ?></strong> (Chỉ Dịch giả và Quản trị viên mới nhìn thấy trang này)
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" class="btn btn-secondary btn-show-scheduled-popup" 
+                            data-story-id="<?php echo $story_id; ?>" 
+                            data-story-title="<?php echo esc_attr($story_post->post_title); ?>" 
+                            data-scheduled-time="<?php echo esc_attr($sched_time); ?>" 
+                            data-scheduled-formatted="<?php echo esc_attr($sched_fmt); ?>"
+                            style="font-size: 13px; font-weight: 600; border-color: #8b5cf6; color: #6d28d9; background: #ffffff; padding: 7px 14px; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Quản Lý Giờ Hẹn
+                    </button>
+                </div>
+            </div>
+        <?php elseif ($story_post_status === 'draft' || $is_story_hidden) : ?>
+            <div class="alert-draft-banner" style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1.5px solid #fde68a; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-shadow: 0 2px 8px rgba(217, 119, 6, 0.08);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">
+                        <i class="fa-solid fa-eye-slash"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 14px; font-weight: 700; color: #92400e;">
+                            Truyện đang ở trạng thái Ẩn (Bản nháp)
+                        </div>
+                        <div style="font-size: 13px; color: #b45309; margin-top: 2px;">
+                            Độc giả bên ngoài sẽ không thấy truyện này. Bạn có thể hẹn giờ công khai hoặc xuất bản bất cứ lúc nào.
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" class="btn btn-secondary btn-action-schedule-draft" 
+                            data-story-id="<?php echo $story_id; ?>" 
+                            data-story-title="<?php echo esc_attr($story_post->post_title); ?>"
+                            style="font-size: 13px; font-weight: 600; border-color: #d97706; color: #b45309; background: #ffffff; padding: 7px 14px; border-radius: var(--radius-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-clock"></i> Hẹn Giờ Công Khai
+                    </button>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <!-- CENTER 1: ĐƯỜNG DẪN (BREADCRUMB) -->
         <nav class="breadcrumbs">
             <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
@@ -185,10 +267,12 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                         <span class="meta-value"><strong><?php echo $chap_count; ?></strong> Chương</span>
                     </div>
 
-                    <div class="meta-item">
-                        <span class="meta-label"><i class="fa-solid fa-eye"></i> Số lượt xem:</span>
-                        <span class="meta-value"><strong><?php echo number_format($views); ?></strong> lượt</span>
-                    </div>
+                    <?php if (muop_can_see_story_views($story_id)) : ?>
+                        <div class="meta-item">
+                            <span class="meta-label"><i class="fa-solid fa-eye"></i> Số lượt xem:</span>
+                            <span class="meta-value"><strong><?php echo number_format($views); ?></strong> lượt</span>
+                        </div>
+                    <?php endif; ?>
 
                     <div class="meta-item">
                         <span class="meta-label"><i class="fa-solid fa-clock"></i> Cập nhật:</span>
@@ -329,8 +413,8 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                                     <span class="chap-title-text"><?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
                                 </span>
                                 <span class="chapter-item-meta">
-                                    <?php if ($can_manage_story) : ?>
-                                        <span class="chapter-item-views" title="Lượt xem chương (Dịch giả)">
+                                    <?php if (muop_can_see_story_views($story_id)) : ?>
+                                        <span class="chapter-item-views" title="Lượt xem chương (Dịch giả & Quản trị)">
                                             <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
                                         </span>
                                     <?php endif; ?>
@@ -436,6 +520,9 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
 if ($can_manage_story) {
     get_template_part('templates/modal-edit-story-master');
     get_template_part('templates/modal-quick-edit-story');
+}
+if ($is_exempt) {
+    get_template_part('templates/modal-schedule-story');
 }
 
 get_footer();

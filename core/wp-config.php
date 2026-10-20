@@ -105,7 +105,10 @@ if ( ! defined( 'WP_DEBUG_LOG' ) ) {
 if ( ! defined( 'WP_DEBUG_DISPLAY' ) ) {
 	define( 'WP_DEBUG_DISPLAY', true );
 }
-@ini_set( 'display_errors', '1' );
+if ( ! defined( 'DISABLE_WP_CRON' ) ) {
+	define( 'DISABLE_WP_CRON', true );
+}
+@ini_set( 'display_errors', '0' );
 
 
 // Ensure local writable upload temp directory exists to avoid PHP Request Startup notice

@@ -19,19 +19,23 @@ $chap_count = count($chapters);
 
 // Số chương mới nhất nếu có
 $latest_chapter_num = 0;
+$latest_chap_ts     = 0;
 if (!empty($chapters)) {
     $last_chap = end($chapters);
     $latest_chapter_num = intval(get_post_meta($last_chap->ID, '_chuong_number', true));
     if (!$latest_chapter_num) {
         $latest_chapter_num = $chap_count;
     }
+    $c_mod = (int) get_post_timestamp($last_chap->ID, 'modified');
+    $c_pub = (int) get_post_timestamp($last_chap->ID, 'date');
+    $latest_chap_ts = max($c_mod, $c_pub);
 }
 
 // Kiểm tra xem có phải mục "Truyện Mới Cập Nhật" hay không
 $is_new_updated = (!empty($args) && !empty($args['show_latest_chapter'])) || is_page('truyen-moi');
 
-// Thời gian cập nhật gần nhất
-$story_update_data = muop_get_story_last_updated($story_id);
+// Thời gian cập nhật gần nhất (tận dụng $latest_chap_ts để loại bỏ triệt để query DB thừa)
+$story_update_data = muop_get_story_last_updated($story_id, $latest_chap_ts ?: null);
 $time_diff         = $story_update_data['time_ago'] ?: 'Mới';
 
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
@@ -65,9 +69,11 @@ if (!$thumb_url) {
 
         <!-- Dải thông tin lượt xem & bookmark đè đáy ảnh bìa (chuẩn Hình 2) -->
         <div class="story-cover-meta-bar">
-            <span class="meta-views" title="Lượt xem">
-                <i class="fa-regular fa-eye"></i> <?php echo number_format($views); ?>
-            </span>
+            <?php if (muop_can_see_story_views($story_id)) : ?>
+                <span class="meta-views" title="Lượt xem">
+                    <i class="fa-regular fa-eye"></i> <?php echo number_format($views); ?>
+                </span>
+            <?php endif; ?>
             <span class="meta-bookmarks" title="Đánh dấu">
                 <i class="fa-regular fa-bookmark"></i> <?php echo number_format($bookmarks); ?>
             </span>

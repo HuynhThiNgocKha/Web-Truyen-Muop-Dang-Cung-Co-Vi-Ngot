@@ -21,8 +21,29 @@ if ($is_admin && !$is_translator) {
 }
 
 get_header();
-
-$current_user = wp_get_current_user();
+?>
+<style>
+.translator-stories-table th.col-status,
+.translator-stories-table th.col-review,
+.translator-stories-table td.col-status,
+.translator-stories-table td.col-review {
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+.translator-stories-table .badge {
+  white-space: nowrap !important;
+  font-size: 11px !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  padding: 2.5px 7px !important;
+  line-height: 1.25 !important;
+  border-radius: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+</style>
+<?php
 $user_id      = $current_user->ID;
 $registered   = date('d/m/Y', strtotime($current_user->user_registered));
 $avatar_char  = strtoupper(substr($current_user->display_name, 0, 1));
@@ -44,7 +65,7 @@ $my_payments = $wpdb->get_results($wpdb->prepare(
 $my_stories = get_posts(array(
     'post_type'      => 'truyen',
     'posts_per_page' => -1,
-    'post_status'    => array('publish', 'pending', 'draft'),
+    'post_status'    => array('publish', 'pending', 'draft', 'future'),
     'author'         => $user_id
 ));
 
@@ -55,10 +76,15 @@ $count_all     = $story_count;
 $count_publish = 0;
 $count_pending = 0;
 $count_draft   = 0;
+$count_future  = 0;
+$count_hidden  = 0;
 foreach ($my_stories as $st) {
-    if ($st->post_status === 'publish') $count_publish++;
+    $st_is_hidden = (bool) get_post_meta($st->ID, '_truyen_is_hidden', true);
+    if ($st_is_hidden && $st->post_status === 'draft') $count_hidden++;
+    elseif ($st->post_status === 'publish') $count_publish++;
     elseif ($st->post_status === 'pending') $count_pending++;
     elseif ($st->post_status === 'draft') $count_draft++;
+    elseif ($st->post_status === 'future') $count_future++;
 }
 
 $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC'));
@@ -324,7 +350,7 @@ if (!empty($story_ids)) {
                 </a>
             </div>
 
-            <!-- THANH LỌC TRUYỆN: TẤT CẢ / ĐANG PHÁT HÀNH / CHỜ DUYỆT / MỤC LƯU NHÁP -->
+            <!-- THANH LỌC TRUYỆN: TẤT CẢ / ĐANG PHÁT HÀNH / ĐANG HẸN GIỜ / CHỜ DUYỆT / ĐÃ ẨN / MỤC LƯU NHÁP -->
             <div class="story-filter-tabs" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; margin-bottom: 16px;">
                 <button type="button" class="btn btn-tab-filter active" data-filter="all" style="padding: 6px 14px; font-size: 12.5px; border-radius: var(--radius-full); cursor: pointer;">
                     <i class="fa-solid fa-layer-group"></i> Tất Cả (<?php echo $count_all; ?>)
@@ -332,8 +358,14 @@ if (!empty($story_ids)) {
                 <button type="button" class="btn btn-tab-filter" data-filter="publish" style="padding: 6px 14px; font-size: 12.5px; border-radius: var(--radius-full); cursor: pointer;">
                     <i class="fa-solid fa-circle-check"></i> Đang Phát Hành (<?php echo $count_publish; ?>)
                 </button>
+                <button type="button" class="btn btn-tab-filter" data-filter="future" style="padding: 6px 14px; font-size: 12.5px; border-radius: var(--radius-full); cursor: pointer; color: #7c3aed; border-color: #ddd6fe;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Đang Hẹn Giờ (<span id="badgeFutureCount"><?php echo $count_future; ?></span>)
+                </button>
                 <button type="button" class="btn btn-tab-filter" data-filter="pending" style="padding: 6px 14px; font-size: 12.5px; border-radius: var(--radius-full); cursor: pointer;">
                     <i class="fa-solid fa-clock"></i> Chờ Duyệt (<?php echo $count_pending; ?>)
+                </button>
+                <button type="button" class="btn btn-tab-filter" data-filter="hidden" style="padding: 6px 14px; font-size: 12.5px; border-radius: var(--radius-full); cursor: pointer; color: #d97706; border-color: #fde68a;">
+                    <i class="fa-solid fa-eye-slash"></i> Đã Ẩn (<span id="badgeHiddenCount"><?php echo $count_hidden; ?></span>)
                 </button>
                 <button type="button" class="btn btn-tab-filter" data-filter="draft" style="padding: 6px 14px; font-size: 12.5px; border-radius: var(--radius-full); cursor: pointer; color: #b45309; border-color: #fde68a;">
                     <i class="fa-solid fa-file-pen"></i> Mục Lưu Nháp (<span id="badgeDraftCount"><?php echo $count_draft; ?></span>)
@@ -361,12 +393,14 @@ if (!empty($story_ids)) {
                         </thead>
                         <tbody>
                             <?php foreach ($my_stories as $index => $st) : 
-                                $st_views  = muop_get_story_views($st->ID);
-                                $st_status = get_post_meta($st->ID, '_truyen_status', true);
-                                $st_chaps  = count(muop_get_story_chapters($st->ID, 'ASC', array('publish', 'draft', 'pending')));
-                                $st_money  = $st_views * $rate;
+                                $st_views     = muop_get_story_views($st->ID);
+                                $st_status    = get_post_meta($st->ID, '_truyen_status', true);
+                                $st_chaps     = count(muop_get_story_chapters($st->ID, 'ASC', array('publish', 'draft', 'pending', 'future')));
+                                $st_money     = $st_views * $rate;
+                                $st_is_hidden = (bool) get_post_meta($st->ID, '_truyen_is_hidden', true);
+                                $row_filter_status = ($st_is_hidden && $st->post_status === 'draft') ? 'hidden' : $st->post_status;
                             ?>
-                                <tr class="story-table-row" data-status="<?php echo esc_attr($st->post_status); ?>" data-story-id="<?php echo esc_attr($st->ID); ?>">
+                                <tr class="story-table-row" data-status="<?php echo esc_attr($row_filter_status); ?>" data-story-id="<?php echo esc_attr($st->ID); ?>">
                                     <td class="col-stt">
                                         <?php echo esc_html($index + 1); ?>
                                     </td>
@@ -374,8 +408,12 @@ if (!empty($story_ids)) {
                                         <a href="<?php echo esc_url(add_query_arg('from', 'translator', get_permalink($st->ID))); ?>" class="table-story-title" title="<?php echo esc_attr($st->post_title); ?>">
                                             <?php echo esc_html($st->post_title); ?>
                                         </a>
-                                        <?php if ($st->post_status === 'draft') : ?>
+                                        <?php if ($st_is_hidden && $st->post_status === 'draft') : ?>
+                                            <span class="badge" style="background: #fffbeb; color: #d97706; font-size: 10px; margin-left: 4px; border: 1px solid #fde68a;"><i class="fa-solid fa-eye-slash"></i> Đã ẩn</span>
+                                        <?php elseif ($st->post_status === 'draft') : ?>
                                             <span class="badge" style="background: #fef3c7; color: #b45309; font-size: 10px; margin-left: 4px;">Bản nháp</span>
+                                        <?php elseif ($st->post_status === 'future') : ?>
+                                            <span class="badge" style="background: #f5f3ff; color: #7c3aed; font-size: 10px; margin-left: 4px; border: 1px solid #ddd6fe;">Hẹn giờ</span>
                                         <?php endif; ?>
                                     </td>
                                     <td class="col-status">
@@ -389,8 +427,25 @@ if (!empty($story_ids)) {
                                     <td class="col-views"><i class="fa-solid fa-eye"></i> <?php echo number_format($st_views); ?></td>
                                     <td class="col-salary" style="color: #2E7D32; font-weight: 700;"><?php echo number_format($st_money); ?> đ</td>
                                     <td class="col-review">
-                                        <?php if ($st->post_status === 'publish') : ?>
+                                        <?php if ($st_is_hidden && $st->post_status === 'draft') : ?>
+                                            <span class="badge" style="background: #fffbeb; color: #d97706; font-weight: 700; border: 1px solid #fde68a;"><i class="fa-solid fa-eye-slash"></i> Đã ẩn</span>
+                                        <?php elseif ($st->post_status === 'publish') : ?>
                                             <span class="badge badge-approved"><i class="fa-solid fa-check"></i> Đã duyệt</span>
+                                        <?php elseif ($st->post_status === 'future') : 
+                                            $st_sched_time = get_post_meta($st->ID, '_truyen_scheduled_time', true) ?: $st->post_date;
+                                            $st_sched_ts   = strtotime($st_sched_time);
+                                            $st_sched_fmt  = date_i18n('H:i - d/m/Y', $st_sched_ts);
+                                        ?>
+                                            <span class="badge badge-scheduled btn-show-scheduled-popup" 
+                                                  data-story-id="<?php echo $st->ID; ?>" 
+                                                  data-story-title="<?php echo esc_attr($st->post_title); ?>" 
+                                                  data-scheduled-time="<?php echo esc_attr($st_sched_time); ?>" 
+                                                  data-scheduled-formatted="<?php echo esc_attr($st_sched_fmt); ?>" 
+                                                  onclick="if(window.muopOpenScheduleModal){window.muopOpenScheduleModal(<?php echo $st->ID; ?>, '<?php echo esc_js($st->post_title); ?>', '<?php echo esc_js($st_sched_time); ?>', '<?php echo esc_js($st_sched_fmt); ?>'); return false;}"
+                                                  style="cursor: pointer;"
+                                                  title="Nhấn để xem thời gian đã lên lịch">
+                                                <i class="fa-solid fa-clock-rotate-left"></i> Đã hẹn giờ
+                                            </span>
                                         <?php elseif ($st->post_status === 'pending') : ?>
                                             <span class="badge badge-nominate"><i class="fa-solid fa-clock"></i> Chờ duyệt</span>
                                         <?php else : ?>
@@ -403,9 +458,39 @@ if (!empty($story_ids)) {
                                                 <i class="fa-solid fa-ellipsis-vertical"></i>
                                             </button>
                                             <div class="story-dropdown-menu">
-                                                <?php if ($st->post_status === 'draft') : ?>
+                                                <?php if ($st_is_hidden && $st->post_status === 'draft') : ?>
+                                                    <!-- Truyện đang ở trạng thái ẩn -> Hiện truyện -->
+                                                    <button type="button" class="story-dropdown-item btn-translator-toggle-hide" data-action="unhide" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                        <i class="fa-solid fa-eye" style="color: var(--primary-green);"></i> Hiện truyện
+                                                    </button>
+                                                    <button type="button" class="story-dropdown-item btn-action-schedule-draft" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                        <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Hẹn giờ công khai
+                                                    </button>
+                                                <?php elseif ($st->post_status === 'draft') : ?>
                                                     <button type="button" class="story-dropdown-item btn-publish-draft" data-story-id="<?php echo $st->ID; ?>">
                                                         <i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary-green);"></i> Đăng truyện lên
+                                                    </button>
+                                                    <button type="button" class="story-dropdown-item btn-action-schedule-draft" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                        <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Hẹn giờ công khai
+                                                    </button>
+                                                <?php elseif ($st->post_status === 'future') : 
+                                                    $st_sched_time = get_post_meta($st->ID, '_truyen_scheduled_time', true) ?: $st->post_date;
+                                                    $st_sched_ts   = strtotime($st_sched_time);
+                                                    $st_sched_fmt  = date_i18n('H:i - d/m/Y', $st_sched_ts);
+                                                ?>
+                                                    <button type="button" class="story-dropdown-item btn-show-scheduled-popup" 
+                                                            data-story-id="<?php echo $st->ID; ?>" 
+                                                            data-story-title="<?php echo esc_attr($st->post_title); ?>" 
+                                                            data-scheduled-time="<?php echo esc_attr($st_sched_time); ?>" 
+                                                            data-scheduled-formatted="<?php echo esc_attr($st_sched_fmt); ?>"
+                                                            onclick="if(window.muopOpenScheduleModal){window.muopOpenScheduleModal(<?php echo $st->ID; ?>, '<?php echo esc_js($st->post_title); ?>', '<?php echo esc_js($st_sched_time); ?>', '<?php echo esc_js($st_sched_fmt); ?>'); return false;}">
+                                                        <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Xem giờ đã hẹn
+                                                    </button>
+                                                    <button type="button" class="story-dropdown-item btn-publish-draft" data-story-id="<?php echo $st->ID; ?>">
+                                                        <i class="fa-solid fa-bolt" style="color: #2E7D32;"></i> Đăng ngay bây giờ
+                                                    </button>
+                                                    <button type="button" class="story-dropdown-item btn-cancel-schedule-action" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                        <i class="fa-solid fa-file-pen" style="color: #b45309;"></i> Hủy hẹn (Về bản nháp)
                                                     </button>
                                                 <?php endif; ?>
 
@@ -420,6 +505,13 @@ if (!empty($story_ids)) {
                                                 <a href="<?php echo esc_url(add_query_arg(array('story_id' => $st->ID, 'from' => 'translator'), home_url('/them-chuong/'))); ?>" class="story-dropdown-item">
                                                     <i class="fa-solid fa-plus" style="color: #16a34a;"></i> Thêm mới chương
                                                 </a>
+
+                                                <?php if ($st->post_status === 'publish') : ?>
+                                                    <!-- Dịch giả có thể ẩn truyện đang phát hành của mình -->
+                                                    <button type="button" class="story-dropdown-item btn-translator-toggle-hide" data-action="hide" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                        <i class="fa-solid fa-eye-slash" style="color: #d97706;"></i> Ẩn truyện
+                                                    </button>
+                                                <?php endif; ?>
 
                                                 <div class="story-dropdown-divider"></div>
 
@@ -454,6 +546,7 @@ if (!empty($story_ids)) {
 
         <!-- MODAL POPUP MASTER CHỈNH SỬA TRUYỆN & CHƯƠNG -->
         <?php get_template_part('templates/modal-edit-story-master'); ?>
+        <?php get_template_part('templates/modal-schedule-story'); ?>
         </div>
 
         <!-- PHẦN 2: BÌNH LUẬN TỪ ĐỘC GIẢ (ĐƯA XUỐNG PHÍA DƯỚI) -->

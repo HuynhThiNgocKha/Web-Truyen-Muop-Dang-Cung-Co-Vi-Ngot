@@ -9,11 +9,17 @@ $is_logged_in = is_user_logged_in();
 $user_role    = muop_get_effective_user_role();
 $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COOKIE['muop_preview_mode']) : '';
 
-// Get all genres for desktop and mobile navigation
-$genres = get_terms(array(
-    'taxonomy'   => 'the_loai',
-    'hide_empty' => false,
-));
+// Get all genres for desktop and mobile navigation (cached for speed)
+$genres = wp_cache_get('muop_all_genres_list');
+if ($genres === false) {
+    $genres = get_terms(array(
+        'taxonomy'   => 'the_loai',
+        'hide_empty' => false,
+        'orderby'    => 'name',
+        'order'      => 'ASC'
+    ));
+    wp_cache_set('muop_all_genres_list', $genres, '', 3600);
+}
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?> data-theme="light">
@@ -37,7 +43,99 @@ $genres = get_terms(array(
     </script>
     <link rel="profile" href="https://gmpg.org/xfn/11">
     <link rel="icon" type="image/png" href="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>">
-    <link rel="apple-touch-icon" href="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>">
+    <?php
+    // Cấu hình Open Graph & Social Share Meta Tags (Facebook, Zalo, Twitter, Telegram)
+    $og_site_name = get_bloginfo('name');
+    $og_type = 'website';
+    $og_title = wp_get_document_title();
+    $og_desc = get_bloginfo('description');
+    $og_url = home_url(add_query_arg(array(), $GLOBALS['wp']->request ?? ''));
+    $og_image = get_template_directory_uri() . '/assets/images/logo-icon.png';
+    $og_image_w = 600;
+    $og_image_h = 600;
+    $og_image_alt = $og_site_name;
+
+    if (is_singular('truyen')) {
+        $st_id = get_the_ID();
+        $og_type = 'book';
+        $og_title = get_the_title($st_id) . ' — ' . $og_site_name;
+        $raw_desc = get_post_field('post_content', $st_id);
+        if (!empty($raw_desc)) {
+            $og_desc = wp_trim_words(wp_strip_all_tags($raw_desc), 40, '...');
+        }
+        $og_url = get_permalink($st_id);
+
+        $thumb_id = get_post_thumbnail_id($st_id);
+        if ($thumb_id) {
+            $thumb_data = wp_get_attachment_image_src($thumb_id, 'full');
+            if ($thumb_data) {
+                $og_image = $thumb_data[0];
+                $og_image_w = $thumb_data[1] ?: 600;
+                $og_image_h = $thumb_data[2] ?: 800;
+            }
+        }
+        $og_image_alt = 'Ảnh bìa truyện ' . get_the_title($st_id);
+    } elseif (is_singular('chuong')) {
+        $ch_id = get_the_ID();
+        $st_id = (int) get_post_meta($ch_id, '_chuong_story_id', true);
+        if (!$st_id) {
+            $st_id = (int) wp_get_post_parent_id($ch_id);
+        }
+        $og_type = 'article';
+        $st_title = $st_id ? get_the_title($st_id) : '';
+        $og_title = get_the_title($ch_id) . ($st_title ? ' — ' . $st_title : '') . ' | ' . $og_site_name;
+        $raw_desc = get_post_field('post_content', $ch_id);
+        if (!empty($raw_desc)) {
+            $og_desc = wp_trim_words(wp_strip_all_tags($raw_desc), 40, '...');
+        }
+        $og_url = get_permalink($ch_id);
+
+        if ($st_id) {
+            $thumb_id = get_post_thumbnail_id($st_id);
+            if ($thumb_id) {
+                $thumb_data = wp_get_attachment_image_src($thumb_id, 'full');
+                if ($thumb_data) {
+                    $og_image = $thumb_data[0];
+                    $og_image_w = $thumb_data[1] ?: 600;
+                    $og_image_h = $thumb_data[2] ?: 800;
+                }
+            }
+            $og_image_alt = 'Ảnh bìa truyện ' . $st_title;
+        }
+    } elseif (is_tax('team_dich')) {
+        $term = get_queried_object();
+        if ($term && !is_wp_error($term)) {
+            $og_title = 'Team dịch ' . $term->name . ' — ' . $og_site_name;
+            if (!empty($term->description)) {
+                $og_desc = wp_trim_words(wp_strip_all_tags($term->description), 35, '...');
+            }
+            $og_url = get_term_link($term);
+            $team_avatar_id = (int) get_term_meta($term->term_id, '_team_avatar_id', true);
+            if ($team_avatar_id) {
+                $avatar_url = wp_get_attachment_url($team_avatar_id);
+                if ($avatar_url) $og_image = $avatar_url;
+            }
+        }
+    }
+    ?>
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:site_name" content="<?php echo esc_attr($og_site_name); ?>">
+    <meta property="og:type" content="<?php echo esc_attr($og_type); ?>">
+    <meta property="og:title" content="<?php echo esc_attr($og_title); ?>">
+    <meta property="og:description" content="<?php echo esc_attr($og_desc); ?>">
+    <meta property="og:url" content="<?php echo esc_url($og_url); ?>">
+    <meta property="og:image" content="<?php echo esc_url($og_image); ?>">
+    <meta property="og:image:secure_url" content="<?php echo esc_url($og_image); ?>">
+    <meta property="og:image:width" content="<?php echo esc_attr($og_image_w); ?>">
+    <meta property="og:image:height" content="<?php echo esc_attr($og_image_h); ?>">
+    <meta property="og:image:alt" content="<?php echo esc_attr($og_image_alt); ?>">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?php echo esc_attr($og_title); ?>">
+    <meta name="twitter:description" content="<?php echo esc_attr($og_desc); ?>">
+    <meta name="twitter:image" content="<?php echo esc_url($og_image); ?>">
+
     <?php wp_head(); ?>
 </head>
 <body <?php body_class(); ?>>
@@ -248,8 +346,9 @@ $genres = get_terms(array(
                         <?php
                         if (!empty($genres) && !is_wp_error($genres)) :
                             foreach ($genres as $genre) :
+                                $is_curr_genre = (is_tax('the_loai', $genre->term_id) || (isset($_GET['the_loai']) && $_GET['the_loai'] === $genre->slug));
                         ?>
-                            <a href="<?php echo esc_url(get_term_link($genre)); ?>">
+                            <a href="<?php echo esc_url(get_term_link($genre)); ?>" class="<?php echo $is_curr_genre ? 'is-active' : ''; ?>" title="<?php echo esc_attr($genre->name); ?>">
                                 <?php echo esc_html($genre->name); ?>
                             </a>
                         <?php 

@@ -150,6 +150,176 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                 </div>
             </div>
 
+            <!-- CENTER 2.5: TÙY CHỌN HẸN GIỜ ĐĂNG TRUYỆN -->
+            <div class="schedule-story-card" style="background: var(--bg-card); padding: 18px 20px; border-radius: var(--radius-md); border: 1.5px dashed #8b5cf6; margin-bottom: 22px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 0;">
+                        <input type="checkbox" id="toggleScheduleStory" name="enable_schedule" value="1" onchange="muopToggleScheduleBox(this.checked)" style="width: 18px; height: 18px; accent-color: #7c3aed; cursor: pointer;" />
+                        <span style="font-weight: 700; font-size: 14.5px; color: #6d28d9;">
+                            <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Hẹn Giờ Đăng Truyện
+                        </span>
+                    </label>
+                    <span class="badge" style="background: #f5f3ff; color: #7c3aed; font-size: 12px; border: 1px solid #ddd6fe;">
+                        Tự động phát hành theo lịch
+                    </span>
+                </div>
+
+                <div id="scheduleTimeCollapse" style="display: none; margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e2e8f0;">
+                    <div style="margin-bottom: 12px;">
+                        <label class="form-label" style="font-weight: 700; font-size: 13.5px; color: #6d28d9; margin-bottom: 8px; display: block;">
+                            <i class="fa-solid fa-calendar-days"></i> Chọn ngày & giờ đăng truyện (*):
+                        </label>
+                        
+                        <!-- Bộ chọn Ngày và 24 Giờ chuẩn Việt Nam (Không AM/PM) -->
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
+                            <!-- Ngày -->
+                            <div style="flex: 1.2; min-width: 140px;">
+                                <input type="date" id="storySchedDate" class="form-input" min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" onchange="muopSyncDangTruyenSchedule()" style="height: 38px; font-size: 13.5px; font-weight: 600;" />
+                            </div>
+
+                            <!-- Giờ (24 giờ: 00 đến 23) -->
+                            <div style="flex: 1; min-width: 110px;">
+                                <select id="storySchedHour" class="form-input" onchange="muopSyncDangTruyenSchedule()" style="height: 38px; font-size: 13.5px; font-weight: 600;">
+                                    <?php for ($h = 0; $h < 24; $h++): 
+                                        $h_str = str_pad($h, 2, '0', STR_PAD_LEFT);
+                                        $suffix = '';
+                                        if ($h >= 0 && $h < 6) $suffix = ' (đêm)';
+                                        elseif ($h >= 6 && $h < 11) $suffix = ' (sáng)';
+                                        elseif ($h >= 11 && $h < 13) $suffix = ' (trưa)';
+                                        elseif ($h >= 13 && $h < 18) $suffix = ' (chiều)';
+                                        else $suffix = ' (tối)';
+                                    ?>
+                                        <option value="<?php echo $h_str; ?>"><?php echo $h_str . ' giờ' . $suffix; ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+
+                            <!-- Phút (00 đến 55) -->
+                            <div style="flex: 0.9; min-width: 95px;">
+                                <select id="storySchedMinute" class="form-input" onchange="muopSyncDangTruyenSchedule()" style="height: 38px; font-size: 13.5px; font-weight: 600;">
+                                    <?php for ($m = 0; $m < 60; $m += 5): 
+                                        $m_str = str_pad($m, 2, '0', STR_PAD_LEFT);
+                                    ?>
+                                        <option value="<?php echo $m_str; ?>"><?php echo $m_str . ' phút'; ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Input ẩn gửi dữ liệu chuẩn YYYY-MM-DD HH:MM:00 về backend -->
+                        <input type="hidden" id="storyScheduledTime" name="scheduled_time" value="" />
+
+                        <!-- Xem trước thời gian hẹn -->
+                        <div id="storySchedPreview" style="font-size: 12.5px; font-weight: 700; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 6px; padding: 6px 12px; margin-bottom: 12px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-clock"></i> <span>Thời gian chọn: --:-- ngày --/--/----</span>
+                        </div>
+                    </div>
+
+                    <!-- Gợi ý chọn nhanh thời gian -->
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        <span style="font-size: 12.5px; color: var(--text-muted); font-weight: 600;">Gợi ý nhanh:</span>
+                        <button type="button" class="btn btn-outline btn-quick-sched" data-hours="1" onclick="muopSetQuickSchedule(1, null)" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;">+1 Giờ</button>
+                        <button type="button" class="btn btn-outline btn-quick-sched" data-hours="3" onclick="muopSetQuickSchedule(3, null)" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;">+3 Giờ</button>
+                        <button type="button" class="btn btn-outline btn-quick-sched" data-preset="tonight" onclick="muopSetQuickSchedule(null, 'tonight')" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;">Tối nay (20:00)</button>
+                        <button type="button" class="btn btn-outline btn-quick-sched" data-preset="tomorrow_morning" onclick="muopSetQuickSchedule(null, 'tomorrow_morning')" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;">Sáng mai (08:00)</button>
+                    </div>
+
+                    <p style="font-size: 12.5px; color: var(--text-muted); margin: 10px 0 0 0;">
+                        <i class="fa-solid fa-circle-info" style="color: #8b5cf6;"></i> Truyện sẽ được lưu ở trạng thái <strong>Đã hẹn giờ</strong> và sẽ tự động chuyển thành công khai đúng mốc thời gian bạn đã chọn.
+                    </p>
+                </div>
+            </div>
+
+            <script>
+            function muopPad2(n) { return String(n).padStart(2, '0'); }
+
+            function muopSyncDangTruyenSchedule() {
+                var dEl = document.getElementById('storySchedDate');
+                var hEl = document.getElementById('storySchedHour');
+                var mEl = document.getElementById('storySchedMinute');
+                var hiddenEl = document.getElementById('storyScheduledTime');
+                var prevEl = document.getElementById('storySchedPreview');
+
+                if (!dEl || !hEl || !mEl || !hiddenEl) return;
+                var dVal = dEl.value;
+                var hVal = hEl.value;
+                var mVal = mEl.value;
+                if (!dVal) return;
+
+                hiddenEl.value = dVal + ' ' + hVal + ':' + mVal + ':00';
+
+                var dParts = dVal.split('-');
+                if (dParts.length === 3 && prevEl) {
+                    var dateFmt = dParts[2] + '/' + dParts[1] + '/' + dParts[0];
+                    prevEl.innerHTML = '<i class="fa-solid fa-clock"></i> <span>Dự kiến đăng: <strong>' + hVal + ':' + mVal + ' ngày ' + dateFmt + '</strong> (Giờ Việt Nam)</span>';
+                }
+            }
+
+            function muopToggleScheduleBox(isChecked) {
+                var collapse = document.getElementById('scheduleTimeCollapse');
+                if (collapse) {
+                    collapse.style.display = isChecked ? 'block' : 'none';
+                }
+                var btnText = document.getElementById('btnSubmitStoryText');
+                if (btnText) {
+                    btnText.textContent = isChecked ? 'Lên Lịch Đăng' : 'Đăng Truyện';
+                }
+                var btnIcon = document.getElementById('btnSubmitStoryIcon');
+                if (btnIcon) {
+                    if (isChecked) {
+                        btnIcon.classList.remove('fa-cloud-arrow-up');
+                        btnIcon.classList.add('fa-clock');
+                    } else {
+                        btnIcon.classList.remove('fa-clock');
+                        btnIcon.classList.add('fa-cloud-arrow-up');
+                    }
+                }
+                var timeInput = document.getElementById('storyScheduledTime');
+                if (isChecked && (!timeInput || !timeInput.value)) {
+                    muopSetQuickSchedule(3, null);
+                }
+            }
+
+            function muopSetQuickSchedule(hours, preset) {
+                var d = new Date();
+                if (preset === 'tonight') {
+                    d.setHours(20, 0, 0, 0);
+                    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+                } else if (preset === 'tomorrow_morning') {
+                    d.setDate(d.getDate() + 1);
+                    d.setHours(8, 0, 0, 0);
+                } else if (hours) {
+                    d.setHours(d.getHours() + parseInt(hours, 10));
+                    var m = Math.ceil(d.getMinutes() / 5) * 5;
+                    if (m >= 60) {
+                        d.setHours(d.getHours() + 1);
+                        m = 0;
+                    }
+                    d.setMinutes(m, 0, 0);
+                }
+
+                var dEl = document.getElementById('storySchedDate');
+                var hEl = document.getElementById('storySchedHour');
+                var mEl = document.getElementById('storySchedMinute');
+
+                if (dEl) dEl.value = d.getFullYear() + '-' + muopPad2(d.getMonth() + 1) + '-' + muopPad2(d.getDate());
+                if (hEl) hEl.value = muopPad2(d.getHours());
+                if (mEl) {
+                    var rM = Math.floor(d.getMinutes() / 5) * 5;
+                    if (rM >= 60) rM = 55;
+                    mEl.value = muopPad2(rM);
+                }
+
+                muopSyncDangTruyenSchedule();
+
+                var chk = document.getElementById('toggleScheduleStory');
+                if (chk && !chk.checked) {
+                    chk.checked = true;
+                    muopToggleScheduleBox(true);
+                }
+            }
+            </script>
+
             <input type="hidden" name="is_draft" id="isStoryDraftInput" value="0" />
 
             <!-- CENTER 3: BUTTONS THÊM, LƯU NHÁP & HỦY -->
@@ -161,7 +331,7 @@ $all_genres = get_terms(array('taxonomy' => 'the_loai', 'hide_empty' => false));
                     <i class="fa-solid fa-file-pen"></i> Lưu Nháp
                 </button>
                 <button type="submit" id="btnSubmitPublishStory" class="btn btn-primary" style="padding: 10px 28px; font-size: 15px;">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Đăng Truyện
+                    <i class="fa-solid fa-cloud-arrow-up" id="btnSubmitStoryIcon"></i> <span id="btnSubmitStoryText">Đăng Truyện</span>
                 </button>
             </div>
         </form>

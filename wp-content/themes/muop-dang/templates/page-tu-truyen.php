@@ -122,16 +122,13 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
             <span style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html($curr_meta['title']); ?></span>
         </nav>
 
-        <!-- HEADER SECTION -->
-        <div class="section-header tu-truyen-header" style="margin-bottom: 20px;">
+        <!-- HEADER SECTION (Đã bỏ dòng giới thiệu và thanh tabs theo yêu cầu) -->
+        <div class="section-header tu-truyen-header" style="margin-bottom: 24px;">
             <div>
                 <h1 class="section-title">
                     <i class="<?php echo esc_attr($curr_meta['icon']); ?>" style="color: <?php echo esc_attr($curr_meta['color']); ?>; margin-right: 8px;"></i>
                     <?php echo esc_html($curr_meta['title']); ?>
                 </h1>
-                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
-                    <?php echo esc_html($curr_meta['subtitle']); ?>
-                </p>
             </div>
             
             <?php if ($current_tab === 'history' && $count_history > 0) : ?>
@@ -139,40 +136,6 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
                     <i class="fa-solid fa-trash-can"></i> Xóa Tất Cả Lịch Sử
                 </button>
             <?php endif; ?>
-        </div>
-
-        <!-- TAB NAVIGATION PILLS CHUẨN MENU YÊU CẦU -->
-        <div class="tu-truyen-tabs-bar">
-            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=saved')); ?>" class="tu-truyen-tab-pill <?php echo $current_tab === 'saved' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-bookmark"></i>
-                <span>Truyện đã lưu</span>
-                <span class="tab-badge"><?php echo $count_saved; ?></span>
-            </a>
-            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=favorites')); ?>" class="tu-truyen-tab-pill <?php echo $current_tab === 'favorites' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-heart" style="color: #f43f5e;"></i>
-                <span>Truyện yêu thích</span>
-                <span class="tab-badge"><?php echo $count_favorites; ?></span>
-            </a>
-            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=following')); ?>" class="tu-truyen-tab-pill <?php echo $current_tab === 'following' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-bell" style="color: #8b5cf6;"></i>
-                <span>Truyện đang theo dõi</span>
-                <span class="tab-badge"><?php echo $count_following; ?></span>
-            </a>
-            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=teams_favorite')); ?>" class="tu-truyen-tab-pill <?php echo $current_tab === 'teams_favorite' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-users-viewfinder" style="color: #ec4899;"></i>
-                <span>Team dịch đã yêu thích</span>
-                <span class="tab-badge"><?php echo $count_teams_fav; ?></span>
-            </a>
-            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=teams_following')); ?>" class="tu-truyen-tab-pill <?php echo $current_tab === 'teams_following' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-user-check" style="color: #10b981;"></i>
-                <span>Team dịch đang theo dõi</span>
-                <span class="tab-badge"><?php echo $count_teams_following; ?></span>
-            </a>
-            <a href="<?php echo esc_url(home_url('/tu-truyen/?tab=history')); ?>" class="tu-truyen-tab-pill <?php echo $current_tab === 'history' ? 'active' : ''; ?>">
-                <i class="fa-solid fa-clock-rotate-left" style="color: #0284c7;"></i>
-                <span>Truyện đã đọc</span>
-                <span class="tab-badge"><?php echo $count_history; ?></span>
-            </a>
         </div>
 
         <!-- ==================== TAB 1: TRUYỆN ĐÃ LƯU ==================== -->

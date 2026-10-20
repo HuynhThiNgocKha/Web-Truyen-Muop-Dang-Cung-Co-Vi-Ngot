@@ -321,6 +321,14 @@ if (!defined('ABSPATH')) exit;
     </div>
 </div>
 
+<?php 
+// Include Modal Xem & Quản Lý Lịch Hẹn Giờ Đăng Truyện
+$schedule_modal_file = get_template_directory() . '/templates/modal-schedule-story.php';
+if (file_exists($schedule_modal_file)) {
+    include $schedule_modal_file;
+}
+?>
+
 <?php wp_footer(); ?>
 </body>
 </html>

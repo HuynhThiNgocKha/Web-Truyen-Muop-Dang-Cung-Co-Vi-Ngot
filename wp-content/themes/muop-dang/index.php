@@ -25,47 +25,59 @@ get_header();
         </div>
     </div>
 
-    <!-- 1. MỤC TRUYỆN ĐỀ CỬ (12 TRUYỆN) -->
-    <section class="section-block">
+    <!-- 1. MỤC TRUYỆN ĐỀ CỬ (TỐI ĐA 12 TRUYỆN - KÉO QUA LẠI) -->
+    <section class="section-block section-nominated-carousel">
         <div class="section-header">
             <h2 class="section-title">
                 <i class="fa-solid fa-star"></i> Truyện Đề Cử
             </h2>
+            <div class="carousel-nav-arrows">
+                <button type="button" class="carousel-arrow-btn carousel-prev" id="btnNominatedPrev" aria-label="Kéo sang trái">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button type="button" class="carousel-arrow-btn carousel-next" id="btnNominatedNext" aria-label="Kéo sang phải">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
         </div>
 
-        <div class="story-grid">
-            <?php
-            $query_nominate = new WP_Query(array(
-                'post_type'      => 'truyen',
-                'posts_per_page' => 12,
-                'post_status'    => 'publish',
-                'meta_query'     => array(
-                    'relation' => 'OR',
-                    array(
-                        'key'     => '_truyen_nominated',
-                        'value'   => array('day', 'week', 'month'),
-                        'compare' => 'IN'
+        <div class="story-carousel-wrap">
+            <div class="story-carousel-track story-nominated-track" id="nominatedStoryTrack">
+                <?php
+                $query_nominate = new WP_Query(array(
+                    'post_type'      => 'truyen',
+                    'posts_per_page' => 12,
+                    'post_status'    => 'publish',
+                    'meta_query'     => array(
+                        'relation' => 'OR',
+                        array(
+                            'key'     => '_truyen_nominated',
+                            'value'   => array('day', 'week', 'month'),
+                            'compare' => 'IN'
+                        ),
+                        array(
+                            'key'     => '_truyen_views',
+                            'value'   => 0,
+                            'compare' => '>='
+                        )
                     ),
-                    array(
-                        'key'     => '_truyen_views',
-                        'value'   => 0,
-                        'compare' => '>='
-                    )
-                ),
-                'orderby'        => 'meta_value_num',
-                'meta_key'       => '_truyen_views',
-                'order'          => 'DESC'
-            ));
+                    'orderby'        => 'meta_value_num',
+                    'meta_key'       => '_truyen_views',
+                    'order'          => 'DESC'
+                ));
 
-            if ($query_nominate->have_posts()) :
-                while ($query_nominate->have_posts()) : $query_nominate->the_post();
-                    get_template_part('template-parts/story-card');
-                endwhile;
-                wp_reset_postdata();
-            else :
-                echo '<p style="grid-column: 1/-1; color: var(--text-muted); text-align: center; padding: 20px;">Chưa có truyện đề cử nào.</p>';
-            endif;
-            ?>
+                if ($query_nominate->have_posts()) :
+                    while ($query_nominate->have_posts()) : $query_nominate->the_post();
+                        get_template_part('template-parts/story-card');
+                    endwhile;
+                    wp_reset_postdata();
+                else :
+                    echo '<p style="color: var(--text-muted); text-align: center; padding: 20px; width: 100%;">Chưa có truyện đề cử nào.</p>';
+                endif;
+                ?>
+            </div>
+            <!-- Các dấu chấm màu xanh chỉ báo vị trí truyện đề cử -->
+            <div class="story-carousel-dots" id="nominatedStoryDots" aria-label="Chỉ báo vị trí truyện đề cử"></div>
         </div>
     </section>
 

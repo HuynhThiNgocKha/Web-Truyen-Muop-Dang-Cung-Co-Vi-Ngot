@@ -2,6 +2,7 @@
 /**
  * Template Name: Trang Thể Loại
  * Taxonomy / Page Thể Loại Truyện
+ * Thiết kế giao diện chuẩn Hình 1 & Hình 2 (dammyy)
  */
 if (!defined('ABSPATH')) exit;
 
@@ -22,16 +23,26 @@ if ($queried_obj instanceof WP_Term && $queried_obj->taxonomy === 'the_loai') {
 }
 $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
 
-$all_genres = get_terms(array(
-    'taxonomy'   => 'the_loai',
-    'hide_empty' => false,
-));
+// Cache danh mục thể loại để tăng tốc độ tải trang
+$all_genres = wp_cache_get('muop_all_genres_list');
+if ($all_genres === false) {
+    $all_genres = get_terms(array(
+        'taxonomy'   => 'the_loai',
+        'hide_empty' => false,
+        'orderby'    => 'name',
+        'order'      => 'ASC',
+    ));
+    wp_cache_set('muop_all_genres_list', $all_genres, '', 3600);
+}
 
+// Truy vấn truyện: luôn sắp xếp truyện mới nhất trước
 $query_args = array(
     'post_type'      => 'truyen',
     'posts_per_page' => 20,
     'post_status'    => 'publish',
-    'paged'          => $paged
+    'paged'          => $paged,
+    'orderby'        => 'date',
+    'order'          => 'DESC'
 );
 
 if (!empty($current_genre_slug)) {
@@ -45,6 +56,9 @@ if (!empty($current_genre_slug)) {
 }
 
 $query = new WP_Query($query_args);
+
+// Tiêu đề trang: TRUYỆN [TÊN THỂ LOẠI] (In hoa, đậm)
+$page_heading = !empty($current_genre_slug) ? ('TRUYỆN ' . mb_strtoupper($genre_title, 'UTF-8')) : 'TẤT CẢ THỂ LOẠI';
 ?>
 
 <div class="container">
@@ -59,36 +73,44 @@ $query = new WP_Query($query_args);
             <?php endif; ?>
         </nav>
 
-        <!-- Danh sách tất cả thể loại (Pill Filter) -->
-        <div style="background: var(--bg-card); padding: 18px 20px; border-radius: var(--radius-md); border: 1px solid var(--border-light); margin-bottom: 24px;">
-            <div style="font-size: 13.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-                <i class="fa-solid fa-filter" style="color: var(--primary-green);"></i> Chọn Thể Loại Truyện:
-            </div>
-            <div class="genre-tag-list">
-                <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="genre-pill <?php echo empty($current_genre_slug) ? 'active' : ''; ?>" style="<?php echo empty($current_genre_slug) ? 'background: var(--primary-green); color: #fff;' : ''; ?>">
-                    Tất Cả
-                </a>
-                <?php if (!empty($all_genres) && !is_wp_error($all_genres)) : ?>
-                    <?php foreach ($all_genres as $g) : 
-                        $is_active = ($g->slug === $current_genre_slug);
-                    ?>
-                        <a href="<?php echo esc_url(get_term_link($g)); ?>" class="genre-pill" style="<?php echo $is_active ? 'background: var(--primary-green); color: #fff;' : ''; ?>">
-                            <?php echo esc_html($g->name); ?> (<?php echo $g->count; ?>)
-                        </a>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <div class="section-header">
-            <h1 class="section-title">
-                <i class="fa-solid fa-tags"></i> Thể Loại: <?php echo esc_html($genre_title); ?>
+        <!-- Tiêu đề TRUYỆN [TÊN THỂ LOẠI] (Đã bỏ phần sắp xếp, chiếm trọn 1 hàng) -->
+        <div class="genre-page-top-bar">
+            <h1 class="genre-page-title">
+                <?php echo esc_html($page_heading); ?>
             </h1>
-            <span style="font-size: 13.5px; color: var(--text-muted);">
-                Hiển thị <?php echo $query->found_posts; ?> truyện phù hợp
-            </span>
         </div>
 
+        <!-- Khung Menu Thể Loại (Mặc định ẩn đi để hiện danh sách truyện, bấm vào mới hiện menu theo yêu cầu) -->
+        <div class="genre-selector-card is-collapsed" id="genreSelectorCard">
+            <div class="genre-selector-header" id="genreSelectorHeader" role="button" tabindex="0" aria-label="Đóng mở danh sách thể loại">
+                <span class="genre-selector-title">
+                    <i class="fa-solid fa-layer-group" style="font-size: 14px; color: var(--primary-green);"></i> Thể Loại
+                </span>
+                <button type="button" class="genre-selector-arrow-btn" id="btnGenreSelectorArrow" aria-label="Thu gọn hoặc mở rộng danh sách thể loại">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+            </div>
+
+            <div class="genre-selector-body" id="genreSelectorBody">
+                <div class="genre-selector-grid">
+                    <a href="<?php echo esc_url(home_url('/the-loai/')); ?>" class="genre-box-btn <?php echo empty($current_genre_slug) ? 'is-active' : ''; ?>">
+                        Tất Cả Thể Loại
+                    </a>
+                    <?php if (!empty($all_genres) && !is_wp_error($all_genres)) : ?>
+                        <?php foreach ($all_genres as $g) : 
+                            $is_active = ($g->slug === $current_genre_slug);
+                            $item_url = get_term_link($g);
+                        ?>
+                            <a href="<?php echo esc_url($item_url); ?>" class="genre-box-btn <?php echo $is_active ? 'is-active' : ''; ?>" title="<?php echo esc_attr($g->name); ?>">
+                                <?php echo esc_html($g->name); ?>
+                            </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danh sách truyện dạng card (Sắp xếp mới nhất trước) -->
         <div class="story-grid">
             <?php
             if ($query->have_posts()) :
@@ -119,6 +141,46 @@ $query = new WP_Query($query_args);
         ?>
     </div>
 </div>
+
+<script>
+(function() {
+    function initGenreSelectorToggle() {
+        var card = document.getElementById('genreSelectorCard');
+        var header = document.getElementById('genreSelectorHeader');
+        var arrow = document.getElementById('btnGenreSelectorArrow');
+        if (!card || !header) return;
+
+        function toggleGenreCard(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            card.classList.toggle('is-collapsed');
+        }
+
+        header.addEventListener('click', toggleGenreCard);
+        header.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleGenreCard(e);
+            }
+        });
+
+        if (arrow && arrow !== header) {
+            arrow.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleGenreCard(e);
+            });
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initGenreSelectorToggle);
+    } else {
+        initGenreSelectorToggle();
+    }
+})();
+</script>
 
 <?php
 get_footer();

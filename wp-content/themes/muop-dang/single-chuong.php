@@ -46,6 +46,29 @@ $story_post_author  = $story ? (int) $story->post_author : 0;
 $is_admin_user      = muop_is_admin();
 $is_own_story       = ($current_uid > 0 && ($current_uid === $story_post_author || ($story_id && muop_can_user_manage_story_frontend($story_id, $current_uid))));
 
+$story_post_status = $story ? $story->post_status : 'publish';
+$is_story_hidden   = $story_id ? (bool) get_post_meta($story_id, '_truyen_is_hidden', true) : false;
+
+// Nếu truyện chưa công khai (future, draft, trash hoặc bị ẩn) mà người xem KHÔNG PHẢI là Admin và KHÔNG PHẢI chính dịch giả truyện:
+if (!$is_admin_user && !$is_own_story && ($story_post_status === 'future' || $story_post_status === 'draft' || $story_post_status === 'trash' || $is_story_hidden)) {
+    status_header(404);
+    nocache_headers();
+    ?>
+    <div class="container" style="padding: 60px 16px; text-align: center;">
+        <div style="max-width: 500px; margin: 0 auto; background: var(--bg-card); padding: 40px 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);">
+            <div style="font-size: 64px; color: var(--text-muted); margin-bottom: 16px;"><i class="fa-solid fa-file-circle-question"></i></div>
+            <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">Không tìm thấy chương</h1>
+            <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6; margin-bottom: 24px;">Truyện này hiện không tồn tại, đã bị ẩn hoặc chưa đến thời gian phát hành công khai.</p>
+            <a href="<?php echo esc_url(home_url('/')); ?>" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-house"></i> Về Trang Chủ
+            </a>
+        </div>
+    </div>
+    <?php
+    get_footer();
+    exit;
+}
+
 // Quy tắc hiển thị link Shopee Gatekeeper:
 // - Nếu là Admin HOẶC Dịch giả đọc truyện của chính mình: MIỄN NHIỄM HOÀN TOÀN (không khóa chương, không popup Shopee)
 // - Truyện có 3 hoặc 4 chương: Xuất hiện ở chương 1 và chương 3
@@ -76,6 +99,21 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
             <i class="fa-solid fa-angle-right breadcrumb-chapter-sep" style="font-size: 11px;"></i>
             <span class="breadcrumb-chapter-current" style="color: var(--primary-green); font-weight: 600;"><?php echo esc_html(muop_get_clean_chapter_title(get_the_title())); ?></span>
         </nav>
+
+        <?php if ($story_post_status === 'future') : 
+            $ch_sched_time = get_post_meta($story_id, '_truyen_scheduled_time', true) ?: ($story ? $story->post_date : '');
+            $ch_sched_fmt  = $ch_sched_time ? date_i18n('H:i - d/m/Y', strtotime($ch_sched_time)) : '';
+        ?>
+            <div style="background: linear-gradient(135deg, #f5f3ff, #faf5ff); border: 1px solid #c4b5fd; border-radius: var(--radius-sm); padding: 10px 16px; margin-bottom: 16px; font-size: 13px; color: #5b21b6; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.05);">
+                <i class="fa-solid fa-clock-rotate-left" style="font-size: 16px; color: #7c3aed;"></i>
+                <span><strong>Chế độ xem trước (Dịch giả / Quản trị viên):</strong> Bộ truyện này đang được lên lịch hẹn giờ công khai vào lúc <strong><?php echo esc_html($ch_sched_fmt); ?></strong>. Độc giả bình thường chưa thể xem chương này.</span>
+            </div>
+        <?php elseif ($story_post_status === 'draft' || $is_story_hidden) : ?>
+            <div style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; border-radius: var(--radius-sm); padding: 10px 16px; margin-bottom: 16px; font-size: 13px; color: #92400e; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 4px rgba(217, 119, 6, 0.05);">
+                <i class="fa-solid fa-eye-slash" style="font-size: 16px; color: #d97706;"></i>
+                <span><strong>Chế độ xem trước (Dịch giả / Quản trị viên):</strong> Bộ truyện này đang ở trạng thái Ẩn (Bản nháp). Độc giả bình thường chưa thể xem chương này.</span>
+            </div>
+        <?php endif; ?>
 
         <!-- CENTER 2: TOOLBAR ĐIỀU HƯỚNG CHƯƠNG TRƯỚC, 3 GẠCH DANH SÁCH, CHƯƠNG SAU & ĐIỀU CHỈNH CỠ CHỮ -->
         <div class="reading-toolbar-top">

@@ -116,6 +116,155 @@ if (is_wp_error($all_genres)) $all_genres = array();
                     <textarea id="editStoryDescription" name="description" class="form-input form-textarea-large" rows="10" style="min-height: 220px; font-size: 14.5px; line-height: 1.6;" required></textarea>
                 </div>
 
+                <!-- Tùy Chọn Hẹn Giờ Đăng Truyện Trong Modal Sửa -->
+                <div class="schedule-story-card" style="background: var(--bg-body); padding: 14px 16px; border-radius: var(--radius-sm); border: 1.5px dashed #8b5cf6; margin-bottom: 18px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 0;">
+                            <input type="checkbox" id="editToggleScheduleStory" name="enable_schedule" value="1" onchange="muopToggleEditScheduleBox(this.checked)" style="width: 17px; height: 17px; accent-color: #7c3aed; cursor: pointer;" />
+                            <span style="font-weight: 700; font-size: 13.5px; color: #6d28d9;">
+                                <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Hẹn Giờ / Đổi Giờ Phát Hành
+                            </span>
+                        </label>
+                        <span id="editStoryCurrentScheduleBadge" class="badge" style="display: none; background: #f5f3ff; color: #7c3aed; font-size: 11.5px; border: 1px solid #ddd6fe;"></span>
+                    </div>
+
+                    <div id="editScheduleTimeCollapse" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;">
+                        <div style="margin-bottom: 10px;">
+                            <label class="form-label" style="font-weight: 700; font-size: 13px; color: #6d28d9; margin-bottom: 6px; display: block;">
+                                <i class="fa-solid fa-calendar-days"></i> Chọn ngày & giờ hẹn mới (Chuẩn 24 Giờ Việt Nam):
+                            </label>
+
+                            <!-- Bộ chọn Ngày và 24 Giờ chuẩn Việt Nam (Không AM/PM) -->
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
+                                <!-- Ngày -->
+                                <div style="flex: 1.2; min-width: 140px;">
+                                    <input type="date" id="editStorySchedDate" class="form-input" min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" onchange="muopSyncEditStorySchedule()" style="height: 36px; font-size: 13px; font-weight: 600;" />
+                                </div>
+
+                                <!-- Giờ (24 giờ: 00 đến 23) -->
+                                <div style="flex: 1; min-width: 105px;">
+                                    <select id="editStorySchedHour" class="form-input" onchange="muopSyncEditStorySchedule()" style="height: 36px; font-size: 13px; font-weight: 600;">
+                                        <?php for ($h = 0; $h < 24; $h++): 
+                                            $h_str = str_pad($h, 2, '0', STR_PAD_LEFT);
+                                            $suffix = '';
+                                            if ($h >= 0 && $h < 6) $suffix = ' (đêm)';
+                                            elseif ($h >= 6 && $h < 11) $suffix = ' (sáng)';
+                                            elseif ($h >= 11 && $h < 13) $suffix = ' (trưa)';
+                                            elseif ($h >= 13 && $h < 18) $suffix = ' (chiều)';
+                                            else $suffix = ' (tối)';
+                                        ?>
+                                            <option value="<?php echo $h_str; ?>"><?php echo $h_str . ' giờ' . $suffix; ?></option>
+                                        <?php endfor; ?>
+                                    </select>
+                                </div>
+
+                                <!-- Phút (00 đến 55) -->
+                                <div style="flex: 0.9; min-width: 90px;">
+                                    <select id="editStorySchedMinute" class="form-input" onchange="muopSyncEditStorySchedule()" style="height: 36px; font-size: 13px; font-weight: 600;">
+                                        <?php for ($m = 0; $m < 60; $m += 5): 
+                                            $m_str = str_pad($m, 2, '0', STR_PAD_LEFT);
+                                        ?>
+                                            <option value="<?php echo $m_str; ?>"><?php echo $m_str . ' phút'; ?></option>
+                                        <?php endfor; ?>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Input ẩn gửi dữ liệu chuẩn YYYY-MM-DD HH:MM:00 về backend -->
+                            <input type="hidden" id="editStoryScheduledTime" name="scheduled_time" value="" />
+
+                            <!-- Xem trước thời gian hẹn -->
+                            <div id="editStorySchedPreview" style="font-size: 12px; font-weight: 700; color: #6d28d9; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 6px; padding: 5px 10px; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-clock"></i> <span>Thời gian chọn: --:-- ngày --/--/----</span>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
+                            <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Gợi ý nhanh:</span>
+                            <button type="button" class="btn btn-outline btn-quick-edit-sched" data-hours="1" onclick="muopSetQuickEditSchedule(1, null)" style="padding: 3px 8px; font-size: 11.5px; border-radius: 4px;">+1 Giờ</button>
+                            <button type="button" class="btn btn-outline btn-quick-edit-sched" data-hours="3" onclick="muopSetQuickEditSchedule(3, null)" style="padding: 3px 8px; font-size: 11.5px; border-radius: 4px;">+3 Giờ</button>
+                            <button type="button" class="btn btn-outline btn-quick-edit-sched" data-preset="tonight" onclick="muopSetQuickEditSchedule(null, 'tonight')" style="padding: 3px 8px; font-size: 11.5px; border-radius: 4px;">Tối nay (20:00)</button>
+                            <button type="button" class="btn btn-outline btn-quick-edit-sched" data-preset="tomorrow_morning" onclick="muopSetQuickEditSchedule(null, 'tomorrow_morning')" style="padding: 3px 8px; font-size: 11.5px; border-radius: 4px;">Sáng mai (08:00)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                function muopPad2Edit(n) { return String(n).padStart(2, '0'); }
+
+                function muopSyncEditStorySchedule() {
+                    var dEl = document.getElementById('editStorySchedDate');
+                    var hEl = document.getElementById('editStorySchedHour');
+                    var mEl = document.getElementById('editStorySchedMinute');
+                    var hiddenEl = document.getElementById('editStoryScheduledTime');
+                    var prevEl = document.getElementById('editStorySchedPreview');
+
+                    if (!dEl || !hEl || !mEl || !hiddenEl) return;
+                    var dVal = dEl.value;
+                    var hVal = hEl.value;
+                    var mVal = mEl.value;
+                    if (!dVal) return;
+
+                    hiddenEl.value = dVal + ' ' + hVal + ':' + mVal + ':00';
+
+                    var dParts = dVal.split('-');
+                    if (dParts.length === 3 && prevEl) {
+                        var dateFmt = dParts[2] + '/' + dParts[1] + '/' + dParts[0];
+                        prevEl.innerHTML = '<i class="fa-solid fa-clock"></i> <span>Thời gian hẹn: <strong>' + hVal + ':' + mVal + ' ngày ' + dateFmt + '</strong> (Giờ Việt Nam)</span>';
+                    }
+                }
+
+                function muopToggleEditScheduleBox(isChecked) {
+                    var collapse = document.getElementById('editScheduleTimeCollapse');
+                    if (collapse) {
+                        collapse.style.display = isChecked ? 'block' : 'none';
+                    }
+                    var timeInput = document.getElementById('editStoryScheduledTime');
+                    if (isChecked && (!timeInput || !timeInput.value)) {
+                        muopSetQuickEditSchedule(3, null);
+                    }
+                }
+
+                function muopSetQuickEditSchedule(hours, preset) {
+                    var d = new Date();
+                    if (preset === 'tonight') {
+                        d.setHours(20, 0, 0, 0);
+                        if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+                    } else if (preset === 'tomorrow_morning') {
+                        d.setDate(d.getDate() + 1);
+                        d.setHours(8, 0, 0, 0);
+                    } else if (hours) {
+                        d.setHours(d.getHours() + parseInt(hours, 10));
+                        var m = Math.ceil(d.getMinutes() / 5) * 5;
+                        if (m >= 60) {
+                            d.setHours(d.getHours() + 1);
+                            m = 0;
+                        }
+                        d.setMinutes(m, 0, 0);
+                    }
+
+                    var dEl = document.getElementById('editStorySchedDate');
+                    var hEl = document.getElementById('editStorySchedHour');
+                    var mEl = document.getElementById('editStorySchedMinute');
+
+                    if (dEl) dEl.value = d.getFullYear() + '-' + muopPad2Edit(d.getMonth() + 1) + '-' + muopPad2Edit(d.getDate());
+                    if (hEl) hEl.value = muopPad2Edit(d.getHours());
+                    if (mEl) {
+                        var rM = Math.floor(d.getMinutes() / 5) * 5;
+                        if (rM >= 60) rM = 55;
+                        mEl.value = muopPad2Edit(rM);
+                    }
+
+                    muopSyncEditStorySchedule();
+
+                    var chk = document.getElementById('editToggleScheduleStory');
+                    if (chk && !chk.checked) {
+                        chk.checked = true;
+                        muopToggleEditScheduleBox(true);
+                    }
+                }
+                </script>
+
                 <!-- Buttons Hủy, Lưu Nháp & Cập Nhật Truyện -->
                 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
                     <button type="button" class="btn btn-secondary btn-close-modal-story-info">Hủy</button>

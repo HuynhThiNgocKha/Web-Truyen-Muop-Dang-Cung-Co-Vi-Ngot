@@ -44,7 +44,7 @@ $unauthorized_story_error = false;
 $story_args = array(
     'post_type'      => 'truyen',
     'posts_per_page' => -1,
-    'post_status'    => array('publish', 'pending', 'draft')
+    'post_status'    => array('publish', 'pending', 'draft', 'future')
 );
 if ($is_admin && $from_admin) {
     $user_stories = get_posts($story_args);
@@ -158,9 +158,17 @@ if ($selected_story_id) {
                             } elseif ($from === 'admin') {
                                 $opt_url = add_query_arg('from', 'admin', $opt_url);
                             }
+                            $st_tag = '';
+                            if ($st->post_status === 'future') {
+                                $st_tag = ' (⏰ Đang hẹn giờ)';
+                            } elseif ($st->post_status === 'draft') {
+                                $st_tag = ' (👁️ Đang ẩn / Bản nháp)';
+                            } elseif ($st->post_status === 'pending') {
+                                $st_tag = ' (⏳ Chờ duyệt)';
+                            }
                         ?>
                             <option value="<?php echo esc_attr($st->ID); ?>" data-url="<?php echo esc_url($opt_url); ?>" <?php selected($st->ID, $selected_story_id); ?>>
-                                <?php echo esc_html($st->post_title); ?>
+                                <?php echo esc_html($st->post_title . $st_tag); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

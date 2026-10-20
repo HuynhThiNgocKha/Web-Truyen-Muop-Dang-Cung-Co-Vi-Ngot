@@ -697,16 +697,9 @@
     config: {
       storageKeyFirst: 'muop_tt_first_clicked',
       storageKeyLastTs: 'muop_tt_last_trigger_ts',
-      storageKeyBtnClicks: 'muop_tt_btn_clicks',
-      storageKeyChapClicks: 'muop_tt_chap_clicks',
 
-      // Thời gian cho nút thông thường: mỗi 4 lần bấm hoặc sau 2 phút
-      generalCooldownMs: 120 * 1000,
-      generalClickThreshold: 4,
-
-      // Thời gian cho nút chuyển chương (Chương trước / Chương sau): mỗi 2 lần chuyển chương hoặc sau 60s
-      chapCooldownMs: 60 * 1000,
-      chapClickThreshold: 2
+      // Thời gian giãn cách tối thiểu giữa các lần nhảy link TikTok: 7 phút (7 * 60 * 1000 = 420.000 ms)
+      cooldownMs: 7 * 60 * 1000
     },
 
     init() {
@@ -744,37 +737,33 @@
         : 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ';
     },
 
+    getCooldownMs() {
+      if (typeof muopConfig !== 'undefined' && muopConfig.tiktokCooldownMinutes) {
+        const mins = parseInt(muopConfig.tiktokCooldownMinutes, 10);
+        if (mins > 0) return mins * 60 * 1000;
+      }
+      return this.config.cooldownMs; // Mặc định 7 phút
+    },
+
     shouldTrigger(isChapterNav) {
       const now = Date.now();
-      const firstClicked = localStorage.getItem(this.config.storageKeyFirst);
+      const lastTs = parseInt(localStorage.getItem(this.config.storageKeyLastTs), 10) || 0;
 
-      // 1. Lần đầu tiên người dùng bấm vào bất kỳ button nào -> Kích hoạt ngay lập tức!
-      if (!firstClicked) {
+      // 1. Lần đầu tiên người dùng tương tác -> Kích hoạt nhảy link lần 1
+      if (!lastTs) {
         return true;
       }
 
-      // 2. Các lần tiếp theo ("lâu lâu"):
-      const lastTs = parseInt(localStorage.getItem(this.config.storageKeyLastTs), 10) || 0;
+      // 2. Kiểm tra khoảng thời gian đã trôi qua kể từ lần nhảy trước đó
+      const cooldownMs = this.getCooldownMs();
       const elapsed = now - lastTs;
 
-      if (isChapterNav) {
-        // ĐẶC BIỆT: Nút chuyển chương trước / chương sau
-        const chapClicks = (parseInt(localStorage.getItem(this.config.storageKeyChapClicks), 10) || 0) + 1;
-        localStorage.setItem(this.config.storageKeyChapClicks, chapClicks.toString());
-
-        if (chapClicks >= this.config.chapClickThreshold || elapsed >= this.config.chapCooldownMs) {
-          return true;
-        }
-      } else {
-        // Nút thông thường
-        const btnClicks = (parseInt(localStorage.getItem(this.config.storageKeyBtnClicks), 10) || 0) + 1;
-        localStorage.setItem(this.config.storageKeyBtnClicks, btnClicks.toString());
-
-        if (btnClicks >= this.config.generalClickThreshold || elapsed >= this.config.generalCooldownMs) {
-          return true;
-        }
+      // Hạn chế nghiêm ngặt: Phải đúng sau 7 phút (420.000 ms) mới cho nhảy lần tiếp theo
+      if (elapsed >= cooldownMs) {
+        return true;
       }
 
+      // Nếu chưa đủ 7 phút: Tuyệt đối KHÔNG nhảy link dù click bao nhiêu lần
       return false;
     },
 
@@ -782,8 +771,6 @@
       const now = Date.now();
       localStorage.setItem(this.config.storageKeyFirst, '1');
       localStorage.setItem(this.config.storageKeyLastTs, now.toString());
-      localStorage.setItem(this.config.storageKeyBtnClicks, '0');
-      localStorage.setItem(this.config.storageKeyChapClicks, '0');
     },
 
     openLinkSafely(url) {
@@ -955,43 +942,134 @@
     }
   };
 
-  // 4. ANTI-COPY PROTECTION
+  // 4. ANTI-COPY & ANTI-CRAWLER PROTECTION (BẢO VỆ BẢN QUYỀN TRUYỆN)
   const AntiCopyManager = {
     init() {
       const $box = $('.chapter-content-box');
-      if (!$box.length) return;
+      const isReadingPage = $box.length > 0 || $('.chapter-reading-wrapper').length > 0;
+      if (!isReadingPage) return;
 
-      // Prevent Context Menu (Right click)
+      // 1. Phát hiện trình duyệt tự động Headless (Puppeteer, Selenium, Playwright, HeadlessChrome)
+      if (
+        navigator.webdriver ||
+        window.__nightmare ||
+        window._phantom ||
+        window.callPhantom ||
+        window.__selenium_evaluate ||
+        window.__webdriver_evaluate ||
+        window.__driver_evaluate
+      ) {
+        $('.chapter-body-text').html(
+          '<div style="padding:40px 20px;text-align:center;color:#ef4444;font-size:16px;line-height:1.6;font-weight:600;">' +
+          '<i class="fa-solid fa-triangle-exclamation" style="font-size:32px;margin-bottom:12px;display:block;"></i>' +
+          'Phát hiện công cụ tự động hóa (Automation / Headless Scraper).<br>' +
+          'Để bảo vệ tác quyền, vui lòng truy cập và đọc truyện bằng trình duyệt thông thường!' +
+          '</div>'
+        );
+        return;
+      }
+
+      // 2. Thuật toán cắt ngắn văn bản: Chỉ cho phép copy 1 vài chữ (3-4 từ) trong mỗi đoạn
+      const truncateParagraphs = (rawText) => {
+        if (!rawText || typeof rawText !== 'string') return '';
+        const lines = rawText.split(/\r?\n/);
+        const processed = lines.map(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return '';
+          
+          // Tách các từ trong đoạn
+          const words = trimmed.split(/\s+/).filter(Boolean);
+          if (words.length === 0) return '';
+          
+          // Giữ lại 3 từ đầu tiên của mỗi đoạn, phần còn lại bị cắt bỏ
+          const limit = Math.min(3, words.length);
+          const firstWords = words.slice(0, limit).join(' ');
+          
+          return firstWords + '... [Nội dung đã được bảo hộ bản quyền bởi Mướp Đắng - Không sao chép toàn bộ]';
+        });
+        
+        return processed.filter(Boolean).join('\n\n');
+      };
+
+      // 3. Can thiệp sự kiện Copy ở Capture Phase (Chạy trước mọi Extension "Allow Copy" hay script thứ ba)
+      document.addEventListener('copy', function(e) {
+        try {
+          const selection = window.getSelection();
+          let selectedText = selection ? selection.toString() : '';
+
+          // Nếu không có vùng chọn nhưng có sự kiện copy kích hoạt trên trang đọc
+          if (!selectedText) {
+            const bodyEl = document.querySelector('.chapter-body-text');
+            if (bodyEl) {
+              selectedText = bodyEl.innerText || bodyEl.textContent || '';
+            }
+          }
+
+          if (selectedText) {
+            const truncated = truncateParagraphs(selectedText);
+            if (e.clipboardData) {
+              e.clipboardData.setData('text/plain', truncated);
+              e.clipboardData.setData('text/html', '<p>' + truncated.split(/\n\n+/).join('</p><p>') + '</p>');
+            }
+          }
+        } catch (err) {
+          // Bỏ qua lỗi ngầm
+        }
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }, true); // useCapture: true
+
+      // 4. Hook API navigator.clipboard.writeText đề phòng tool/extension ghi trực tiếp clipboard
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+        navigator.clipboard.writeText = function(text) {
+          try {
+            const truncated = truncateParagraphs(text);
+            return originalWriteText(truncated);
+          } catch (e) {
+            return originalWriteText(text);
+          }
+        };
+      }
+
+      // 5. Chặn chuột phải (Context Menu)
       $box.on('contextmenu', function(e) {
         e.preventDefault();
-        AntiCopyManager.showNotice('Nội dung thuộc bản quyền website Mướp Đắng Cũng Có Vị Ngọt. Vui lòng không sao chép!');
+        e.stopPropagation();
         return false;
       });
 
-      // Prevent Copy / Cut
-      $box.on('copy cut selectstart', function(e) {
+      // 6. Chặn chọn khối (selectstart), kéo thả (dragstart)
+      $box.on('selectstart dragstart', function(e) {
         e.preventDefault();
-        AntiCopyManager.showNotice('Chức năng sao chép nội dung đã bị vô hiệu hóa để bảo vệ tác quyền!');
         return false;
       });
 
-      // Prevent Key combinations (Ctrl+C, Ctrl+U, Ctrl+S, F12)
+      // 7. Chặn tổ hợp phím tắt: Ctrl+C, Ctrl+A, Ctrl+X, Ctrl+U, Ctrl+S, Ctrl+P, F12, DevTools
       $(document).on('keydown', function(e) {
-        if (
-          (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S' || e.key === 'p' || e.key === 'P')) ||
-          e.key === 'F12'
-        ) {
-          if ($('.chapter-reading-wrapper').length) {
-            e.preventDefault();
-            AntiCopyManager.showNotice('Thao tác phím tắt này bị chặn trên trang đọc truyện!');
-            return false;
-          }
+        const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+        const key = (e.key || '').toLowerCase();
+
+        // Chặn phím tắt copy, select all, cut, view-source, save, print
+        if (isCtrlOrCmd && (key === 'c' || key === 'a' || key === 'x' || key === 'u' || key === 's' || key === 'p')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+
+        // Chặn F12 và Ctrl+Shift+I / J / C (Mở DevTools)
+        if (e.key === 'F12' || (isCtrlOrCmd && e.shiftKey && (key === 'i' || key === 'j' || key === 'c'))) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
         }
       });
     },
 
     showNotice(msg) {
-      // Đã ẩn hoàn toàn thông báo chống sao chép theo yêu cầu người dùng
+      // Ẩn thông báo popup để không gây gián đoạn trải nghiệm đọc của độc giả
       return;
     }
   };
@@ -1033,6 +1111,7 @@
       this.bindChapterDrawerEvents();
       this.recordHistoryAndView();
       this.bindBookmarkToggle();
+      this.bindAutoHideHeaderOnScroll();
 
       // Khi đổi Theme Sáng / Tối, tự động cập nhật màu chữ và bảng màu tương ứng
       $(document).on('muopThemeChanged', (e, theme) => {
@@ -1373,6 +1452,7 @@
       $('#btnFloatingScrollTop').on('click', (e) => {
         e.preventDefault();
         if (!hasDragged) {
+          $('.site-header').removeClass('header-hidden-reading');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
@@ -1384,6 +1464,71 @@
           this.openQuickModal();
         }
       });
+    },
+
+    // Auto-hide Header khi kéo/cuộn đọc truyện để tối ưu hóa không gian đọc
+    bindAutoHideHeaderOnScroll() {
+      const $readingWrap = $('.chapter-reading-wrapper');
+      const isReadingPage = $readingWrap.length > 0 || $('body').hasClass('single-chuong');
+      if (!isReadingPage) return;
+
+      const $header = $('.site-header');
+      if (!$header.length) return;
+
+      let lastScrollTop = Math.max(0, window.pageYOffset || document.documentElement.scrollTop || 0);
+      let ticking = false;
+      const scrollThreshold = 8; // Ngưỡng cuộn (px) để tránh rung giật
+      const minScrollToHide = 50; // Chỉ ẩn khi đã cuộn qua 50px từ đầu trang
+
+      const handleScroll = () => {
+        const currentScrollTop = Math.max(0, window.pageYOffset || document.documentElement.scrollTop || 0);
+
+        // 1. Khi ở gần đầu trang (<= 25px): Luôn luôn hiện Header
+        if (currentScrollTop <= 25) {
+          $header.removeClass('header-hidden-reading');
+          lastScrollTop = currentScrollTop;
+          ticking = false;
+          return;
+        }
+
+        // 2. Không ẩn nếu đang mở Menu Drawer, Popup tùy chỉnh hoặc đang gõ tìm kiếm
+        if (
+          $('#mobileNavDrawer').hasClass('open') ||
+          $('#readingSettingsQuickModal').is(':visible') ||
+          $('#chapterDrawerModal').hasClass('open') ||
+          $('#shopeeGatekeeperModal').is(':visible') ||
+          $('.site-header input:focus').length > 0
+        ) {
+          ticking = false;
+          return;
+        }
+
+        const diff = currentScrollTop - lastScrollTop;
+
+        // 3. Kéo lên màn hình (trang cuộn xuống tiếp tục đọc truyện): Ẩn Header
+        if (diff > scrollThreshold && currentScrollTop > minScrollToHide) {
+          if (!$header.hasClass('header-hidden-reading')) {
+            $header.addClass('header-hidden-reading');
+          }
+          lastScrollTop = currentScrollTop;
+        } 
+        // 4. Kéo xuống màn hình (trang cuộn ngược lên): Hiện lại Header mượt mà
+        else if (diff < -scrollThreshold) {
+          if ($header.hasClass('header-hidden-reading')) {
+            $header.removeClass('header-hidden-reading');
+          }
+          lastScrollTop = currentScrollTop;
+        }
+
+        ticking = false;
+      };
+
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          window.requestAnimationFrame(handleScroll);
+          ticking = true;
+        }
+      }, { passive: true });
     },
 
     // Quick Modal Handlers
@@ -3517,9 +3662,11 @@
       // =========================================================================
 
       // 1. Stories Live Search & Multi-Filters (Hot, Newest, Full, Ongoing, Nominated, Hidden, Visible)
-      const filterAdminStories = () => {
+      const filterAdminStories = (forcedFilter) => {
         const query = $.trim($('#admStorySearchInput').val()).toLowerCase();
-        const quickFilter = $('#admStoryQuickFilter').val() || 'all';
+        const pillFilter = $('#admStoryFilterPills .btn-story-filter-pill.active').data('filter');
+        const selectFilter = $('#admStoryQuickFilter').val();
+        const quickFilter = forcedFilter || pillFilter || selectFilter || 'all';
 
         const $tbody = $('#tableAdminStories tbody');
         const $rows = $tbody.find('tr.adm-story-row').get();
@@ -3569,8 +3716,10 @@
             matchFilter = (nominate === 'none' || !nominate);
           } else if (quickFilter === 'visible') {
             matchFilter = (status === 'publish');
+          } else if (quickFilter === 'future') {
+            matchFilter = (status === 'future');
           } else if (quickFilter === 'hidden') {
-            matchFilter = (status === 'draft' || status !== 'publish');
+            matchFilter = (status !== 'publish' && status !== 'future');
           }
 
           if (matchQuery && matchFilter) {
@@ -3601,13 +3750,15 @@
         }
       };
 
-      $('#admStorySearchInput').on('input keyup', filterAdminStories);
+      $('#admStorySearchInput').on('input keyup', function() {
+        filterAdminStories();
+      });
 
       $('#admStoryQuickFilter').on('change', function() {
         const val = $(this).val() || 'all';
         $('#admStoryFilterPills .btn-story-filter-pill').removeClass('active');
         $('#admStoryFilterPills .btn-story-filter-pill[data-filter="' + val + '"]').addClass('active');
-        filterAdminStories();
+        filterAdminStories(val);
       });
 
       $(document).on('click', '#admStoryFilterPills .btn-story-filter-pill', function(e) {
@@ -3616,7 +3767,7 @@
         $('#admStoryFilterPills .btn-story-filter-pill').removeClass('active');
         $(this).addClass('active');
         $('#admStoryQuickFilter').val(val);
-        filterAdminStories();
+        filterAdminStories(val);
       });
 
       // 2. Open Story Detail Hierarchical View
@@ -4116,6 +4267,78 @@
       // Prevent closing when clicking inside user panel, allowing direct navigation
       $(document).on('click', '#userDropdownPanel, .user-dropdown-panel', function(e) {
         e.stopPropagation();
+      });
+
+      // Hover grace timer cho Thể loại dropdown (đứng yên không bị tắt khi di chuột cuộn kéo)
+      let genreDropdownHoverTimer = null;
+      $(document).on('mouseenter', '.has-genre-dropdown', function() {
+        if (genreDropdownHoverTimer) {
+          clearTimeout(genreDropdownHoverTimer);
+          genreDropdownHoverTimer = null;
+        }
+        $(this).addClass('hovered');
+      });
+
+      $(document).on('mouseleave', '.has-genre-dropdown', function() {
+        const $this = $(this);
+        genreDropdownHoverTimer = setTimeout(() => {
+          $this.removeClass('hovered');
+        }, 260);
+      });
+
+      // Kéo cuộn lên xuống mượt mà bằng chuột cho Menu Thể Loại
+      function initVerticalDragScroll(selector) {
+        $(selector).each(function() {
+          const el = this;
+          if (el._hasDragScroll) return;
+          el._hasDragScroll = true;
+
+          let isDown = false;
+          let startY = 0;
+          let scrollTop = 0;
+          let isDragging = false;
+
+          el.addEventListener('mousedown', function(e) {
+            if (e.button !== 0) return; // Chỉ bắt chuột trái
+            isDown = true;
+            isDragging = false;
+            startY = e.pageY - el.getBoundingClientRect().top;
+            scrollTop = el.scrollTop;
+          });
+
+          window.addEventListener('mouseup', function() {
+            if (!isDown) return;
+            isDown = false;
+            setTimeout(() => {
+              isDragging = false;
+            }, 60);
+          });
+
+          el.addEventListener('mousemove', function(e) {
+            if (!isDown) return;
+            const currentY = e.pageY - el.getBoundingClientRect().top;
+            const walk = (currentY - startY) * 1.25;
+            if (Math.abs(walk) > 4) {
+              isDragging = true;
+              el.scrollTop = scrollTop - walk;
+            }
+          });
+
+          el.addEventListener('click', function(e) {
+            if (isDragging) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          }, true);
+        });
+      }
+
+      // Khởi tạo kéo cuộn dọc
+      initVerticalDragScroll('.genre-dropdown-menu, .genre-selector-body');
+      $(document).on('click', '#navGenreToggle, #genreSelectorHeader, #btnGenreSelectorArrow', function() {
+        setTimeout(() => {
+          initVerticalDragScroll('.genre-dropdown-menu, .genre-selector-body');
+        }, 60);
       });
 
       // Toggle Thể loại dropdown on click
@@ -5494,6 +5717,94 @@
         });
       });
 
+      // 2.1 Dịch Giả & Admin Ẩn hoặc Bỏ Ẩn Truyện
+      $(document).on('click', '.btn-translator-toggle-hide', function(e) {
+        e.preventDefault();
+        $('.story-actions-dropdown').removeClass('is-open');
+        const $btn = $(this);
+        const storyId = $btn.data('story-id');
+        const actionType = $btn.data('action') || 'hide'; // 'hide' or 'unhide'
+        const storyTitle = $btn.data('story-title') || 'bộ truyện này';
+
+        if (actionType === 'hide') {
+          muopConfirm(`Bạn có chắc chắn muốn ẩn truyện "${storyTitle}" không? Sau khi ẩn, độc giả sẽ không thể xem hoặc tìm kiếm truyện này trên website.`, () => {
+            $btn.prop('disabled', true);
+            $.ajax({
+              url: muopConfig.ajaxUrl,
+              type: 'POST',
+              data: {
+                action: 'muop_toggle_story_hide',
+                nonce: muopConfig.nonce,
+                story_id: storyId,
+                action_type: 'hide'
+              },
+              success: (res) => {
+                if (typeof res === 'string') {
+                  try { res = JSON.parse(res); } catch (e) {}
+                }
+                if (res && res.success) {
+                  muopAlert(getAjaxMsg(res, 'Đã ẩn truyện thành công!'), 'success', () => {
+                    window.location.reload();
+                  });
+                } else {
+                  muopAlert(getAjaxMsg(res, 'Lỗi ẩn truyện!'), 'error');
+                  $btn.prop('disabled', false);
+                }
+              },
+              error: (xhr) => {
+                let err = 'Lỗi kết nối máy chủ!';
+                if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+                muopAlert(err, 'error');
+                $btn.prop('disabled', false);
+              }
+            });
+          }, null, {
+            title: 'Xác Nhận Ẩn Truyện',
+            type: 'warning',
+            confirmText: 'Ẩn Truyện',
+            cancelText: 'Hủy'
+          });
+        } else {
+          muopConfirm(`Bạn có chắc chắn muốn bỏ ẩn và hiển thị công khai lại truyện "${storyTitle}" trên website?`, () => {
+            $btn.prop('disabled', true);
+            $.ajax({
+              url: muopConfig.ajaxUrl,
+              type: 'POST',
+              data: {
+                action: 'muop_toggle_story_hide',
+                nonce: muopConfig.nonce,
+                story_id: storyId,
+                action_type: 'unhide'
+              },
+              success: (res) => {
+                if (typeof res === 'string') {
+                  try { res = JSON.parse(res); } catch (e) {}
+                }
+                if (res && res.success) {
+                  muopAlert(getAjaxMsg(res, 'Đã hiển thị công khai truyện thành công!'), 'success', () => {
+                    window.location.reload();
+                  });
+                } else {
+                  muopAlert(getAjaxMsg(res, 'Lỗi thao tác!'), 'error');
+                  $btn.prop('disabled', false);
+                }
+              },
+              error: (xhr) => {
+                let err = 'Lỗi kết nối máy chủ!';
+                if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+                muopAlert(err, 'error');
+                $btn.prop('disabled', false);
+              }
+            });
+          }, null, {
+            title: 'Xác Nhận Hiện Truyện',
+            type: 'warning',
+            confirmText: 'Hiện Truyện',
+            cancelText: 'Hủy'
+          });
+        }
+      });
+
       // 3. Mở Modal Chỉnh Sửa Thông Tin Truyện (Popup 1)
       $(document).on('click', '.btn-edit-story, .btn-action-edit-story-desc', function(e) {
         e.preventDefault();
@@ -5551,6 +5862,34 @@
                 data.categories.forEach(catId => {
                   $(`#editGenresCheckboxList input[value="${catId}"]`).prop('checked', true);
                 });
+              }
+
+              // Hẹn giờ đăng truyện (chuẩn Việt Nam 24h)
+              if (data.post_status === 'future' || data.scheduled_time) {
+                $('#editToggleScheduleStory').prop('checked', true);
+                $('#editScheduleTimeCollapse').show();
+                if (data.scheduled_formatted) {
+                  $('#editStoryCurrentScheduleBadge').text('Đang hẹn: ' + data.scheduled_formatted).show();
+                }
+                if (data.scheduled_time) {
+                  const sParts = data.scheduled_time.replace('T', ' ').split(' ');
+                  if (sParts.length >= 2) {
+                    $('#editStorySchedDate').val(sParts[0]);
+                    const tP = sParts[1].split(':');
+                    if (tP.length >= 1) $('#editStorySchedHour').val(tP[0].padStart(2, '0'));
+                    if (tP.length >= 2) {
+                      const rM = Math.floor(parseInt(tP[1], 10) / 5) * 5;
+                      $('#editStorySchedMinute').val(String(rM).padStart(2, '0'));
+                    }
+                  }
+                  if (typeof muopSyncEditStorySchedule === 'function') {
+                    muopSyncEditStorySchedule();
+                  }
+                }
+              } else {
+                $('#editToggleScheduleStory').prop('checked', false);
+                $('#editScheduleTimeCollapse').hide();
+                $('#editStoryCurrentScheduleBadge').hide();
               }
             } else {
               muopAlert(getAjaxMsg(res, 'Không thể tải thông tin truyện!'), 'error');
@@ -9381,6 +9720,850 @@
     }
   };
 
+  // 31. SPOTLIGHT CAROUSEL MANAGER (TOP TRUYỆN NỔI BẬT CHUYỂN ĐỘNG QUA LẠI)
+  const SpotlightCarouselManager = {
+    init() {
+      const $box = $('#teamSpotlightBox');
+      if (!$box.length) return;
+
+      const $track = $('#teamSpotlightTrack');
+      const $slides = $track.find('.spotlight-slide');
+      const total = $slides.length;
+      if (total <= 1) return;
+
+      let current = 0;
+      let timer = null;
+      let isPaused = false;
+      let direction = 1; // 1: tiến, -1: lùi (chuyển động qua lại)
+
+      const goToSlide = (index) => {
+        if (index < 0) index = total - 1;
+        if (index >= total) index = 0;
+        current = index;
+        $track.css('transform', 'translateX(-' + (current * 100) + '%)');
+        $('#teamSpotlightDots .spotlight-dot').removeClass('active');
+        $('#teamSpotlightDots .spotlight-dot[data-slide="' + current + '"]').addClass('active');
+      };
+
+      const startAutoPlay = () => {
+        stopAutoPlay();
+        timer = setInterval(() => {
+          if (isPaused) return;
+          // Tự động chuyển động qua lại
+          if (current >= total - 1) {
+            direction = -1;
+          } else if (current <= 0) {
+            direction = 1;
+          }
+          goToSlide(current + direction);
+        }, 3500);
+      };
+
+      const stopAutoPlay = () => {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      };
+
+      $('#btnSpotlightPrev').on('click', function(e) {
+        e.preventDefault();
+        goToSlide(current - 1);
+        startAutoPlay();
+      });
+
+      $('#btnSpotlightNext').on('click', function(e) {
+        e.preventDefault();
+        goToSlide(current + 1);
+        startAutoPlay();
+      });
+
+      $(document).on('click', '#teamSpotlightDots .spotlight-dot', function(e) {
+        e.preventDefault();
+        const idx = parseInt($(this).data('slide'), 10);
+        goToSlide(idx);
+        startAutoPlay();
+      });
+
+      // Tạm dừng khi rê chuột hoặc chạm tay
+      $box.on('mouseenter touchstart', function() {
+        isPaused = true;
+      }).on('mouseleave touchend', function() {
+        isPaused = false;
+      });
+
+      // Vuốt chạm cảm ứng trên di động
+      let startX = 0;
+      $box.on('touchstart', function(e) {
+        if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length) {
+          startX = e.originalEvent.touches[0].clientX;
+        }
+      });
+      $box.on('touchend', function(e) {
+        if (e.originalEvent && e.originalEvent.changedTouches && e.originalEvent.changedTouches.length) {
+          const endX = e.originalEvent.changedTouches[0].clientX;
+          const diff = startX - endX;
+          if (Math.abs(diff) > 40) {
+            if (diff > 0) goToSlide(current + 1);
+            else goToSlide(current - 1);
+            startAutoPlay();
+          }
+        }
+      });
+
+      startAutoPlay();
+    }
+  };
+
+  // 32. SCHEDULE STORY MANAGER (HẸN GIỜ ĐĂNG TRUYỆN, POPUP ĐẾM NGƯỢC & BỘ LỌC)
+  const ScheduleStoryManager = {
+    activeCountdownInterval: null,
+
+    calcPreset(type, hours) {
+      const d = new Date();
+      if (hours) {
+        d.setHours(d.getHours() + hours);
+      } else if (type === 'tonight') {
+        if (d.getHours() >= 20) d.setDate(d.getDate() + 1);
+        d.setHours(20, 0, 0, 0);
+      } else if (type === 'tomorrow_morning') {
+        d.setDate(d.getDate() + 1);
+        d.setHours(8, 0, 0, 0);
+      }
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    },
+
+    init() {
+      const self = this;
+
+      // Đảm bảo trạng thái hiển thị đúng nếu checkbox đã được tích sẵn
+      if ($('#toggleScheduleStory').is(':checked')) {
+        $('#scheduleTimeCollapse').show();
+        $('#btnSubmitStoryText').text('Lên Lịch Đăng');
+        $('#btnSubmitStoryIcon').removeClass('fa-cloud-arrow-up').addClass('fa-clock');
+      }
+      if ($('#editToggleScheduleStory').is(':checked')) {
+        $('#editScheduleTimeCollapse').show();
+      }
+
+      // 1. Giao diện trang Đăng Truyện: Bật/Tắt hẹn giờ
+      $(document).on('change', '#toggleScheduleStory', function() {
+        if ($(this).is(':checked')) {
+          $('#scheduleTimeCollapse').slideDown(200);
+          $('#btnSubmitStoryText').text('Lên Lịch Đăng');
+          $('#btnSubmitStoryIcon').removeClass('fa-cloud-arrow-up').addClass('fa-clock');
+          if (!$('#storyScheduledTime').val()) {
+            $('#storyScheduledTime').val(self.calcPreset(null, 3));
+          }
+        } else {
+          $('#scheduleTimeCollapse').slideUp(200);
+          $('#btnSubmitStoryText').text('Đăng Truyện');
+          $('#btnSubmitStoryIcon').removeClass('fa-clock').addClass('fa-cloud-arrow-up');
+        }
+      });
+
+      // Nút chọn nhanh thời gian trong form Đăng truyện
+      $(document).on('click', '.btn-quick-sched', function(e) {
+        e.preventDefault();
+        const hours = $(this).data('hours');
+        const preset = $(this).data('preset');
+        if (typeof muopSetQuickSchedule === 'function') {
+          muopSetQuickSchedule(hours, preset);
+        } else {
+          $('#storyScheduledTime').val(self.calcPreset(preset, hours));
+        }
+        if (!$('#toggleScheduleStory').is(':checked')) {
+          $('#toggleScheduleStory').prop('checked', true).trigger('change');
+        }
+      });
+
+      // 2. Giao diện Modal Sửa truyện: Bật/Tắt hẹn giờ
+      $(document).on('change', '#editToggleScheduleStory', function() {
+        if ($(this).is(':checked')) {
+          $('#editScheduleTimeCollapse').slideDown(200);
+          if (typeof muopSetQuickEditSchedule === 'function') {
+            muopSetQuickEditSchedule(3, null);
+          } else if (!$('#editStoryScheduledTime').val()) {
+            $('#editStoryScheduledTime').val(self.calcPreset(null, 3));
+          }
+        } else {
+          $('#editScheduleTimeCollapse').slideUp(200);
+        }
+      });
+
+      $(document).on('click', '.btn-quick-edit-sched', function(e) {
+        e.preventDefault();
+        const hours = $(this).data('hours');
+        const preset = $(this).data('preset');
+        if (typeof muopSetQuickEditSchedule === 'function') {
+          muopSetQuickEditSchedule(hours, preset);
+        } else {
+          $('#editStoryScheduledTime').val(self.calcPreset(preset, hours));
+        }
+        if (!$('#editToggleScheduleStory').is(':checked')) {
+          $('#editToggleScheduleStory').prop('checked', true).trigger('change');
+        }
+      });
+
+      $(document).on('click', '.btn-popup-quick-sched', function(e) {
+        e.preventDefault();
+        const hours = $(this).data('hours');
+        const preset = $(this).data('preset');
+        if (typeof window.muopSetPopupQuickSchedule === 'function') {
+          window.muopSetPopupQuickSchedule(hours, preset);
+        } else {
+          $('#inputQuickChangeScheduleTime').val(self.calcPreset(preset, hours));
+        }
+      });
+
+      // 3. Mở Popup Chi Tiết Thời Gian Đã Lên Lịch khi click vào trạng thái Đã hẹn giờ
+      $(document).on('click', '.btn-show-scheduled-popup', function(e) {
+        e.preventDefault();
+        $('.story-actions-dropdown').removeClass('is-open');
+        const storyId   = $(this).data('story-id');
+        const storyTitle= $(this).data('story-title') || 'Bộ truyện';
+        const schedTime = $(this).data('scheduled-time') || '';
+        const schedFmt  = $(this).data('scheduled-formatted') || schedTime;
+
+        if (!storyId) return;
+
+        if (typeof window.muopOpenScheduleModal === 'function') {
+          window.muopOpenScheduleModal(storyId, storyTitle, schedTime, schedFmt);
+          return;
+        }
+
+        const $modal = $('#modalScheduleStoryDetail');
+        if (!$modal.length) return;
+
+        $modal.data('story-id', storyId);
+        $modal.data('scheduled-time', schedTime);
+        $('#scheduleModalStoryTitle').text(storyTitle);
+        $('#scheduleModalDatetimeText').text(schedFmt);
+        $('#scheduleDetailAlert').hide();
+        $('#scheduleChangeFormWrap').hide();
+
+        // Bắt đầu đếm ngược thời gian thực
+        self.startCountdown(schedTime);
+        $modal.css('display', 'flex');
+      });
+
+      // Đóng Popup
+      $('.btn-close-schedule-modal').on('click', function(e) {
+        e.preventDefault();
+        self.stopCountdown();
+        $('#modalScheduleStoryDetail').hide();
+      });
+
+      $('#modalScheduleStoryDetail').on('click', function(e) {
+        if (e.target === this) {
+          self.stopCountdown();
+          $(this).hide();
+        }
+      });
+
+      // 4. Bấm "Đổi Giờ Hẹn" trong Popup
+      $('#btnTriggerToggleChangeSchedule').on('click', function(e) {
+        e.preventDefault();
+        $('#scheduleChangeFormWrap').slideToggle(200);
+      });
+
+      $('#btnCancelToggleChangeSchedule').on('click', function(e) {
+        e.preventDefault();
+        $('#scheduleChangeFormWrap').slideUp(200);
+      });
+
+      // 5. Xác nhận lưu giờ hẹn mới từ Popup
+      $('#btnSubmitChangeScheduleTime').on('click', function(e) {
+        e.preventDefault();
+        const $modal = $('#modalScheduleStoryDetail');
+        const storyId = $modal.data('story-id');
+        const newTime = $('#inputQuickChangeScheduleTime').val();
+
+        if (!newTime) {
+          muopAlert('Vui lòng chọn thời gian hẹn giờ mới!', 'warning');
+          return;
+        }
+
+        const $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
+
+        $.ajax({
+          url: muopConfig.ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_schedule_story',
+            nonce: muopConfig.nonce,
+            story_id: storyId,
+            scheduled_time: newTime
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Giờ Hẹn Mới');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const data = res.data || {};
+              $('#scheduleModalDatetimeText').text(data.scheduled_formatted || newTime);
+              $('#scheduleChangeFormWrap').slideUp(200);
+              $modal.data('scheduled-time', data.scheduled_time || newTime);
+              self.startCountdown(data.scheduled_time || newTime);
+              muopAlert('Đã cập nhật giờ hẹn thành công!', 'success', () => {
+                window.location.reload();
+              });
+            } else {
+              muopAlert(getAjaxMsg(res, 'Không thể cập nhật giờ hẹn!'), 'error');
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Giờ Hẹn Mới');
+            let err = 'Lỗi kết nối máy chủ!';
+            if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+            muopAlert(err, 'error');
+          }
+        });
+      });
+
+      // 6. Đăng ngay bây giờ từ Popup
+      $('#btnPopupPublishScheduledNow').on('click', function(e) {
+        e.preventDefault();
+        const $modal = $('#modalScheduleStoryDetail');
+        const storyId = $modal.data('story-id');
+        if (!storyId) return;
+
+        muopConfirm('Bạn có chắc chắn muốn phát hành bộ truyện này ngay lập tức thay vì chờ đến giờ hẹn?', () => {
+          const $btn = $('#btnPopupPublishScheduledNow');
+          $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng...');
+
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_publish_draft',
+              nonce: muopConfig.nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                muopAlert(getAjaxMsg(res, 'Đã phát hành truyện thành công!'), 'success', () => {
+                  window.location.reload();
+                });
+              } else {
+                $btn.prop('disabled', false).html('<i class="fa-solid fa-bolt"></i> Đăng Ngay');
+                muopAlert(getAjaxMsg(res, 'Lỗi đăng truyện!'), 'error');
+              }
+            },
+            error: (xhr) => {
+              $btn.prop('disabled', false).html('<i class="fa-solid fa-bolt"></i> Đăng Ngay');
+              let err = 'Lỗi kết nối!';
+              if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+              muopAlert(err, 'error');
+            }
+          });
+        });
+      });
+
+      // 7. Hủy hẹn giờ (về Bản Nháp)
+      $('#btnPopupCancelScheduleToDraft, .btn-cancel-schedule-action').on('click', function(e) {
+        e.preventDefault();
+        const storyId = $(this).data('story-id') || $('#modalScheduleStoryDetail').data('story-id');
+        if (!storyId) return;
+
+        muopConfirm('Bạn có chắc chắn muốn hủy lịch hẹn và chuyển bộ truyện này về Bản Nháp?', () => {
+          $.ajax({
+            url: muopConfig.ajaxUrl,
+            type: 'POST',
+            data: {
+              action: 'muop_cancel_schedule',
+              nonce: muopConfig.nonce,
+              story_id: storyId
+            },
+            success: (res) => {
+              if (typeof res === 'string') {
+                try { res = JSON.parse(res); } catch (e) {}
+              }
+              if (res && res.success) {
+                muopAlert(getAjaxMsg(res, 'Đã chuyển về bản nháp!'), 'success', () => {
+                  window.location.reload();
+                });
+              } else {
+                muopAlert(getAjaxMsg(res, 'Không thể hủy lịch hẹn!'), 'error');
+              }
+            },
+            error: (xhr) => {
+              let err = 'Lỗi kết nối!';
+              if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
+              muopAlert(err, 'error');
+            }
+          });
+        });
+      });
+
+      // 8. Tác vụ Hẹn giờ đăng cho bản nháp từ menu 3 chấm
+      $(document).on('click', '.btn-action-schedule-draft', function(e) {
+        e.preventDefault();
+        $('.story-actions-dropdown').removeClass('is-open');
+        const storyId = $(this).data('story-id');
+        const storyTitle = $(this).data('story-title') || 'Bộ truyện';
+
+        if (typeof window.muopOpenScheduleModal === 'function') {
+          window.muopOpenScheduleModal(storyId, storyTitle, '', '');
+          $('#scheduleChangeFormWrap').show();
+          return;
+        }
+
+        const $modal = $('#modalScheduleStoryDetail');
+        $modal.data('story-id', storyId);
+        $modal.data('scheduled-time', '');
+        $('#scheduleModalStoryTitle').text(storyTitle);
+        $('#scheduleModalDatetimeText').text('Chưa lên lịch');
+        $('#scheduleModalCountdownText').html('<i class="fa-solid fa-clock"></i> Hãy chọn thời gian bạn muốn đăng');
+        if (typeof window.muopSetPopupQuickSchedule === 'function') {
+          window.muopSetPopupQuickSchedule(3, null);
+        }
+        $('#scheduleChangeFormWrap').show();
+        $modal.css('display', 'flex');
+      });
+    },
+
+    startCountdown(schedTimeStr) {
+      this.stopCountdown();
+      if (!schedTimeStr) {
+        $('#scheduleModalCountdownText').html('<i class="fa-solid fa-circle-info"></i> Chưa có thời gian cụ thể');
+        return;
+      }
+
+      const update = () => {
+        const targetDate = new Date(schedTimeStr.replace(/-/g, '/')).getTime();
+        const now = new Date().getTime();
+        const diff = targetDate - now;
+
+        if (diff <= 0) {
+          $('#scheduleModalCountdownText').html('<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Đã đến giờ phát hành! Hệ thống đang kích hoạt xuất bản.');
+          return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+        let parts = [];
+        if (days > 0) parts.push(days + ' ngày');
+        if (hours > 0 || days > 0) parts.push(hours + ' giờ');
+        parts.push(mins + ' phút');
+        parts.push(secs + ' giây');
+
+        $('#scheduleModalCountdownText').html('<i class="fa-solid fa-hourglass-half fa-spin"></i> Còn ' + parts.join(' '));
+      };
+
+      update();
+      this.activeCountdownInterval = setInterval(update, 1000);
+    },
+
+    stopCountdown() {
+      if (this.activeCountdownInterval) {
+        clearInterval(this.activeCountdownInterval);
+        this.activeCountdownInterval = null;
+      }
+    }
+  };
+
+  // 33. NOMINATED CAROUSEL MANAGER (TRUYỆN ĐỀ CỬ: KHUNG XANH MỜ PHÍA SAU, CĂN GIỮA & VÒNG LẶP VÔ TẬN NHƯ VÒNG TRÒN)
+  const NominatedCarouselManager = {
+    init() {
+      const track = document.getElementById('nominatedStoryTrack');
+      if (!track) return;
+
+      const container = track.closest('.section-nominated-carousel') || track;
+      const btnPrev = document.getElementById('btnNominatedPrev');
+      const btnNext = document.getElementById('btnNominatedNext');
+      const dotsContainer = document.getElementById('nominatedStoryDots');
+
+      // Danh sách các thẻ truyện gốc
+      const originalCards = Array.from(track.querySelectorAll('.story-card:not(.is-clone)'));
+      const originalCount = originalCards.length;
+      if (!originalCount) return;
+
+      // Đánh số chỉ số thực (realIndex) cho từng truyện gốc (0..originalCount - 1)
+      originalCards.forEach((card, idx) => {
+        card.dataset.realIndex = idx;
+      });
+
+      // Tạo vòng lặp vô tận liền mạch như vòng tròn (Circular Infinite Loop):
+      // Nhân bản 1 bộ phía trước (Set 0) và 1 bộ phía sau (Set 2) ôm trọn bộ gốc (Set 1)
+      let allCards = [];
+      if (originalCount >= 2) {
+        const set0Clones = originalCards.map((card, idx) => {
+          const clone = card.cloneNode(true);
+          clone.dataset.realIndex = idx;
+          clone.classList.add('is-clone');
+          return clone;
+        });
+
+        const set2Clones = originalCards.map((card, idx) => {
+          const clone = card.cloneNode(true);
+          clone.dataset.realIndex = idx;
+          clone.classList.add('is-clone');
+          return clone;
+        });
+
+        // Chèn Set 0 vào trước Set 1
+        set0Clones.forEach(clone => track.insertBefore(clone, originalCards[0]));
+        // Nối Set 2 vào sau Set 1
+        set2Clones.forEach(clone => track.appendChild(clone));
+
+        allCards = Array.from(track.querySelectorAll('.story-card'));
+      } else {
+        allCards = originalCards;
+      }
+
+      let isDown = false;
+      let startX = 0;
+      let scrollLeft = 0;
+      let isDragging = false;
+      let autoTimer = null;
+      let isUserInteracting = false;
+      let isHoveringCard = false;
+      let scrollThrottle = null;
+      let isScrolling = false;
+      let scrollResetTimeout = null;
+
+      // Khoảng cách cuộn trọn vẹn 1 vòng 360 độ (chiều rộng đúng 1 set truyện)
+      const getSetDistance = () => {
+        if (originalCount < 2 || allCards.length < 3 * originalCount) return 0;
+        return allCards[2 * originalCount].offsetLeft - allCards[originalCount].offsetLeft;
+      };
+
+      // Cập nhật padding hai bên của track để truyện đầu tiên và truyện cuối cùng đều nằm chính giữa
+      const updateTrackPadding = () => {
+        if (!track || !allCards.length) return;
+        const firstCard = allCards[0];
+        const lastCard = allCards[allCards.length - 1];
+        if (!firstCard) return;
+
+        const halfTrack = track.clientWidth / 2;
+        const halfFirst = firstCard.offsetWidth / 2;
+        const halfLast = (lastCard ? lastCard.offsetWidth : firstCard.offsetWidth) / 2;
+
+        const padLeft = Math.max(12, Math.round(halfTrack - halfFirst));
+        const padRight = Math.max(12, Math.round(halfTrack - halfLast));
+
+        track.style.paddingLeft = padLeft + 'px';
+        track.style.paddingRight = padRight + 'px';
+      };
+
+      // Xác định card trong toàn bộ danh sách đang nằm gần tâm giữa màn hình nhất
+      const getActiveGlobalIndex = () => {
+        const trackCenter = track.scrollLeft + (track.clientWidth / 2);
+        let minDiff = Infinity;
+        let activeIdx = 0;
+
+        allCards.forEach((card, idx) => {
+          const cardCenter = card.offsetLeft + (card.offsetWidth / 2);
+          const diff = Math.abs(cardCenter - trackCenter);
+          if (diff < minDiff) {
+            minDiff = diff;
+            activeIdx = idx;
+          }
+        });
+        return activeIdx;
+      };
+
+      // Chuẩn hóa vị trí vòng lặp về lại Set 1 (giữa) mượt mà không hề giật
+      const normalizeLoopPosition = () => {
+        if (originalCount < 2) return;
+        const setDist = getSetDistance();
+        if (setDist <= 0) return;
+
+        const currentIdx = getActiveGlobalIndex();
+
+        // Nếu đã trôi sang Set 2 (phía sau): dịch ngược lại về Set 1
+        if (currentIdx >= 2 * originalCount) {
+          const normalizedIdx = currentIdx - originalCount;
+          const targetCard = allCards[normalizedIdx];
+          if (targetCard) {
+            const targetLeft = targetCard.offsetLeft + (targetCard.offsetWidth / 2) - (track.clientWidth / 2);
+            track.style.scrollSnapType = 'none';
+            track.scrollLeft = targetLeft;
+            void track.offsetWidth;
+            track.style.scrollSnapType = 'x mandatory';
+            updateActiveCard();
+          }
+        }
+        // Nếu đã trôi ngược về Set 0 (phía trước): dịch tiến tới về Set 1
+        else if (currentIdx < originalCount) {
+          const normalizedIdx = currentIdx + originalCount;
+          const targetCard = allCards[normalizedIdx];
+          if (targetCard) {
+            const targetLeft = targetCard.offsetLeft + (targetCard.offsetWidth / 2) - (track.clientWidth / 2);
+            track.style.scrollSnapType = 'none';
+            track.scrollLeft = targetLeft;
+            void track.offsetWidth;
+            track.style.scrollSnapType = 'x mandatory';
+            updateActiveCard();
+          }
+        }
+      };
+
+      // Cuộn để đưa truyện chỉ định nằm ngay chính giữa màn hình
+      const scrollToCard = (idx, behavior = 'smooth') => {
+        if (!allCards.length) return;
+        if (idx < 0) idx = 0;
+        if (idx >= allCards.length) idx = allCards.length - 1;
+
+        const targetCard = allCards[idx];
+        if (!targetCard) return;
+
+        const targetScrollLeft = targetCard.offsetLeft + (targetCard.offsetWidth / 2) - (track.clientWidth / 2);
+
+        if (behavior === 'smooth') {
+          isScrolling = true;
+          track.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+
+          if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
+          scrollResetTimeout = setTimeout(() => {
+            isScrolling = false;
+            normalizeLoopPosition();
+          }, 460);
+        } else {
+          track.style.scrollSnapType = 'none';
+          track.scrollLeft = targetScrollLeft;
+          void track.offsetWidth;
+          track.style.scrollSnapType = 'x mandatory';
+          normalizeLoopPosition();
+        }
+      };
+
+      // Tạo các dấu chấm màu xanh tương ứng với các truyện gốc
+      const renderDots = () => {
+        if (!dotsContainer) return;
+        dotsContainer.innerHTML = '';
+        originalCards.forEach((card, realIdx) => {
+          const dot = document.createElement('button');
+          dot.type = 'button';
+          dot.className = 'story-carousel-dot' + (realIdx === 0 ? ' is-active' : '');
+          dot.setAttribute('aria-label', 'Xem truyện thứ ' + (realIdx + 1));
+          dot.dataset.realIndex = realIdx;
+
+          dot.addEventListener('click', (e) => {
+            e.preventDefault();
+            const currGlobalIdx = getActiveGlobalIndex();
+            const currRealIdx = parseInt(allCards[currGlobalIdx].dataset.realIndex, 10) || 0;
+
+            // Tính bước nhảy ngắn nhất theo vòng tròn
+            let diff = realIdx - currRealIdx;
+            if (diff > originalCount / 2) diff -= originalCount;
+            if (diff < -originalCount / 2) diff += originalCount;
+
+            const targetGlobalIdx = currGlobalIdx + diff;
+            scrollToCard(targetGlobalIdx, 'smooth');
+            pauseThenResume(4500);
+          });
+
+          dotsContainer.appendChild(dot);
+        });
+      };
+
+      // Cập nhật card & dấu chấm đang được kéo đến nằm ở giữa (active: to lên + khung xanh mờ phía sau)
+      const updateActiveCard = () => {
+        if (isHoveringCard) return;
+
+        const activeGlobalIdx = getActiveGlobalIndex();
+        const activeCard = allCards[activeGlobalIdx];
+        if (!activeCard) return;
+
+        const activeRealIdx = parseInt(activeCard.dataset.realIndex, 10) || 0;
+
+        allCards.forEach((card, idx) => {
+          if (idx === activeGlobalIdx) {
+            card.classList.add('is-active');
+          } else {
+            card.classList.remove('is-active');
+          }
+        });
+
+        if (dotsContainer) {
+          const dots = dotsContainer.querySelectorAll('.story-carousel-dot');
+          dots.forEach((dot) => {
+            const dotRealIdx = parseInt(dot.dataset.realIndex, 10);
+            if (dotRealIdx === activeRealIdx) {
+              dot.classList.add('is-active');
+            } else {
+              dot.classList.remove('is-active');
+            }
+          });
+        }
+      };
+
+      // Tự động chuyển động tiến tới theo 1 vòng lặp vô tận như vòng tròn
+      const stepAutoScroll = () => {
+        if (isUserInteracting || isDown || isDragging || isScrolling) return;
+
+        const currentIdx = getActiveGlobalIndex();
+        scrollToCard(currentIdx + 1, 'smooth');
+      };
+
+      const startAutoPlay = () => {
+        stopAutoPlay();
+        autoTimer = setInterval(stepAutoScroll, 3200);
+      };
+
+      const stopAutoPlay = () => {
+        if (autoTimer) {
+          clearInterval(autoTimer);
+          autoTimer = null;
+        }
+      };
+
+      const pauseThenResume = (delay = 4000) => {
+        stopAutoPlay();
+        setTimeout(() => {
+          if (!isUserInteracting && !isDown) {
+            startAutoPlay();
+          }
+        }, delay);
+      };
+
+      // Lắng nghe sự kiện scroll trên track để cập nhật card phóng to liên tục thời gian thực
+      track.addEventListener('scroll', () => {
+        if (scrollThrottle) return;
+        scrollThrottle = requestAnimationFrame(() => {
+          updateActiveCard();
+          scrollThrottle = null;
+        });
+      }, { passive: true });
+
+      // Hover trên desktop: phóng to ngay truyện được rê chuột vào
+      allCards.forEach((card) => {
+        card.addEventListener('mouseenter', () => {
+          isHoveringCard = true;
+          allCards.forEach(c => c.classList.remove('is-active'));
+          card.classList.add('is-active');
+        });
+
+        card.addEventListener('mouseleave', () => {
+          isHoveringCard = false;
+          updateActiveCard();
+        });
+      });
+
+      // Kéo chuột thủ công trên PC
+      track.addEventListener('mousedown', (e) => {
+        isDown = true;
+        isDragging = false;
+        startX = e.pageX - track.offsetLeft;
+        scrollLeft = track.scrollLeft;
+        stopAutoPlay();
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (!isDown) return;
+        isDown = false;
+        setTimeout(() => {
+          isDragging = false;
+          updateActiveCard();
+          normalizeLoopPosition();
+          if (!isUserInteracting) startAutoPlay();
+        }, 120);
+      });
+
+      track.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        const x = e.pageX - track.offsetLeft;
+        const walk = (x - startX) * 1.5;
+        if (Math.abs(walk) > 6) {
+          isDragging = true;
+          track.scrollLeft = scrollLeft - walk;
+        }
+      });
+
+      // Ngăn chặn chuyển hướng trang khi người dùng đang kéo rê chuột
+      track.addEventListener('click', (e) => {
+        if (isDragging) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
+
+      // Tạm dừng khi rê chuột vào khung truyện đề cử
+      container.addEventListener('mouseenter', () => {
+        isUserInteracting = true;
+        stopAutoPlay();
+      });
+
+      container.addEventListener('mouseleave', () => {
+        isUserInteracting = false;
+        if (!isDown) startAutoPlay();
+      });
+
+      // Tạm dừng khi chạm vuốt trên màn hình cảm ứng di động
+      track.addEventListener('touchstart', () => {
+        isUserInteracting = true;
+        stopAutoPlay();
+      }, { passive: true });
+
+      track.addEventListener('touchend', () => {
+        isUserInteracting = false;
+        setTimeout(() => {
+          updateActiveCard();
+          normalizeLoopPosition();
+        }, 150);
+        pauseThenResume(3500);
+      }, { passive: true });
+
+      // Nút Prev (<) & Next (>) theo vòng lặp tròn
+      if (btnPrev) {
+        btnPrev.addEventListener('click', (e) => {
+          e.preventDefault();
+          const currentIdx = getActiveGlobalIndex();
+          scrollToCard(currentIdx - 1, 'smooth');
+          pauseThenResume(4500);
+        });
+      }
+
+      if (btnNext) {
+        btnNext.addEventListener('click', (e) => {
+          e.preventDefault();
+          const currentIdx = getActiveGlobalIndex();
+          scrollToCard(currentIdx + 1, 'smooth');
+          pauseThenResume(4500);
+        });
+      }
+
+      // Tự động tạm dừng khi chuyển sang tab khác để tiết kiệm pin & CPU
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          stopAutoPlay();
+        } else if (!isUserInteracting) {
+          startAutoPlay();
+        }
+      });
+
+      // Cập nhật padding để căn giữa và định vị lại khi đổi kích thước màn hình
+      updateTrackPadding();
+      window.addEventListener('resize', () => {
+        updateTrackPadding();
+        const activeIdx = getActiveGlobalIndex();
+        scrollToCard(activeIdx, 'auto');
+      });
+
+      // Khởi tạo các dấu chấm màu xanh
+      renderDots();
+
+      // Bắt đầu ngay tại truyện đầu tiên của Set 1 (giữa)
+      const initialIndex = (originalCount >= 2) ? originalCount : 0;
+      scrollToCard(initialIndex, 'auto');
+      updateActiveCard();
+
+      // Bắt đầu tự động chuyển động sau 2.5s khi trang tải xong
+      setTimeout(startAutoPlay, 2500);
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     try {
@@ -9425,6 +10608,9 @@
     safeInit('AdminExtraManager', () => AdminExtraManager.init());
     safeInit('SensitiveWordModerator', () => SensitiveWordModerator.init());
     safeInit('ImageOptimizerManager', () => ImageOptimizerManager.init());
+    safeInit('SpotlightCarouselManager', () => SpotlightCarouselManager.init());
+    safeInit('ScheduleStoryManager', () => ScheduleStoryManager.init());
+    safeInit('NominatedCarouselManager', () => NominatedCarouselManager.init());
   });
 
 })(jQuery);

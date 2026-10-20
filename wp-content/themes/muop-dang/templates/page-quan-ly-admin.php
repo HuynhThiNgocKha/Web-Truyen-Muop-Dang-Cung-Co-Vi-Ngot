@@ -48,13 +48,37 @@ get_header();
     margin: 0 !important;
     padding: 0 !important;
   }
+  /* Compact single-line badges for status (Hình 1) */
+  .db-status-badges {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+  }
+  .db-status-badges .badge,
+  .badge-scheduled {
+    white-space: nowrap !important;
+    font-size: 11px !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    padding: 2.5px 7px !important;
+    line-height: 1.25 !important;
+    border-radius: 4px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    flex-shrink: 0 !important;
+  }
 </style>
 <?php
 
 global $wpdb;
 
 // 1. SYSTEM KPI STATS
-$total_stories = wp_count_posts('truyen')->publish + wp_count_posts('truyen')->pending + wp_count_posts('truyen')->draft;
+$c_posts = wp_count_posts('truyen');
+$total_stories = (int)($c_posts->publish ?? 0) + (int)($c_posts->pending ?? 0) + (int)($c_posts->draft ?? 0) + (int)($c_posts->future ?? 0);
 
 // Users count by role
 $user_counts = count_users();
@@ -71,22 +95,44 @@ $current_month_str = date('Y-m');
 $all_published_stories = get_posts(array(
     'post_type'      => 'truyen',
     'posts_per_page' => -1,
-    'post_status'    => array('publish', 'pending', 'draft')
+    'post_status'    => array('publish', 'pending', 'draft', 'future')
 ));
 
 $total_month_views = 0;
 $total_views_all = 0;
+$adm_count_all = count($all_published_stories);
+$adm_count_full = 0;
+$adm_count_ongoing = 0;
+$adm_count_nominated = 0;
+$adm_count_not_nominated = 0;
+$adm_count_visible = 0;
+$adm_count_hidden = 0;
+$adm_count_future = 0;
+
 foreach ($all_published_stories as $st) {
     $v = (int) get_post_meta($st->ID, '_truyen_views', true);
     $total_views_all += $v;
     $vm = (int) get_post_meta($st->ID, '_truyen_views_' . $current_month_str, true);
     $total_month_views += ($vm ?: $v);
+
+    $p_prog = get_post_meta($st->ID, '_truyen_status', true) ?: 'dang_ra';
+    if ($p_prog === 'hoan_thanh') $adm_count_full++;
+    else $adm_count_ongoing++;
+
+    $p_nom = get_post_meta($st->ID, '_truyen_nominated', true) ?: 'none';
+    if ($p_nom && $p_nom !== 'none') $adm_count_nominated++;
+    else $adm_count_not_nominated++;
+
+    if ($st->post_status === 'publish') $adm_count_visible++;
+    elseif ($st->post_status === 'future') $adm_count_future++;
+    else $adm_count_hidden++;
 }
 
 // Current URLs
-$current_shopee_url = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
-$current_tiktok_url = get_option('muop_tiktok_url', 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ');
-$salary_rate        = (int) get_option('muop_salary_rate', 8);
+$current_shopee_url      = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
+$current_tiktok_url      = get_option('muop_tiktok_url', 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ');
+$current_tiktok_cooldown = (int) get_option('muop_tiktok_cooldown_minutes', 7);
+$salary_rate             = (int) get_option('muop_salary_rate', 8);
 
 // Affiliate Recent Clicks
 $table_clicks = $wpdb->prefix . 'affiliate_clicks';
@@ -397,15 +443,16 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                     </div>
                     <div class="toolbar-filter-box">
                         <select id="admStoryQuickFilter" class="form-input" style="min-width: 260px; font-weight: 600; color: var(--primary-green); cursor: pointer;" title="Lọc danh sách truyện nhanh">
-                            <option value="all">⚡ Tất cả truyện (<?php echo count($all_published_stories); ?>)</option>
+                            <option value="all">⚡ Tất cả truyện (<?php echo $adm_count_all; ?>)</option>
+                            <option value="future">⏰ Đang hẹn giờ (<?php echo $adm_count_future; ?>)</option>
                             <option value="hot">🔥 Nhiều lượt xem nhất (Truyện hot)</option>
                             <option value="newest">✨ Đăng mới nhất (Truyện mới)</option>
-                            <option value="full">✅ Đã hoàn thành (Truyện full)</option>
-                            <option value="ongoing">⏳ Chưa full (Đang ra)</option>
-                            <option value="nominated">⭐ Được đề cử</option>
-                            <option value="not_nominated">⚪ Không được đề cử</option>
-                            <option value="visible">🌐 Đang hiển thị</option>
-                            <option value="hidden">👁️‍🗨️ Đã ẩn</option>
+                            <option value="full">✅ Đã hoàn thành (Truyện full - <?php echo $adm_count_full; ?>)</option>
+                            <option value="ongoing">⏳ Chưa full (Đang ra - <?php echo $adm_count_ongoing; ?>)</option>
+                            <option value="nominated">⭐ Được đề cử (<?php echo $adm_count_nominated; ?>)</option>
+                            <option value="not_nominated">⚪ Không được đề cử (<?php echo $adm_count_not_nominated; ?>)</option>
+                            <option value="visible">🌐 Đang hiển thị (<?php echo $adm_count_visible; ?>)</option>
+                            <option value="hidden">👁️‍🗨️ Đã ẩn (<?php echo $adm_count_hidden; ?>)</option>
                         </select>
                     </div>
                     <div class="toolbar-actions">
@@ -521,6 +568,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                         $adm_count_not_nominated = 0;
                         $adm_count_visible = 0;
                         $adm_count_hidden = 0;
+                        $adm_count_future = 0;
 
                         foreach ($all_published_stories as $st_cnt) {
                             $p_prog = get_post_meta($st_cnt->ID, '_truyen_status', true) ?: 'dang_ra';
@@ -532,6 +580,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                             else $adm_count_not_nominated++;
 
                             if ($st_cnt->post_status === 'publish') $adm_count_visible++;
+                            elseif ($st_cnt->post_status === 'future') $adm_count_future++;
                             else $adm_count_hidden++;
                         }
                         ?>
@@ -541,6 +590,9 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                             <div class="adm-story-filter-pills" id="admStoryFilterPills">
                                 <button type="button" class="btn-story-filter-pill active" data-filter="all">
                                     <i class="fa-solid fa-layer-group"></i> Tất cả (<?php echo $adm_count_all; ?>)
+                                </button>
+                                <button type="button" class="btn-story-filter-pill" data-filter="future" title="Lọc truyện đang hẹn giờ đăng">
+                                    <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Đang hẹn giờ (<?php echo $adm_count_future; ?>)
                                 </button>
                                 <button type="button" class="btn-story-filter-pill" data-filter="hot" title="Lọc truyện nhiều lượt xem nhất">
                                     <i class="fa-solid fa-fire" style="color: #ef4444;"></i> Nhiều view nhất (Hot)
@@ -583,11 +635,11 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                         <th>Tên Truyện</th>
                                         <th>Team Dịch</th>
                                         <th>Người Đăng</th>
-                                        <th>Trạng Thái</th>
-                                        <th>Số Chương</th>
-                                        <th>Lượt Xem</th>
-                                        <th>Đề Cử</th>
-                                        <th style="width: 130px; text-align: center;">Hành Động CSDL</th>
+                                        <th style="min-width: 140px; text-align: center; white-space: nowrap;">Trạng Thái</th>
+                                        <th style="text-align: center; white-space: nowrap;">Số Chương</th>
+                                        <th style="text-align: center; white-space: nowrap;">Lượt Xem</th>
+                                        <th style="text-align: center; white-space: nowrap;">Đề Cử</th>
+                                        <th style="width: 130px; text-align: center; white-space: nowrap;">Hành Động CSDL</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -689,18 +741,33 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                                 <div class="db-author-name"><i class="fa-solid fa-user-pen" style="color: #64748b; margin-right: 4px; font-size: 11px;"></i> <?php echo esc_html($st_author); ?></div>
                                             </td>
 
-                                            <!-- Cột Trạng Thái -->
-                                            <td>
-                                                <div class="db-status-badges">
+                                            <!-- Cột Trạng Thái (Hình 1: Chữ nhỏ 1 xíu để nằm cùng 1 hàng) -->
+                                            <td style="text-align: center; white-space: nowrap;">
+                                                <div class="db-status-badges" style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: nowrap; white-space: nowrap;">
                                                     <?php if ($st->post_status === 'publish') : ?>
-                                                        <span class="badge badge-approved"><i class="fa-solid fa-check"></i> Hiển thị</span>
+                                                        <span class="badge badge-approved" style="white-space: nowrap !important; font-size: 11px !important; text-transform: none !important; letter-spacing: 0 !important; padding: 2.5px 7px !important; line-height: 1.25 !important; border-radius: 4px !important; display: inline-flex !important; align-items: center !important; gap: 3px !important;"><i class="fa-solid fa-check"></i> Hiển thị</span>
+                                                    <?php elseif ($st->post_status === 'future') : 
+                                                        $adm_sched_time = get_post_meta($st->ID, '_truyen_scheduled_time', true) ?: $st->post_date;
+                                                        $adm_sched_ts   = strtotime($adm_sched_time);
+                                                        $adm_sched_fmt  = date_i18n('H:i - d/m/Y', $adm_sched_ts);
+                                                    ?>
+                                                        <span class="badge badge-scheduled btn-show-scheduled-popup" 
+                                                              data-story-id="<?php echo $st->ID; ?>" 
+                                                              data-story-title="<?php echo esc_attr($st->post_title); ?>" 
+                                                              data-scheduled-time="<?php echo esc_attr($adm_sched_time); ?>" 
+                                                              data-scheduled-formatted="<?php echo esc_attr($adm_sched_fmt); ?>" 
+                                                              onclick="if(window.muopOpenScheduleModal){window.muopOpenScheduleModal(<?php echo $st->ID; ?>, '<?php echo esc_js($st->post_title); ?>', '<?php echo esc_js($adm_sched_time); ?>', '<?php echo esc_js($adm_sched_fmt); ?>'); return false;}"
+                                                              style="cursor: pointer; white-space: nowrap !important; font-size: 11px !important; text-transform: none !important; letter-spacing: 0 !important; padding: 2.5px 7px !important; line-height: 1.25 !important; border-radius: 4px !important; display: inline-flex !important; align-items: center !important; gap: 3px !important;"
+                                                              title="Nhấn để xem thời gian đã lên lịch">
+                                                            <i class="fa-solid fa-clock-rotate-left"></i> Đã hẹn giờ
+                                                        </span>
                                                     <?php elseif ($st->post_status === 'pending') : ?>
-                                                        <span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Chờ duyệt</span>
+                                                        <span class="badge badge-hot" style="white-space: nowrap !important; font-size: 11px !important; text-transform: none !important; letter-spacing: 0 !important; padding: 2.5px 7px !important; line-height: 1.25 !important; border-radius: 4px !important; display: inline-flex !important; align-items: center !important; gap: 3px !important;"><i class="fa-solid fa-clock"></i> Chờ duyệt</span>
                                                     <?php else : ?>
-                                                        <span class="badge" style="background: #fee2e2; color: #dc2626;"><i class="fa-solid fa-eye-slash"></i> Đang ẩn</span>
+                                                        <span class="badge" style="background: #fee2e2; color: #dc2626; white-space: nowrap !important; font-size: 11px !important; text-transform: none !important; letter-spacing: 0 !important; padding: 2.5px 7px !important; line-height: 1.25 !important; border-radius: 4px !important; display: inline-flex !important; align-items: center !important; gap: 3px !important;"><i class="fa-solid fa-eye-slash"></i> Đang ẩn</span>
                                                     <?php endif; ?>
 
-                                                    <span class="badge <?php echo ($st_progress === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?> btn-table-change-status" data-story-id="<?php echo $st->ID; ?>" data-current-status="<?php echo esc_attr($st_progress); ?>" title="Đổi trạng thái Đang ra / Full">
+                                                    <span class="badge <?php echo ($st_progress === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?> btn-table-change-status" data-story-id="<?php echo $st->ID; ?>" data-current-status="<?php echo esc_attr($st_progress); ?>" style="white-space: nowrap !important; font-size: 11px !important; text-transform: none !important; letter-spacing: 0 !important; padding: 2.5px 7px !important; line-height: 1.25 !important; border-radius: 4px !important; display: inline-flex !important; align-items: center !important; gap: 3px !important;" title="Đổi trạng thái Đang ra / Full">
                                                         <i class="fa-solid <?php echo ($st_progress === 'hoan_thanh') ? 'fa-check' : 'fa-arrows-rotate'; ?>"></i>
                                                         <span class="table-status-text"><?php echo ($st_progress === 'hoan_thanh') ? 'Full' : 'Đang ra'; ?></span>
                                                     </span>
@@ -737,6 +804,24 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                                             <i class="fa-solid fa-ellipsis-vertical"></i>
                                                         </button>
                                                         <div class="story-dropdown-menu">
+                                                            <?php if ($st->post_status === 'future') : ?>
+                                                                <!-- Xem giờ đã hẹn (Hình 2: hiển thị khi truyện đã lên lịch) -->
+                                                                <button type="button" class="story-dropdown-item btn-show-scheduled-popup" 
+                                                                        data-story-id="<?php echo $st->ID; ?>" 
+                                                                        data-story-title="<?php echo esc_attr($st->post_title); ?>" 
+                                                                        data-scheduled-time="<?php echo esc_attr($adm_sched_time); ?>" 
+                                                                        data-scheduled-formatted="<?php echo esc_attr($adm_sched_fmt); ?>"
+                                                                        onclick="if(window.muopOpenScheduleModal){window.muopOpenScheduleModal(<?php echo $st->ID; ?>, '<?php echo esc_js($st->post_title); ?>', '<?php echo esc_js($adm_sched_time); ?>', '<?php echo esc_js($adm_sched_fmt); ?>'); return false;}">
+                                                                    <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Xem giờ đã hẹn
+                                                                </button>
+                                                                <button type="button" class="story-dropdown-item btn-publish-draft" data-story-id="<?php echo $st->ID; ?>">
+                                                                    <i class="fa-solid fa-bolt" style="color: #2E7D32;"></i> Đăng ngay (Xuất bản)
+                                                                </button>
+                                                                <button type="button" class="story-dropdown-item btn-cancel-schedule-action" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                                    <i class="fa-solid fa-file-pen" style="color: #b45309;"></i> Hủy hẹn (Về bản nháp)
+                                                                </button>
+                                                            <?php endif; ?>
+
                                                             <!-- 1. Thêm (chỉ hiện popup ở đây) -->
                                                             <button type="button" class="story-dropdown-item btn-action-quick-add-chapter" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
                                                                 <i class="fa-solid fa-plus" style="color: #16a34a;"></i> Thêm chương mới
@@ -762,14 +847,17 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                                                 <i class="fa-solid fa-trash-can" style="color: #dc2626;"></i> Xóa truyện
                                                             </button>
 
-                                                            <!-- 6. Ẩn truyện / Hiện truyện -->
+                                                            <!-- 6. Ẩn truyện / Hiện truyện / Hẹn giờ công khai -->
                                                             <?php if ($st->post_status === 'publish') : ?>
                                                                 <button type="button" class="story-dropdown-item btn-admin-action btn-toggle-story-visibility" data-action="hide_story" data-story-id="<?php echo $st->ID; ?>">
                                                                     <i class="fa-solid fa-eye-slash" style="color: #d97706;"></i> Ẩn truyện
                                                                 </button>
-                                                            <?php else : ?>
+                                                            <?php elseif ($st->post_status !== 'future') : ?>
                                                                 <button type="button" class="story-dropdown-item btn-admin-action btn-toggle-story-visibility" data-action="unhide_story" data-story-id="<?php echo $st->ID; ?>">
                                                                     <i class="fa-solid fa-eye" style="color: var(--primary-green);"></i> Hiện truyện
+                                                                </button>
+                                                                <button type="button" class="story-dropdown-item btn-action-schedule-draft" data-story-id="<?php echo $st->ID; ?>" data-story-title="<?php echo esc_attr($st->post_title); ?>">
+                                                                    <i class="fa-solid fa-clock-rotate-left" style="color: #8b5cf6;"></i> Hẹn giờ công khai
                                                                 </button>
                                                             <?php endif; ?>
 
@@ -1623,7 +1711,13 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                         $u_stt = 1;
                                         foreach ($all_users as $u) : 
                                             $roles = (array) $u->roles;
-                                            $r = !empty($roles) ? $roles[0] : 'doc_gia';
+                                            if (in_array('administrator', $roles, true)) {
+                                                $r = 'administrator';
+                                            } elseif (in_array('dich_gia', $roles, true)) {
+                                                $r = 'dich_gia';
+                                            } else {
+                                                $r = 'doc_gia';
+                                            }
                                             $is_locked = (bool) get_user_meta($u->ID, '_muop_account_locked', true);
                                             $u_avatar = get_user_meta($u->ID, 'muop_user_avatar', true);
                                             $u_avatar = function_exists('muop_normalize_url') ? muop_normalize_url($u_avatar) : $u_avatar;
@@ -1924,6 +2018,16 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     <input type="url" name="tiktok_url" class="form-input" value="<?php echo esc_url($current_tiktok_url); ?>" required />
                                     <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 3px;">
                                         Kích hoạt chuyển hướng nền khi tương tác.
+                                    </small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" style="font-size: 12.5px;">
+                                        <i class="fa-solid fa-clock-rotate-left" style="color: #4A148C;"></i> Thời Gian Giãn Cách Nhảy Link TikTok (Phút)
+                                    </label>
+                                    <input type="number" name="tiktok_cooldown_minutes" class="form-input" min="1" max="1440" value="<?php echo esc_attr($current_tiktok_cooldown); ?>" required />
+                                    <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 3px;">
+                                        Hạn chế tần suất: Sau khi nhảy 1 lần, hệ thống sẽ chờ đúng số phút này (mặc định 7 phút) mới cho nhảy tiếp lần nữa.
                                     </small>
                                 </div>
 
@@ -4504,6 +4608,7 @@ jQuery(document).ready(function($) {
 
   // Role change
   $(document).on('change_role', function(e, userId, newRole) {
+    var $row = $('#adminUserRow_' + userId);
     $.ajax({
       url: muopConfig.ajaxUrl,
       type: 'POST',
@@ -4515,7 +4620,14 @@ jQuery(document).ready(function($) {
         nonce: muopConfig.nonce
       },
       success: function(res) {
-        muopAlert(res.data ? res.data.message : 'Đã đổi quyền người dùng!', 'success');
+        if (res.success) {
+          if ($row.length) {
+            $row.attr('data-role', newRole);
+          }
+          muopAlert(res.data ? res.data.message : 'Đã đổi quyền người dùng!', 'success');
+        } else {
+          muopAlert(res.data ? res.data.message : 'Lỗi đổi quyền người dùng!', 'error');
+        }
       },
       error: function(xhr, status, error) {
         muopAlert(handleAjaxError(xhr, status, error, 'Lỗi đổi quyền người dùng!'), 'error');
@@ -4855,4 +4967,5 @@ jQuery(document).ready(function($) {
 <?php
 get_template_part('templates/modal-edit-story-master');
 get_template_part('templates/modal-admin-popups');
+get_template_part('templates/modal-schedule-story');
 get_footer();
