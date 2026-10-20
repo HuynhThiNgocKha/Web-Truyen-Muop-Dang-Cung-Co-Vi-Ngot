@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.3.6');
+define('MUOP_THEME_VERSION', '2.3.7');
 define('MUOP_THEME_DIR', get_template_directory());
 define('MUOP_THEME_URI', get_template_directory_uri());
 
@@ -6321,6 +6321,25 @@ function muop_format_story_summary($content) {
     }
 
     return $output;
+}
+
+/**
+ * Định dạng lời giới thiệu Team Dịch hoặc Dịch Giả thành các đoạn văn xuống dòng chuẩn xác
+ */
+function muop_format_team_bio($bio) {
+    if (empty($bio) || !is_string($bio)) return '';
+
+    // Chuẩn hóa dấu xuống dòng
+    $bio = str_replace(array("\r\n", "\r"), "\n", $bio);
+    $lines = explode("\n", $bio);
+    $output = '';
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if ($trimmed === '') continue;
+        $output .= '<p>' . esc_html($trimmed) . '</p>' . "\n";
+    }
+
+    return !empty($output) ? $output : '<p>' . esc_html($bio) . '</p>';
 }
 
 /**

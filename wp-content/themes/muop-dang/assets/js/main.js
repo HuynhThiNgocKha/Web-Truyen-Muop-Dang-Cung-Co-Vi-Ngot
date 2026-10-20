@@ -5424,7 +5424,8 @@
       $('#btnEditTeamBioInline').on('click', function(e) {
         e.preventDefault();
         $('#editSingleBioAlert').hide();
-        $('#inputSingleTeamBio').val($('#teamHeroBioDisplay').text().trim());
+        const currentBio = $('#teamHeroBioDisplay').attr('data-raw-bio') || $('#teamHeroBioDisplay').text().trim();
+        $('#inputSingleTeamBio').val(currentBio);
         $('#modalEditSingleTeamBio').css('display', 'flex');
         setTimeout(() => $('#inputSingleTeamBio').trigger('focus'), 100);
       });
@@ -5434,7 +5435,8 @@
         e.preventDefault();
         $('#editTeamAlert').hide();
         $('#inputTeamName').val($('#teamHeroNameDisplay').text().trim());
-        $('#inputTeamBio').val($('#teamHeroBioDisplay').text().trim());
+        const currentBio = $('#teamHeroBioDisplay').attr('data-raw-bio') || $('#teamHeroBioDisplay').text().trim();
+        $('#inputTeamBio').val(currentBio);
         $('#modalEditTeamInfo').css('display', 'flex');
         setTimeout(() => $('#inputTeamName').trigger('focus'), 100);
       });
@@ -5540,9 +5542,17 @@
 
               // Cập nhật bio
               if (res.data.team_bio !== undefined) {
-                $('#teamHeroBioDisplay').text(res.data.team_bio);
-                $('#inputSingleTeamBio').val(res.data.team_bio);
-                $('#inputTeamBio').val(res.data.team_bio);
+                const bioRaw = (res.data.team_bio || '').trim();
+                $('#teamHeroBioDisplay').attr('data-raw-bio', bioRaw);
+                const bioLines = bioRaw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                if (bioLines.length > 0) {
+                  const formattedHtml = bioLines.map(l => $('<p>').text(l).prop('outerHTML')).join('');
+                  $('#teamHeroBioDisplay').html(formattedHtml);
+                } else {
+                  $('#teamHeroBioDisplay').html('');
+                }
+                $('#inputSingleTeamBio').val(bioRaw);
+                $('#inputTeamBio').val(bioRaw);
               }
 
               // Cập nhật avatar

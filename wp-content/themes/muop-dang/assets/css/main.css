@@ -1359,6 +1359,8 @@ html[data-theme="dark"] .genre-dropdown-menu::-webkit-scrollbar-thumb {
   line-height: 1.85;
   color: var(--text-main);
   letter-spacing: 0.012em;
+  white-space: pre-line;
+  word-break: break-word;
 }
 
 .story-summary-box p:last-child {
@@ -5954,10 +5956,21 @@ html[data-theme="dark"] .auth-brand-static .auth-brand-logo {
 
 .team-hero-bio {
   flex: 1;
-  font-size: 14px;
+  font-size: 14.5px;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.65;
   margin: 0;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.team-hero-bio p {
+  margin: 0 0 8px 0;
+  line-height: 1.65;
+}
+
+.team-hero-bio p:last-child {
+  margin-bottom: 0;
 }
 
 .team-hero-action {

@@ -243,7 +243,7 @@ if (is_user_logged_in() && $team_id > 0) {
                     </div>
 
                     <div class="team-hero-bio-row">
-                        <p class="team-hero-bio" id="teamHeroBioDisplay"><?php echo esc_html($team_bio); ?></p>
+                        <div class="team-hero-bio" id="teamHeroBioDisplay" data-raw-bio="<?php echo esc_attr($team_bio); ?>"><?php echo muop_format_team_bio($team_bio); ?></div>
                         <?php if ($can_edit_team) : ?>
                             <button type="button" class="btn-edit-team-inline" id="btnEditTeamBioInline" title="Chỉnh sửa lời giới thiệu team">
                                 <i class="fa-solid fa-pen-to-square"></i>
