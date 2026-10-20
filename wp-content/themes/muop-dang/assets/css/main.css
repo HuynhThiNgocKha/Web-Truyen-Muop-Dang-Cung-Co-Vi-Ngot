@@ -11537,6 +11537,14 @@ html[data-theme="dark"] .input-user-pass-inline {
   user-select: none;
   margin-bottom: 14px;
   padding-bottom: 2px;
+  outline: none;
+}
+
+.genre-selector-header:focus,
+.genre-selector-header:focus-visible,
+.genre-selector-arrow-btn:focus,
+.genre-selector-arrow-btn:focus-visible {
+  outline: none;
 }
 
 .genre-selector-title {

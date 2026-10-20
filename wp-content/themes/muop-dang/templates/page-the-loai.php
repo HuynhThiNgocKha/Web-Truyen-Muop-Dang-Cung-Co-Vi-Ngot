@@ -80,8 +80,12 @@ $page_heading = !empty($current_genre_slug) ? ('TRUYỆN ' . mb_strtoupper($genr
             </h1>
         </div>
 
-        <!-- Khung Menu Thể Loại (Mặc định hiển thị đầy đủ toàn bộ khung theo yêu cầu) -->
-        <div class="genre-selector-card" id="genreSelectorCard">
+        <!-- Khung Menu Thể Loại (Khi nhấp vào thể loại thì sau đó ẩn đi, tới khi nhấn vào thanh tiêu đề mới sổ xuống) -->
+        <?php
+        $is_specific_genre = !empty($current_genre_slug);
+        $card_collapsed_class = $is_specific_genre ? 'is-collapsed' : '';
+        ?>
+        <div class="genre-selector-card <?php echo esc_attr($card_collapsed_class); ?>" id="genreSelectorCard" data-specific-genre="<?php echo $is_specific_genre ? '1' : '0'; ?>">
             <div class="genre-selector-header" id="genreSelectorHeader" role="button" tabindex="0" aria-label="Đóng mở danh sách thể loại">
                 <span class="genre-selector-title">
                     <i class="fa-solid fa-layer-group" style="font-size: 14px; color: var(--primary-green);"></i> Thể Loại
@@ -144,18 +148,53 @@ $page_heading = !empty($current_genre_slug) ? ('TRUYỆN ' . mb_strtoupper($genr
 
 <script>
 (function() {
-    function initGenreSelectorToggle() {
+    function initGenreSelector() {
         var card = document.getElementById('genreSelectorCard');
         var header = document.getElementById('genreSelectorHeader');
-        var arrow = document.getElementById('btnGenreSelectorArrow');
         if (!card || !header) return;
 
+        var isSpecificGenre = card.dataset.specificGenre === '1';
+
+        // Kiểm tra trạng thái đã lưu từ sessionStorage
+        var savedState = null;
+        try {
+            savedState = sessionStorage.getItem('muop_genre_collapsed');
+        } catch(e) {}
+
+        if (savedState === '1') {
+            card.classList.add('is-collapsed');
+        } else if (savedState === '0' && !isSpecificGenre) {
+            card.classList.remove('is-collapsed');
+        }
+
+        // Khi nhấp vào bất kỳ nút thể loại nào -> Lưu cờ để sau đó trang thể loại tự động ẩn đi
+        var genreButtons = card.querySelectorAll('.genre-box-btn');
+        genreButtons.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                try {
+                    sessionStorage.setItem('muop_genre_collapsed', '1');
+                } catch(e) {}
+            });
+        });
+
+        // Bấm vào thanh tiêu đề Thể Loại để đóng / mở (sổ xuống)
         function toggleGenreCard(e) {
             if (e) {
                 e.preventDefault();
                 e.stopPropagation();
             }
-            card.classList.toggle('is-collapsed');
+            var isCurrentlyCollapsed = card.classList.contains('is-collapsed');
+            if (isCurrentlyCollapsed) {
+                card.classList.remove('is-collapsed');
+                try {
+                    sessionStorage.setItem('muop_genre_collapsed', '0');
+                } catch(e) {}
+            } else {
+                card.classList.add('is-collapsed');
+                try {
+                    sessionStorage.setItem('muop_genre_collapsed', '1');
+                } catch(e) {}
+            }
         }
 
         header.addEventListener('click', toggleGenreCard);
@@ -165,19 +204,12 @@ $page_heading = !empty($current_genre_slug) ? ('TRUYỆN ' . mb_strtoupper($genr
                 toggleGenreCard(e);
             }
         });
-
-        if (arrow && arrow !== header) {
-            arrow.addEventListener('click', function(e) {
-                e.stopPropagation();
-                toggleGenreCard(e);
-            });
-        }
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initGenreSelectorToggle);
+        document.addEventListener('DOMContentLoaded', initGenreSelector);
     } else {
-        initGenreSelectorToggle();
+        initGenreSelector();
     }
 })();
 </script>
