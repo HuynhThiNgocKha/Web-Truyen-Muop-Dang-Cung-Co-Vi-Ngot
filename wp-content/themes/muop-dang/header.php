@@ -329,6 +329,10 @@ if ($genres === false) {
     <meta name="twitter:image" content="<?php echo esc_url($og_image); ?>">
 
     <?php wp_head(); ?>
+    <?php if (!wp_style_is('muop-main-style', 'enqueued') && !wp_style_is('muop-main-style', 'done')) : ?>
+        <link rel="stylesheet" id="muop-theme-style-fallback" href="<?php echo esc_url(get_stylesheet_uri() . '?v=' . (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0')); ?>">
+        <link rel="stylesheet" id="muop-main-style-fallback" href="<?php echo esc_url(get_template_directory_uri() . '/assets/css/main.css?v=' . (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0')); ?>">
+    <?php endif; ?>
 </head>
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
