@@ -384,7 +384,7 @@ if (is_user_logged_in() && $team_id > 0) {
                                         <div class="team-spotlight-meta">
                                             <span><i class="fa-solid fa-pen-nib"></i> <?php echo esc_html($item_author); ?></span>
                                             <span><i class="fa-solid fa-book-open"></i> <?php echo $item_chap_cnt; ?> Chương</span>
-                                            <?php if (muop_can_see_story_views($item_id)) : ?>
+                                            <?php if (function_exists('muop_can_see_story_views') ? muop_can_see_story_views($item_id) : true) : ?>
                                                 <span style="color: var(--primary-green); font-weight: 700;"><i class="fa-solid fa-eye"></i> <?php echo number_format($item_views); ?> lượt đọc</span>
                                             <?php endif; ?>
                                             <span class="badge <?php echo ($item_status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?>">

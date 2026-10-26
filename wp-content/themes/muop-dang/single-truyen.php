@@ -266,7 +266,7 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                         <span class="meta-value"><strong><?php echo $chap_count; ?></strong> Chương</span>
                     </div>
 
-                    <?php if (muop_can_see_story_views($story_id)) : ?>
+                    <?php if (function_exists('muop_can_see_story_views') ? muop_can_see_story_views($story_id) : true) : ?>
                         <div class="meta-item">
                             <span class="meta-label"><i class="fa-solid fa-eye"></i> Số lượt xem:</span>
                             <span class="meta-value"><strong><?php echo number_format($views); ?></strong> lượt</span>
@@ -412,7 +412,7 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                                     <span class="chap-title-text"><?php echo esc_html(muop_get_clean_chapter_title($chap->post_title)); ?></span>
                                 </span>
                                 <span class="chapter-item-meta">
-                                    <?php if (muop_can_see_story_views($story_id)) : ?>
+                                    <?php if (function_exists('muop_can_see_story_views') ? muop_can_see_story_views($story_id) : true) : ?>
                                         <span class="chapter-item-views" title="Lượt xem chương (Dịch giả & Quản trị)">
                                             <i class="fa-regular fa-eye"></i> <?php echo number_format($chap_views); ?>
                                         </span>

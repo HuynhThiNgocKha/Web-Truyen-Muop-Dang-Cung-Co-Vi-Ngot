@@ -53,8 +53,35 @@ if (!function_exists('muop_get_story_views')) {
     }
 }
 if (!function_exists('muop_get_story_last_updated')) {
-    function muop_get_story_last_updated($id) {
-        return array('display' => get_the_modified_date('d/m/Y', $id), 'timestamp' => get_post_modified_time('U', false, $id));
+    function muop_get_story_last_updated($id, $override_ts = null) {
+        $mod_ts = $override_ts ?: get_post_modified_time('U', false, $id);
+        $diff = function_exists('human_time_diff') ? human_time_diff($mod_ts, current_time('timestamp')) : '';
+        return array(
+            'display'   => get_the_modified_date('d/m/Y', $id),
+            'timestamp' => $mod_ts,
+            'time_ago'  => $diff ? ($diff . ' trước') : 'Mới'
+        );
+    }
+}
+if (!function_exists('muop_time_ago')) {
+    function muop_time_ago($ts) {
+        if (empty($ts)) return '';
+        $t = is_numeric($ts) ? (int)$ts : strtotime($ts);
+        $diff = function_exists('human_time_diff') ? human_time_diff($t, current_time('timestamp')) : '';
+        return $diff ? ($diff . ' trước') : 'Mới';
+    }
+}
+if (!function_exists('muop_can_see_story_views')) {
+    function muop_can_see_story_views($story_id = 0) {
+        if (!is_user_logged_in()) return false;
+        if (function_exists('muop_is_admin') && muop_is_admin()) return true;
+        $current_uid = get_current_user_id();
+        if (function_exists('muop_user_is_translator') && muop_user_is_translator($current_uid)) return true;
+        if ($story_id) {
+            $author_id = (int) get_post_field('post_author', $story_id);
+            if ($author_id && $author_id === $current_uid) return true;
+        }
+        return false;
     }
 }
 if (!function_exists('muop_get_story_chapters')) {
@@ -97,6 +124,73 @@ if (!function_exists('muop_is_chapter_checkpoint')) {
         $total_chapters = (int)$total_chapters;
         if ($total_chapters <= 4) return ($chap_num === 1 || $chap_num === 3);
         return ($chap_num >= 2 && ($chap_num % 3 === 2));
+    }
+}
+if (!function_exists('muop_can_user_delete_comment')) {
+    function muop_can_user_delete_comment($comment, $user_id = 0) {
+        if (!$user_id) $user_id = get_current_user_id();
+        return user_can($user_id, 'manage_options');
+    }
+}
+if (!function_exists('muop_format_story_summary')) {
+    function muop_format_story_summary($str) {
+        return wp_kses_post(nl2br($str));
+    }
+}
+if (!function_exists('muop_format_team_bio')) {
+    function muop_format_team_bio($bio) {
+        return wp_kses_post(nl2br($bio));
+    }
+}
+if (!function_exists('muop_get_chapter_views')) {
+    function muop_get_chapter_views($id) {
+        return (int) get_post_meta($id, '_chuong_views', true);
+    }
+}
+if (!function_exists('muop_get_clean_chapter_title')) {
+    function muop_get_clean_chapter_title($title) {
+        return esc_html($title);
+    }
+}
+if (!function_exists('muop_get_sensitive_words')) {
+    function muop_get_sensitive_words() {
+        return array();
+    }
+}
+if (!function_exists('muop_get_user_team_url')) {
+    function muop_get_user_team_url($user_id = 0) {
+        return home_url('/');
+    }
+}
+if (!function_exists('muop_is_story_of_team_muop_dang')) {
+    function muop_is_story_of_team_muop_dang($story_id) {
+        return true;
+    }
+}
+if (!function_exists('muop_is_translator_or_admin')) {
+    function muop_is_translator_or_admin($user_id = 0) {
+        if (!$user_id) $user_id = get_current_user_id();
+        return user_can($user_id, 'manage_options');
+    }
+}
+if (!function_exists('muop_is_user_following_team')) {
+    function muop_is_user_following_team($uid, $tid) {
+        return false;
+    }
+}
+if (!function_exists('muop_normalize_url')) {
+    function muop_normalize_url($url) {
+        return esc_url($url);
+    }
+}
+if (!function_exists('muop_render_comment_content')) {
+    function muop_render_comment_content($content) {
+        return esc_html($content);
+    }
+}
+if (!function_exists('muop_render_sticker_picker')) {
+    function muop_render_sticker_picker() {
+        return '';
     }
 }
 

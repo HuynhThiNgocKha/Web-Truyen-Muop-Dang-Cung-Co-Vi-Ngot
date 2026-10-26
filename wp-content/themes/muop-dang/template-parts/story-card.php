@@ -35,8 +35,8 @@ if (!empty($chapters)) {
 $is_new_updated = (!empty($args) && !empty($args['show_latest_chapter'])) || is_page('truyen-moi');
 
 // Thời gian cập nhật gần nhất (tận dụng $latest_chap_ts để loại bỏ triệt để query DB thừa)
-$story_update_data = muop_get_story_last_updated($story_id, $latest_chap_ts ?: null);
-$time_diff         = $story_update_data['time_ago'] ?: 'Mới';
+$story_update_data = function_exists('muop_get_story_last_updated') ? muop_get_story_last_updated($story_id, $latest_chap_ts ?: null) : [];
+$time_diff         = (!empty($story_update_data['time_ago'])) ? $story_update_data['time_ago'] : 'Mới';
 
 $thumb_url = get_the_post_thumbnail_url($story_id, 'muop-cover');
 if (!$thumb_url) {
@@ -69,7 +69,7 @@ if (!$thumb_url) {
 
         <!-- Dải thông tin lượt xem & bookmark đè đáy ảnh bìa (chuẩn Hình 2) -->
         <div class="story-cover-meta-bar">
-            <?php if (muop_can_see_story_views($story_id)) : ?>
+            <?php if (function_exists('muop_can_see_story_views') ? muop_can_see_story_views($story_id) : true) : ?>
                 <span class="meta-views" title="Lượt xem">
                     <i class="fa-regular fa-eye"></i> <?php echo number_format($views); ?>
                 </span>
