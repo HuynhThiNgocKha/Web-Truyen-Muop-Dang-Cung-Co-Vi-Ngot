@@ -4,12 +4,15 @@
  */
 if (!defined('ABSPATH')) exit;
 
-// Cưỡng chế nạp functions.php cùng thư mục nếu WordPress chưa nạp
+// 1. Luôn bảo đảm hằng số phiên bản theme tồn tại
 if (!defined('MUOP_THEME_VERSION')) {
-    $functions_file = __DIR__ . '/functions.php';
-    if (file_exists($functions_file)) {
-        require_once $functions_file;
-    }
+    define('MUOP_THEME_VERSION', '2.5.0');
+}
+
+// 2. Cưỡng chế nạp functions.php cùng thư mục nếu chưa nạp
+$functions_file = __DIR__ . '/functions.php';
+if (file_exists($functions_file) && !function_exists('muop_setup_theme')) {
+    require_once $functions_file;
 }
 
 // Fallback an toàn phòng khi functions.php chưa nạp kịp trên hosting
@@ -86,6 +89,14 @@ if (!function_exists('muop_is_user_following_story')) {
 if (!function_exists('muop_is_user_favorited_story')) {
     function muop_is_user_favorited_story($uid, $sid) {
         return false;
+    }
+}
+if (!function_exists('muop_is_chapter_checkpoint')) {
+    function muop_is_chapter_checkpoint($chap_num, $total_chapters) {
+        $chap_num = (int)$chap_num;
+        $total_chapters = (int)$total_chapters;
+        if ($total_chapters <= 4) return ($chap_num === 1 || $chap_num === 3);
+        return ($chap_num >= 2 && ($chap_num % 3 === 2));
     }
 }
 
@@ -250,7 +261,7 @@ if ($genres === false) {
                     <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>" alt="Logo Mướp Đắng" class="brand-icon-img" />
                 </div>
                 <div class="brand-text">
-                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . MUOP_THEME_VERSION); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" />
+                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0')); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" />
                     <h1 class="sr-only"><?php bloginfo('name'); ?></h1>
                 </div>
             </a>
@@ -532,7 +543,7 @@ if ($genres === false) {
                 <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>" alt="Logo Mướp Đắng" class="brand-icon-img" />
             </div>
             <div class="brand-text">
-                <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . MUOP_THEME_VERSION); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" style="height: 32px;" />
+                <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0')); ?>" alt="<?php bloginfo('name'); ?>" class="brand-title-img" style="height: 32px;" />
             </div>
         </a>
         <button type="button" class="drawer-close-btn" id="drawerCloseBtn" aria-label="Đóng menu">

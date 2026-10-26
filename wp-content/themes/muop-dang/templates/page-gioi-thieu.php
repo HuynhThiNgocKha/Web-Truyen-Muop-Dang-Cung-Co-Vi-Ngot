@@ -17,13 +17,13 @@ get_header();
 
         <div style="text-align: center; margin-bottom: 32px;">
             <div class="about-hero-logo">
-                <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png?v=' . MUOP_THEME_VERSION); ?>" 
+                <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png?v=' . (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0')); ?>" 
                      alt="Logo Mướp Đắng Cũng Có Vị Ngọt" 
                      class="about-logo-icon" />
             </div>
             <div class="about-hero-title">
                 <h1 style="margin: 0; line-height: 1;">
-                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . MUOP_THEME_VERSION); ?>" 
+                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0')); ?>" 
                          alt="Mướp Đắng Cũng Có Vị Ngọt" 
                          class="about-logo-text" />
                     <span class="sr-only">Mướp Đắng Cũng Có Vị Ngọt</span>

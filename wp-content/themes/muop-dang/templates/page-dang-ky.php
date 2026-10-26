@@ -20,7 +20,7 @@ get_header();
                     <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>" alt="Logo Mướp Đắng" style="width: 100% !important; height: 100% !important; border-radius: 50% !important; object-fit: cover !important; display: block !important;" />
                 </div>
                 <div class="auth-brand-text" style="display: flex !important; align-items: center !important; flex-shrink: 0 !important;">
-                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . MUOP_THEME_VERSION); ?>" alt="<?php bloginfo('name'); ?>" style="height: 34px !important; width: auto !important; max-width: 165px !important; object-fit: contain !important; display: block !important;" />
+                    <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-text.png?v=' . (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0')); ?>" alt="<?php bloginfo('name'); ?>" style="height: 34px !important; width: auto !important; max-width: 165px !important; object-fit: contain !important; display: block !important;" />
                 </div>
             </a>
             <h2>Đăng Ký Tài Khoản Độc Giả</h2>

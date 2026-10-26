@@ -2803,7 +2803,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                 <div>
                                     <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
                                         Tổng Hợp Tính Năng & Nhật Ký Phát Triển Website
-                                        <span class="badge badge-green" style="font-size: 11px;">v<?php echo MUOP_THEME_VERSION; ?></span>
+                                        <span class="badge badge-green" style="font-size: 11px;">v<?php echo (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0'); ?></span>
                                     </h3>
                                     <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-muted);">
                                         Liệt kê đầy đủ mọi tính năng, chức năng của website. Mọi cập nhật hay chức năng mới luôn được tự động hiển thị ở đầu trang.
@@ -2831,7 +2831,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     </div>
                                     <div>
                                         <label class="form-label" style="font-size: 12px; font-weight: 600;">Phiên Bản</label>
-                                        <input type="text" name="version" class="form-input" value="v<?php echo MUOP_THEME_VERSION; ?>" placeholder="v2.2.47" />
+                                        <input type="text" name="version" class="form-input" value="v<?php echo (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0'); ?>" placeholder="v2.2.47" />
                                     </div>
                                     <div>
                                         <label class="form-label" style="font-size: 12px; font-weight: 600;">Phân Hệ</label>
@@ -3319,7 +3319,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                     <span class="db-status-dot"></span>
                     <span class="db-status-text">Hệ thống vận hành ổn định</span>
                     <span class="admin-db-footer-divider">•</span>
-                    <span class="db-version-badge">v<?php echo MUOP_THEME_VERSION; ?></span>
+                    <span class="db-version-badge">v<?php echo (defined('MUOP_THEME_VERSION') ? MUOP_THEME_VERSION : '2.5.0'); ?></span>
                 </div>
             </footer>
         </section>
