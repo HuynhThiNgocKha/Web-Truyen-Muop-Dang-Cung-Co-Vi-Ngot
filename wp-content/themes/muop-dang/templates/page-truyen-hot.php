@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Trang Truyện Hot
- * Hiển thị tất cả truyện có lượt xem cao nhất (20 truyện / trang)
+ * Hiển thị tất cả truyện có lượt xem cao nhất (24 truyện / trang)
  */
 if (!defined('ABSPATH')) exit;
 
@@ -10,7 +10,7 @@ get_header();
 $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
 $query = new WP_Query(array(
     'post_type'      => 'truyen',
-    'posts_per_page' => 20,
+    'posts_per_page' => 24,
     'post_status'    => 'publish',
     'meta_key'       => '_truyen_views',
     'orderby'        => 'meta_value_num',

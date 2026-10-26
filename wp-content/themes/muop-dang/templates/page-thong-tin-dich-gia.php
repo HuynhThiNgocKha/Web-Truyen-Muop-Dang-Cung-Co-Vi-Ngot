@@ -433,8 +433,7 @@ if (!empty($story_ids)) {
                                             <span class="badge badge-approved"><i class="fa-solid fa-check"></i> Đã duyệt</span>
                                         <?php elseif ($st->post_status === 'future') : 
                                             $st_sched_time = get_post_meta($st->ID, '_truyen_scheduled_time', true) ?: $st->post_date;
-                                            $st_sched_ts   = strtotime($st_sched_time);
-                                            $st_sched_fmt  = date_i18n('H:i - d/m/Y', $st_sched_ts);
+                                            $st_sched_fmt  = muop_format_datetime($st_sched_time, 'H:i - d/m/Y');
                                         ?>
                                             <span class="badge badge-scheduled btn-show-scheduled-popup" 
                                                   data-story-id="<?php echo $st->ID; ?>" 
@@ -475,8 +474,7 @@ if (!empty($story_ids)) {
                                                     </button>
                                                 <?php elseif ($st->post_status === 'future') : 
                                                     $st_sched_time = get_post_meta($st->ID, '_truyen_scheduled_time', true) ?: $st->post_date;
-                                                    $st_sched_ts   = strtotime($st_sched_time);
-                                                    $st_sched_fmt  = date_i18n('H:i - d/m/Y', $st_sched_ts);
+                                                    $st_sched_fmt  = muop_format_datetime($st_sched_time, 'H:i - d/m/Y');
                                                 ?>
                                                     <button type="button" class="story-dropdown-item btn-show-scheduled-popup" 
                                                             data-story-id="<?php echo $st->ID; ?>" 

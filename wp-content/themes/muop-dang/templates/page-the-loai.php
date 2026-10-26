@@ -38,7 +38,7 @@ if ($all_genres === false) {
 // Truy vấn truyện: luôn sắp xếp truyện mới nhất trước
 $query_args = array(
     'post_type'      => 'truyen',
-    'posts_per_page' => 20,
+    'posts_per_page' => 24,
     'post_status'    => 'publish',
     'paged'          => $paged,
     'orderby'        => 'date',

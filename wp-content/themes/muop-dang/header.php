@@ -42,6 +42,8 @@ if ($genres === false) {
       });
     </script>
     <link rel="profile" href="https://gmpg.org/xfn/11">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="icon" type="image/png" href="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-icon.png'); ?>">
     <?php
     // Cấu hình Open Graph & Social Share Meta Tags (Facebook, Zalo, Twitter, Telegram)

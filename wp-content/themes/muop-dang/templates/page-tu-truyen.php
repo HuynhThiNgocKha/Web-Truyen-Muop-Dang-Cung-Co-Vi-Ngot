@@ -145,7 +145,7 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
                     'post_type'      => 'truyen',
                     'post__in'       => $saved_story_ids,
                     'orderby'        => 'post__in',
-                    'posts_per_page' => 20,
+                    'posts_per_page' => 24,
                     'post_status'    => 'publish',
                     'paged'          => $paged
                 ));
@@ -203,7 +203,7 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
                     'post_type'      => 'truyen',
                     'post__in'       => $fav_story_ids,
                     'orderby'        => 'post__in',
-                    'posts_per_page' => 20,
+                    'posts_per_page' => 24,
                     'post_status'    => 'publish',
                     'paged'          => $paged
                 ));
@@ -261,7 +261,7 @@ $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
                     'post_type'      => 'truyen',
                     'post__in'       => $following_story_ids,
                     'orderby'        => 'post__in',
-                    'posts_per_page' => 20,
+                    'posts_per_page' => 24,
                     'post_status'    => 'publish',
                     'paged'          => $paged
                 ));

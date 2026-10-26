@@ -106,8 +106,7 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
         <!-- BANNER TRẠNG THÁI CHO QUẢN TRỊ VIÊN & DỊCH GIẢ KHI TRUYỆN ĐANG HẸN GIỜ HOẶC ẨN -->
         <?php if ($story_post_status === 'future') : 
             $sched_time = get_post_meta($story_id, '_truyen_scheduled_time', true) ?: $story_post->post_date;
-            $sched_ts   = strtotime($sched_time);
-            $sched_fmt  = date_i18n('H:i - d/m/Y', $sched_ts);
+            $sched_fmt  = muop_format_datetime($sched_time, 'H:i - d/m/Y');
         ?>
             <div class="alert-scheduled-banner" style="background: linear-gradient(135deg, #f5f3ff, #faf5ff); border: 1.5px solid #c4b5fd; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.08);">
                 <div style="display: flex; align-items: center; gap: 12px;">

@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Trang Truyện Full
- * Hiển thị tất cả truyện đã full hoàn thành (20 truyện / trang)
+ * Hiển thị tất cả truyện đã full hoàn thành (24 truyện / trang)
  */
 if (!defined('ABSPATH')) exit;
 
@@ -10,7 +10,7 @@ get_header();
 $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
 $query = new WP_Query(array(
     'post_type'      => 'truyen',
-    'posts_per_page' => 20,
+    'posts_per_page' => 24,
     'post_status'    => 'publish',
     'meta_query'     => array(
         array(
@@ -47,7 +47,7 @@ $query = new WP_Query(array(
                 endwhile;
             else :
                 // Fallback to latest stories
-                $fallback = new WP_Query(array('post_type' => 'truyen', 'posts_per_page' => 20, 'post_status' => 'publish'));
+                $fallback = new WP_Query(array('post_type' => 'truyen', 'posts_per_page' => 24, 'post_status' => 'publish'));
                 while ($fallback->have_posts()) : $fallback->the_post();
                     get_template_part('template-parts/story-card');
                 endwhile;
@@ -56,7 +56,7 @@ $query = new WP_Query(array(
             ?>
         </div>
 
-        <!-- Phân trang 20 truyện / trang (Chỉ hiển thị khi có từ 2 trang trở lên) -->
+        <!-- Phân trang 24 truyện / trang (Chỉ hiển thị khi có từ 2 trang trở lên) -->
         <?php if ($query->max_num_pages > 1) : ?>
             <div class="pagination-wrapper">
                 <?php

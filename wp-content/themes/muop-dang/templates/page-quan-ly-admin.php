@@ -17,6 +17,16 @@ show_admin_bar(false);
 get_header();
 ?>
 <style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  html, body, .admin-db-container, .admin-db-sidebar, .admin-db-main, .admin-db-content, .admin-db-footer, button, input, select, textarea, .badge, table, td, th {
+    font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif !important;
+  }
+  .badge {
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+  }
   html, body {
     margin: 0 !important;
     padding: 0 !important;
@@ -130,6 +140,7 @@ foreach ($all_published_stories as $st) {
 
 // Current URLs
 $current_shopee_url      = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp');
+$current_shopee_url_2    = get_option('muop_shopee_url_2', '');
 $current_tiktok_url      = get_option('muop_tiktok_url', 'https://shop.tiktok.com/vn/pdp/1732477773040355077?_t=ZS-9AM5BidmKfQ');
 $current_tiktok_cooldown = (int) get_option('muop_tiktok_cooldown_minutes', 7);
 $salary_rate             = (int) get_option('muop_salary_rate', 8);
@@ -279,6 +290,13 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                 <button type="button" class="dash-tab-btn admin-nav-item active" data-tab="admTabAnalytics" id="navItemAnalytics">
                     <span class="nav-item-icon"><i class="fa-solid fa-chart-line" style="color: #0284c7;"></i></span>
                     <span class="nav-item-label">Thống kê & Phân tích</span>
+                </button>
+
+                <!-- 1.1 Quản lý khách đọc truyện (Mới) -->
+                <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabVisitorLogs" id="navItemVisitorLogs">
+                    <span class="nav-item-icon"><i class="fa-solid fa-users-viewfinder" style="color: #0284c7;"></i></span>
+                    <span class="nav-item-label">Khách đọc truyện</span>
+                    <span class="badge" id="badgeTodayReaders" style="font-size: 10px; padding: 2px 6px; margin-left: auto; background: #e0f2fe; color: #0284c7; font-weight: 700;">Hôm nay</span>
                 </button>
 
                 <!-- 2. Quản lý truyện -->
@@ -749,7 +767,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                                     <?php elseif ($st->post_status === 'future') : 
                                                         $adm_sched_time = get_post_meta($st->ID, '_truyen_scheduled_time', true) ?: $st->post_date;
                                                         $adm_sched_ts   = strtotime($adm_sched_time);
-                                                        $adm_sched_fmt  = date_i18n('H:i - d/m/Y', $adm_sched_ts);
+                                                        $adm_sched_fmt  = muop_format_datetime($adm_sched_time, 'H:i - d/m/Y');
                                                     ?>
                                                         <span class="badge badge-scheduled btn-show-scheduled-popup" 
                                                               data-story-id="<?php echo $st->ID; ?>" 
@@ -1015,22 +1033,22 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                         <!-- 2. PHÂN TÍCH TỔNG QUAN TĂNG TRƯỞNG & LƯỢT ĐỌC TOÀN TRANG -->
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
                             <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
-                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">Tổng Lượt Xem Toàn Trang</div>
+                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">Tổng Lượt Xem Toàn Trang</div>
                                 <div style="font-size: 24px; font-weight: 800; color: #0284c7;"><?php echo number_format($total_views_all); ?></div>
                                 <div style="font-size: 12px; color: #16a34a; margin-top: 4px;"><i class="fa-solid fa-chart-line"></i> Tích lũy toàn bộ truyện</div>
                             </div>
                             <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
-                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">Lượt Xem Tháng Hiện Tại</div>
+                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">Lượt Xem Tháng Hiện Tại</div>
                                 <div style="font-size: 24px; font-weight: 800; color: var(--primary-green);"><?php echo number_format($total_month_views); ?></div>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;"><i class="fa-solid fa-calendar"></i> Tháng <?php echo date('m/Y'); ?></div>
                             </div>
                             <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
-                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">Ước Tính Lương Dịch Giả</div>
+                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">Ước Tính Lương Dịch Giả</div>
                                 <div style="font-size: 24px; font-weight: 800; color: #16a34a;"><?php echo number_format($total_month_views * $salary_rate); ?> <span style="font-size: 14px; font-weight: 600;">đ</span></div>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Định mức: <?php echo $salary_rate; ?>đ / view</div>
                             </div>
                             <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
-                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">Bình Quân Lượt Xem / Truyện</div>
+                                <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">Bình Quân Lượt Xem / Truyện</div>
                                 <div style="font-size: 24px; font-weight: 800; color: #f59e0b;"><?php echo $total_stories > 0 ? number_format(round($total_views_all / $total_stories)) : 0; ?></div>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Hiệu suất lưu lượng truyện</div>
                             </div>
@@ -1157,6 +1175,148 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =================================================================
+                     TAB: QUẢN LÝ KHÁCH ĐỌC TRUYỆN THEO NGÀY (MỚI)
+                     ================================================================= -->
+                <section id="admTabVisitorLogs" class="dash-tab-pane">
+                    <div class="adm-subview-panel">
+                        <!-- 1. Header & Giới thiệu tính năng -->
+                        <div class="db-splitter-container" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px 24px; box-shadow: var(--shadow-sm); margin-bottom: 20px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                                        <i class="fa-solid fa-users-viewfinder"></i>
+                                    </div>
+                                    <div>
+                                        <h3 style="margin: 0; font-size: 16.5px; font-weight: 700; color: var(--text-color);">Quản Lý Khách Đọc Truyện</h3>
+                                        <p style="margin: 3px 0 0; font-size: 13px; color: var(--text-muted);">
+                                            Theo dõi chi tiết số người vào đọc truyện trong từng ngày, địa chỉ IP, đọc truyện gì, chương mấy và thời gian cụ thể.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshVisitorLogs">
+                                        <i class="fa-solid fa-arrow-rotate-right"></i> Làm mới
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Thẻ thống kê tổng quan trong ngày đã chọn -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Số Người Đọc (IP)</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-users"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #0284c7; margin-top: 6px;" id="statVisitorUniqueReaders">0</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="statVisitorDateLabel">Ngày đang xem: --/--/----</div>
+                            </div>
+
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Tổng Lượt Đọc Chương</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-book-open-reader"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #16a34a; margin-top: 6px;" id="statVisitorTotalReads">0</div>
+                                <div style="font-size: 12px; color: #16a34a; margin-top: 4px;"><i class="fa-solid fa-circle-check"></i> Toàn bộ lượt đọc chương</div>
+                            </div>
+
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Khách Vãng Lai</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-user-secret"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #ea580c; margin-top: 6px;" id="statVisitorGuests">0</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Độc giả chưa đăng nhập</div>
+                            </div>
+
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Thành Viên Đăng Nhập</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #faf5ff; color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-id-badge"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #7c3aed; margin-top: 6px;" id="statVisitorMembers">0</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Tài khoản độc giả & dịch giả</div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Thanh điều hướng ngày & bộ lọc dữ liệu -->
+                        <div class="admin-table-toolbar" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; box-shadow: var(--shadow-sm); margin-bottom: 20px;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; width: 100%;">
+                                <!-- Bộ chọn ngày -->
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <label for="inputVisitorDate" style="font-size: 13px; font-weight: 700; color: var(--text-color); margin-bottom: 0;">
+                                        <i class="fa-regular fa-calendar-days" style="color: #0284c7;"></i> Chọn ngày:
+                                    </label>
+                                    <input type="date" id="inputVisitorDate" class="form-input" style="height: 36px; padding: 4px 10px; font-size: 13px; font-weight: 600; width: 150px;" value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>" />
+                                    
+                                    <!-- Nút chọn nhanh -->
+                                    <div style="display: inline-flex; gap: 6px;" id="quickVisitorDateButtons">
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date active" data-date="<?php echo date('Y-m-d'); ?>">Hôm nay</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date" data-date="<?php echo date('Y-m-d', strtotime('-1 day')); ?>">Hôm qua</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date" data-date="<?php echo date('Y-m-d', strtotime('-2 day')); ?>">Hôm kia</button>
+                                    </div>
+                                </div>
+
+                                <!-- Tìm kiếm & lọc đối tượng -->
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end; min-width: 260px;">
+                                    <div style="position: relative; min-width: 200px; flex: 1; max-width: 280px;">
+                                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-muted); pointer-events: none;"></i>
+                                        <input type="text" id="inputVisitorSearch" class="form-input" placeholder="Tìm IP, tên truyện, chương..." style="height: 36px; padding-left: 30px; font-size: 13px;" />
+                                    </div>
+
+                                    <select id="selectVisitorUserType" class="form-input" style="height: 36px; padding: 4px 10px; font-size: 13px; width: 140px;">
+                                        <option value="all">Tất cả đối tượng</option>
+                                        <option value="guest">Khách vãng lai</option>
+                                        <option value="member">Thành viên</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Bảng danh sách chi tiết khách đọc -->
+                        <div class="table-responsive db-table-container" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto;">
+                            <table class="data-table db-data-table" style="width: 100%; min-width: 860px; font-size: 13px;" id="tableVisitorLogs">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px; text-align: center;">STT</th>
+                                        <th style="width: 125px; text-align: center;">Thời Gian</th>
+                                        <th style="width: 150px;">Địa Chỉ IP</th>
+                                        <th style="width: 110px; text-align: center;">Thiết Bị</th>
+                                        <th style="width: 150px;">Người Đọc</th>
+                                        <th style="min-width: 200px;">Bộ Truyện Đọc</th>
+                                        <th style="width: 130px; text-align: center;">Chương Mấy</th>
+                                        <th style="width: 100px; text-align: center;">Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="visitorLogsListBody">
+                                    <tr>
+                                        <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px; display: block; color: var(--primary-green);"></i>
+                                            Đang tải danh sách khách đọc truyện...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div id="visitorLogsEmpty" style="display: none; padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13.5px;">
+                                <i class="fa-solid fa-inbox" style="font-size: 32px; margin-bottom: 10px; display: block; opacity: 0.4;"></i>
+                                Không có lượt đọc nào trong ngày đã chọn hoặc không khớp với bộ lọc tìm kiếm.
+                            </div>
+                        </div>
+
+                        <!-- 5. Phân trang -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; flex-wrap: wrap; gap: 10px;" id="visitorLogsPaginationWrap">
+                            <div style="font-size: 13px; color: var(--text-muted);" id="visitorLogsPaginationInfo">
+                                Hiển thị 0 / 0 lượt đọc
+                            </div>
+                            <div style="display: flex; gap: 6px;" id="visitorLogsPaginationBtns">
+                                <!-- Dynamic pagination buttons -->
                             </div>
                         </div>
                     </div>
@@ -1389,7 +1549,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     </div>
                                     <div>
                                         <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-color);">Lịch Sử Tách Chương</h4>
-                                        <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-muted);">Các phiên tách truyện gần nhất được lưu tự động trên trình duyệt. Khi tải lại trang hoặc quay lại, form sẽ luôn trống để bạn tách truyện mới.</p>
+                                        <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-muted);">Các phiên tách truyện được đồng bộ tự động trên tài khoản (máy tính &amp; điện thoại). Chỉ mất khi bạn chủ động bấm nút xóa.</p>
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
@@ -2003,11 +2163,21 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                             <form id="formUpdateAffiliateLinks">
                                 <div class="form-group">
                                     <label class="form-label" style="font-size: 12.5px;">
-                                        <i class="fa-solid fa-bag-shopping" style="color: #EE4D2D;"></i> Link Shopee (Bắt buộc click từ chương 2)
+                                        <i class="fa-solid fa-bag-shopping" style="color: #EE4D2D;"></i> Link Shopee 1 (Mặc định)
                                     </label>
                                     <input type="url" name="shopee_url" class="form-input" value="<?php echo esc_url($current_shopee_url); ?>" required />
                                     <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 3px;">
-                                        Độc giả phải click link này để mở khóa đọc tiếp ở Chương 2, 5, 8...
+                                        Độc giả phải click link này để mở khóa đọc tiếp (xuất hiện ở các lượt 1, 3, 5...).
+                                    </small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" style="font-size: 12.5px;">
+                                        <i class="fa-solid fa-bag-shopping" style="color: #FF7043;"></i> Link Shopee 2 (Luân phiên / Xen kẽ)
+                                    </label>
+                                    <input type="url" name="shopee_url_2" class="form-input" placeholder="https://s.shopee.vn/... (Tùy chọn)" value="<?php echo esc_url($current_shopee_url_2); ?>" />
+                                    <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 3px;">
+                                        Tự động đổi xen kẽ với Link 1 (lần đầu xuất hiện link 1, lần sau xuất hiện link 2). Để trống nếu chỉ dùng 1 link.
                                     </small>
                                 </div>
 
@@ -3357,6 +3527,7 @@ jQuery(document).ready(function($) {
       const tabLabelMap = {
         'admTabStories': 'Quản lý truyện',
         'admTabAnalytics': 'Thống kê & Phân tích lượt đọc',
+        'admTabVisitorLogs': 'Quản lý khách đọc truyện',
         'admTabTeams': 'Quản lý team dịch',
         'admTabSplitter': 'Tách truyện tự động',
         'admTabVivuCrawler': 'Công cụ lấy crawl tự động',
@@ -3387,6 +3558,9 @@ jQuery(document).ready(function($) {
         $('#toolbarGroupTeams').show();
       } else if (cleanId === 'admTabSplitter') {
         $('#toolbarGroupSplitter').show();
+        if (typeof syncSplitterHistoryFromDB === 'function') syncSplitterHistoryFromDB();
+      } else if (cleanId === 'admTabVisitorLogs') {
+        if (typeof loadVisitorLogs === 'function') loadVisitorLogs(1);
       } else if (cleanId === 'admTabVivuCrawler') {
         $('#toolbarGroupVivuCrawler').show();
       } else if (cleanId === 'admTabAnalytics') {
@@ -3721,7 +3895,94 @@ jQuery(document).ready(function($) {
     }
     saveSplitterHistoryList(list);
     renderSplitterHistoryTable();
+
+    // Đồng bộ tức thời lên cơ sở dữ liệu để đồng bộ sang điện thoại và các thiết bị khác
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_save_splitter_history',
+        session_key: item.id,
+        title: item.title,
+        total_chapters: item.total_chapters,
+        total_words: item.total_words,
+        avg_words: item.avg_words,
+        target_words: item.target_words,
+        chapters: JSON.stringify(item.chapters || []),
+        nonce: muopConfig.nonce
+      }
+    });
   }
+
+  // Tải và đồng bộ lịch sử tách chương từ cơ sở dữ liệu (hỗ trợ điện thoại và máy tính)
+  function syncSplitterHistoryFromDB() {
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_splitter_history',
+        nonce: muopConfig.nonce
+      },
+      success: function(res) {
+        var localList = getSplitterHistory();
+        if (res && res.success && res.data && Array.isArray(res.data.list)) {
+          var serverList = res.data.list;
+          if (serverList.length > 0) {
+            // Kiểm tra các bản ghi local chưa có trên server để đẩy lên
+            var serverKeys = {};
+            serverList.forEach(function(it) { if (it && it.id) serverKeys[it.id] = true; });
+            localList.forEach(function(localItem) {
+              if (localItem && localItem.id && !serverKeys[localItem.id]) {
+                $.ajax({
+                  url: muopConfig.ajaxUrl,
+                  type: 'POST',
+                  data: {
+                    action: 'muop_save_splitter_history',
+                    session_key: localItem.id,
+                    title: localItem.title,
+                    total_chapters: localItem.total_chapters,
+                    total_words: localItem.total_words,
+                    avg_words: localItem.avg_words,
+                    target_words: localItem.target_words,
+                    chapters: JSON.stringify(localItem.chapters || []),
+                    nonce: muopConfig.nonce
+                  }
+                });
+                serverList.push(localItem);
+              }
+            });
+            saveSplitterHistoryList(serverList);
+            renderSplitterHistoryTable();
+          } else if (localList.length > 0) {
+            // Máy chủ chưa có bản ghi nhưng máy khách có -> tự động đẩy tất cả lên máy chủ
+            localList.forEach(function(localItem) {
+              if (localItem && localItem.id) {
+                $.ajax({
+                  url: muopConfig.ajaxUrl,
+                  type: 'POST',
+                  data: {
+                    action: 'muop_save_splitter_history',
+                    session_key: localItem.id,
+                    title: localItem.title,
+                    total_chapters: localItem.total_chapters,
+                    total_words: localItem.total_words,
+                    avg_words: localItem.avg_words,
+                    target_words: localItem.target_words,
+                    chapters: JSON.stringify(localItem.chapters || []),
+                    nonce: muopConfig.nonce
+                  }
+                });
+              }
+            });
+            renderSplitterHistoryTable();
+          } else {
+            renderSplitterHistoryTable();
+          }
+        }
+      }
+    });
+  }
+  window.syncSplitterHistoryFromDB = syncSplitterHistoryFromDB;
 
   function renderSplitterHistoryTable() {
     const list = getSplitterHistory();
@@ -4037,6 +4298,16 @@ jQuery(document).ready(function($) {
       list = list.filter(function(it) { return it.id !== id; });
       saveSplitterHistoryList(list);
       renderSplitterHistoryTable();
+      // Đồng bộ xóa trên Database
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_delete_splitter_history',
+          id: id,
+          nonce: muopConfig.nonce
+        }
+      });
       muopAlert('Đã xóa phiên tách khỏi lịch sử!', 'success');
     }, null, { isDanger: true, confirmText: 'Xóa' });
   });
@@ -4049,6 +4320,16 @@ jQuery(document).ready(function($) {
         localStorage.removeItem(SPLITTER_HISTORY_KEY);
       } catch(e) {}
       renderSplitterHistoryTable();
+      // Đồng bộ xóa sạch trên Database
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_delete_splitter_history',
+          clear_all: '1',
+          nonce: muopConfig.nonce
+        }
+      });
       muopAlert('Đã xóa sạch toàn bộ lịch sử tách chương!', 'success');
     }, null, { isDanger: true, confirmText: 'Xóa Tất Cả' });
   });
@@ -4116,10 +4397,233 @@ jQuery(document).ready(function($) {
   // Tự động reset form trống khi tải/reload trang, đồng thời tải bảng lịch sử
   resetSplitterForm();
   renderSplitterHistoryTable();
+  syncSplitterHistoryFromDB();
 
   // =========================================================================
   // CÔNG CỤ LẤY TRUYỆN TỰ ĐỘNG TỪ VIVUTRUYEN.NET (ADMIN CONTROLLER)
   // =========================================================================
+  // =========================================================================
+  // QUẢN LÝ KHÁCH ĐỌC TRUYỆN THEO NGÀY (VISITOR READING LOGS)
+  // =========================================================================
+  let visitorLogsCurrentPage = 1;
+  let visitorLogsSearchTimer = null;
+
+  function escapeVisitorHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function loadVisitorLogs(page) {
+    page = page || 1;
+    visitorLogsCurrentPage = page;
+    const selectedDate = $('#inputVisitorDate').val() || '';
+    const searchVal = $('#inputVisitorSearch').val() || '';
+    const userType = $('#selectVisitorUserType').val() || 'all';
+
+    const $tbody = $('#visitorLogsListBody');
+    const $empty = $('#visitorLogsEmpty');
+    const $info = $('#visitorLogsPaginationInfo');
+    const $btns = $('#visitorLogsPaginationBtns');
+
+    $tbody.html('<tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px; display: block; color: var(--primary-green);"></i>Đang tải danh sách khách đọc truyện...</td></tr>');
+    $empty.hide();
+
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_visitor_read_logs',
+        date: selectedDate,
+        search: searchVal,
+        user_type: userType,
+        page: page,
+        per_page: 25,
+        nonce: muopConfig.nonce
+      },
+      success: function(res) {
+        if (!res || !res.success || !res.data) {
+          $tbody.html('<tr><td colspan="8" style="text-align: center; padding: 25px; color: #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> Có lỗi khi tải dữ liệu! Vui lòng thử lại.</td></tr>');
+          return;
+        }
+
+        const data = res.data;
+        const summary = data.summary || {};
+        const logs = data.logs || [];
+        const pag = data.pagination || {};
+
+        // 1. Cập nhật các thẻ KPI tổng quan
+        $('#statVisitorUniqueReaders').text(Number(summary.total_unique_readers || 0).toLocaleString());
+        $('#statVisitorTotalReads').text(Number(summary.total_chapter_reads || summary.chapter_reads || 0).toLocaleString());
+        $('#statVisitorGuests').text(Number(summary.guest_readers || 0).toLocaleString());
+        $('#statVisitorMembers').text(Number(summary.member_readers || 0).toLocaleString());
+        if (summary.date_formatted) {
+          $('#statVisitorDateLabel').html('<i class="fa-regular fa-calendar-check"></i> Ngày: ' + escapeVisitorHtml(summary.date_formatted));
+        }
+
+        // 2. Render danh sách nhật ký
+        if (!logs.length) {
+          $tbody.empty();
+          $empty.show();
+          $info.text('Hiển thị 0 / 0 lượt đọc');
+          $btns.empty();
+          return;
+        }
+
+        $empty.hide();
+        let rowsHtml = '';
+        const offset = ((pag.current_page || 1) - 1) * (pag.per_page || 25);
+
+        logs.forEach(function(row, idx) {
+          const stt = offset + idx + 1;
+          const isGuest = row.is_guest;
+          const userBadge = isGuest 
+            ? '<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-user-secret"></i> Vãng lai</span>' 
+            : '<span class="badge" style="background: #ede9fe; color: #7c3aed; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-user-check"></i> ' + escapeVisitorHtml(row.user_name || 'Thành viên') + '</span>';
+
+          let devIcon = '<i class="fa-solid fa-desktop" title="Máy tính"></i> Desktop';
+          if (row.device_type === 'Mobile') {
+            devIcon = '<i class="fa-solid fa-mobile-screen-button" style="color: #0284c7;" title="Điện thoại"></i> Mobile';
+          } else if (row.device_type === 'Tablet') {
+            devIcon = '<i class="fa-solid fa-tablet-screen-button" style="color: #10b981;" title="Máy tính bảng"></i> Tablet';
+          }
+
+          const chapNumBadge = '<span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11.5px; padding: 3px 8px; border-radius: 4px;">Chương ' + (row.chapter_num || 1) + '</span>';
+
+          rowsHtml += '<tr>' +
+            '<td style="text-align: center; color: var(--text-muted); font-size: 12px;">' + stt + '</td>' +
+            '<td style="text-align: center; white-space: nowrap; font-size: 12px;">' +
+              '<div style="font-weight: 700; color: var(--text-color);">' + escapeVisitorHtml(row.time_only || '') + '</div>' +
+              '<div style="font-size: 11px; color: var(--text-muted);">' + escapeVisitorHtml(row.time_ago || '') + '</div>' +
+            '</td>' +
+            '<td>' +
+              '<span class="badge btn-filter-visitor-ip" data-ip="' + escapeVisitorHtml(row.ip_address) + '" style="cursor: pointer; background: #f8fafc; border: 1px solid #cbd5e1; color: #334155; font-family: monospace; font-size: 12px; padding: 3px 7px; border-radius: 4px;" title="Bấm để lọc IP này">' +
+                '<i class="fa-solid fa-network-wired" style="color: #64748b; margin-right: 4px;"></i>' + escapeVisitorHtml(row.ip_address) +
+              '</span>' +
+            '</td>' +
+            '<td style="text-align: center; font-size: 12px; color: var(--text-muted); white-space: nowrap;">' + devIcon + '</td>' +
+            '<td>' + userBadge + '</td>' +
+            '<td>' +
+              '<a href="' + escapeVisitorHtml(row.story_url) + '" target="_blank" style="font-weight: 600; color: var(--text-color); text-decoration: none; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;" title="' + escapeVisitorHtml(row.story_title) + '">' +
+                '<i class="fa-solid fa-book" style="color: var(--primary-green); margin-right: 4px;"></i>' + escapeVisitorHtml(row.story_title || ('Truyện #' + row.story_id)) +
+              '</a>' +
+            '</td>' +
+            '<td style="text-align: center;">' +
+              '<a href="' + escapeVisitorHtml(row.chapter_url) + '" target="_blank" style="text-decoration: none;" title="' + escapeVisitorHtml(row.chapter_title) + '">' +
+                chapNumBadge +
+              '</a>' +
+            '</td>' +
+            '<td style="text-align: center; white-space: nowrap;">' +
+              '<a href="' + escapeVisitorHtml(row.chapter_url) + '" target="_blank" class="btn btn-outline btn-xs" style="padding: 2px 8px; font-size: 11.5px;" title="Xem chương vừa đọc">' +
+                '<i class="fa-solid fa-arrow-up-right-from-square"></i> Xem' +
+              '</a>' +
+            '</td>' +
+          '</tr>';
+        });
+
+        $tbody.html(rowsHtml);
+
+        // 3. Render phân trang
+        const totalLogs = pag.total_logs || logs.length;
+        const totalPages = pag.total_pages || 1;
+        const curPage = pag.current_page || 1;
+        const startItem = offset + 1;
+        const endItem = Math.min(offset + logs.length, totalLogs);
+
+        $info.text('Hiển thị ' + startItem + ' - ' + endItem + ' trên tổng số ' + totalLogs.toLocaleString() + ' lượt đọc');
+
+        let btnsHtml = '';
+        if (totalPages > 1) {
+          btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-visitor-page" data-page="' + (curPage - 1) + '" ' + (curPage <= 1 ? 'disabled style="opacity: 0.5;"' : '') + '><i class="fa-solid fa-chevron-left"></i> Trước</button>';
+
+          let startPage = Math.max(1, curPage - 2);
+          let endPage = Math.min(totalPages, curPage + 2);
+          if (startPage > 1) {
+            btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-visitor-page" data-page="1">1</button>';
+            if (startPage > 2) btnsHtml += '<span style="padding: 0 4px; color: var(--text-muted);">...</span>';
+          }
+          for (let p = startPage; p <= endPage; p++) {
+            const isAct = (p === curPage);
+            btnsHtml += '<button type="button" class="btn ' + (isAct ? 'btn-primary' : 'btn-outline') + ' btn-xs btn-visitor-page" data-page="' + p + '" ' + (isAct ? 'style="font-weight: 700;"' : '') + '>' + p + '</button>';
+          }
+          if (endPage < totalPages) {
+            if (endPage < totalPages - 1) btnsHtml += '<span style="padding: 0 4px; color: var(--text-muted);">...</span>';
+            btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-visitor-page" data-page="' + totalPages + '">' + totalPages + '</button>';
+          }
+
+          btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-visitor-page" data-page="' + (curPage + 1) + '" ' + (curPage >= totalPages ? 'disabled style="opacity: 0.5;"' : '') + '>Sau <i class="fa-solid fa-chevron-right"></i></button>';
+        }
+        $btns.html(btnsHtml);
+      },
+      error: function() {
+        $tbody.html('<tr><td colspan="8" style="text-align: center; padding: 25px; color: #dc2626;"><i class="fa-solid fa-triangle-exclamation"></i> Không thể kết nối máy chủ! Vui lòng thử lại.</td></tr>');
+      }
+    });
+  }
+
+  // Đổi ngày trong input date
+  $('#inputVisitorDate').on('change', function() {
+    const val = $(this).val();
+    $('.btn-quick-visitor-date').each(function() {
+      if ($(this).data('date') === val) {
+        $(this).addClass('active');
+      } else {
+        $(this).removeClass('active');
+      }
+    });
+    loadVisitorLogs(1);
+  });
+
+  // Nút chọn ngày nhanh (Hôm nay, Hôm qua, Hôm kia)
+  $(document).on('click', '.btn-quick-visitor-date', function() {
+    $('.btn-quick-visitor-date').removeClass('active');
+    $(this).addClass('active');
+    const d = $(this).data('date');
+    if (d) {
+      $('#inputVisitorDate').val(d);
+      loadVisitorLogs(1);
+    }
+  });
+
+  // Tìm kiếm theo từ khóa (debounced 350ms)
+  $('#inputVisitorSearch').on('input', function() {
+    clearTimeout(visitorLogsSearchTimer);
+    visitorLogsSearchTimer = setTimeout(function() {
+      loadVisitorLogs(1);
+    }, 350);
+  });
+
+  // Lọc theo đối tượng (Tất cả, Khách, Thành viên)
+  $('#selectVisitorUserType').on('change', function() {
+    loadVisitorLogs(1);
+  });
+
+  // Nút Làm mới
+  $('#btnRefreshVisitorLogs').on('click', function() {
+    loadVisitorLogs(visitorLogsCurrentPage);
+  });
+
+  // Phân trang
+  $(document).on('click', '.btn-visitor-page', function() {
+    const p = parseInt($(this).data('page'), 10);
+    if (p && !$(this).prop('disabled')) {
+      loadVisitorLogs(p);
+    }
+  });
+
+  // Bấm vào badge IP để lọc luôn IP đó
+  $(document).on('click', '.btn-filter-visitor-ip', function() {
+    const ip = $(this).data('ip');
+    if (ip) {
+      $('#inputVisitorSearch').val(ip);
+      loadVisitorLogs(1);
+    }
+  });
+
   const VIVU_HISTORY_KEY = 'muop_vivu_crawler_history';
   let currentVivuStory = null;
   let currentVivuResults = [];

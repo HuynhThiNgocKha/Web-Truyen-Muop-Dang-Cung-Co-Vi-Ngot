@@ -459,6 +459,48 @@
       return false;
     },
 
+    // Xen kẽ link Shopee 1 và Shopee 2 giữa các lần xuất hiện modal
+    getAlternatingShopeeUrl() {
+      const url1 = (typeof muopConfig !== 'undefined' && muopConfig.shopeeUrl) ? muopConfig.shopeeUrl.trim() : 'https://s.shopee.vn/5q8lDzjzRv';
+      const url2 = (typeof muopConfig !== 'undefined' && muopConfig.shopeeUrl2) ? muopConfig.shopeeUrl2.trim() : '';
+
+      // Nếu không có Link 2 hoặc 2 link giống hệt nhau -> Luôn dùng Link 1
+      if (!url2 || url1 === url2) {
+        return url1;
+      }
+
+      // Đọc chỉ số lượt xuất hiện từ localStorage
+      let count = 0;
+      try {
+        count = parseInt(localStorage.getItem('muop_shopee_rot_index') || '0', 10);
+        if (isNaN(count)) count = 0;
+      } catch (e) {
+        count = 0;
+      }
+
+      // Lần đầu (count = 0): Link 1; Lần sau (count = 1): Link 2... xen kẽ tuần tự 1 - 2 - 1 - 2
+      const isSecond = (count % 2 === 1);
+      const chosenUrl = isSecond ? url2 : url1;
+
+      // Cập nhật số lần cho lần kế tiếp
+      try {
+        localStorage.setItem('muop_shopee_rot_index', String((count + 1) % 10000));
+      } catch (e) {}
+
+      return chosenUrl;
+    },
+
+    // Cập nhật link Shopee vào modal hiển thị
+    applyAlternatingShopeeLink() {
+      const chosenUrl = this.getAlternatingShopeeUrl();
+      const $btn = $('#btnShopeeUnlock');
+      if ($btn.length) {
+        $btn.attr('href', chosenUrl);
+        $btn.data('active-url', chosenUrl);
+      }
+      return chosenUrl;
+    },
+
     // Đánh dấu đã mở khóa vĩnh viễn (nhấn 1 lần, không hỏi lại lần 2)
     markUnlocked(storyId, chapterId, chapNum) {
       try {
@@ -481,6 +523,7 @@
         return;
       }
 
+      this.applyAlternatingShopeeLink();
       this.bindChapterListInterceptors();
       this.bindUnlockButton();
       this.checkChapterLock();
@@ -545,12 +588,14 @@
           chapNum: chapNum
         };
 
+        AffiliateManager.applyAlternatingShopeeLink();
         $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(250);
       });
 
       // 2. Nếu đang ở trang đọc chương mà bị khóa, click vào nội dung mờ sẽ mở lại modal Shopee
       $(document).on('click', '.chapter-locked, .chapter-locked-init', function(e) {
         e.preventDefault();
+        AffiliateManager.applyAlternatingShopeeLink();
         $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(250);
       });
 
@@ -575,7 +620,7 @@
       $(document).on('click', '#btnShopeeUnlock', function(e) {
         // KHÔNG gọi e.preventDefault() để trình duyệt mở link Shopee trong tab mới theo thuộc tính target="_blank" tự nhiên, không bao giờ bị popup blocker chặn
         const $btn = $(this);
-        const shopeeUrl = $btn.attr('href') || (typeof muopConfig !== 'undefined' && muopConfig.shopeeUrl) || 'https://s.shopee.vn/5q8lDzjzRv';
+        const shopeeUrl = $btn.data('active-url') || $btn.attr('href') || (typeof muopConfig !== 'undefined' && muopConfig.shopeeUrl) || 'https://s.shopee.vn/5q8lDzjzRv';
 
         const pending = AffiliateManager.pendingUnlock;
         let storyId = 0;
@@ -671,6 +716,7 @@
       } else {
         // Chưa nhấn -> Khóa và hiển thị Popup Shopee
         $('.chapter-content-box').addClass('chapter-locked');
+        this.applyAlternatingShopeeLink();
         $('#shopeeGatekeeperModal').css('display', 'flex').hide().fadeIn(300);
       }
     },
@@ -2049,6 +2095,160 @@
         });
       });
 
+      // Quên Mật Khẩu Modal & Handlers
+      $('#btnOpenForgotPasswordModal').on('click', function(e) {
+        e.preventDefault();
+        $('#forgotAlert').hide();
+        $('#formForgotStep1')[0].reset();
+        $('#formForgotStep2')[0].reset();
+        $('#formForgotStep1').show();
+        $('#formForgotStep2').hide();
+        $('#modalForgotPassword').css('display', 'flex');
+        $('#forgotUsername').focus();
+      });
+
+      $('#btnCloseForgotModal, .btn-close-forgot-modal').on('click', function() {
+        $('#modalForgotPassword').hide();
+      });
+
+      $('#modalForgotPassword').on('click', function(e) {
+        if (e.target === this) {
+          $(this).hide();
+        }
+      });
+
+      $('#btnBackToForgotStep1').on('click', function() {
+        $('#forgotAlert').hide();
+        $('#formForgotStep2').hide();
+        $('#formForgotStep1').slideDown(200);
+      });
+
+      // Bước 1: Kiểm tra tên đăng nhập
+      $('#formForgotStep1').on('submit', function(e) {
+        e.preventDefault();
+        const $f = $(this);
+        const username = $('#forgotUsername').val().trim();
+        const $btn = $('#btnCheckForgotUser');
+        const $alert = $('#forgotAlert');
+
+        if (!username) {
+          $alert.removeClass('alert-success').addClass('alert-error').text('Vui lòng nhập tên đăng nhập hoặc email!').fadeIn();
+          return;
+        }
+
+        const origText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra...');
+        $alert.hide();
+
+        const ajaxUrl = getAjaxUrl();
+        const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_check_username_for_reset',
+            username: username,
+            nonce: nonce
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html(origText);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data) {
+              const uLogin = res.data.username || username;
+              const uName = res.data.name || uLogin;
+              $('#verifiedForgotUsername').val(uLogin);
+              $('#displayVerifiedUser').text(uName + ' (' + uLogin + ')');
+              $alert.hide();
+              $f.hide();
+              $('#formForgotStep2').slideDown(200);
+              $('#forgotNewPassword').focus();
+            } else {
+              const msg = (res && res.data && res.data.message) ? res.data.message : 'Không tìm thấy tên đăng nhập này trong hệ thống!';
+              $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(origText);
+            let msg = 'Lỗi kết nối máy chủ khi kiểm tra tài khoản!';
+            if (xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+              msg = xhr.responseJSON.data.message;
+            }
+            $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+          }
+        });
+      });
+
+      // Bước 2: Lưu mật khẩu mới
+      $('#formForgotStep2').on('submit', function(e) {
+        e.preventDefault();
+        const username = $('#verifiedForgotUsername').val().trim();
+        const newPwd = $('#forgotNewPassword').val();
+        const confirmPwd = $('#forgotConfirmPassword').val();
+        const $btn = $('#btnSubmitResetPassword');
+        const $alert = $('#forgotAlert');
+
+        if (!newPwd || newPwd.length < 6) {
+          $alert.removeClass('alert-success').addClass('alert-error').text('Mật khẩu mới phải có tối thiểu 6 ký tự!').fadeIn();
+          return;
+        }
+
+        if (newPwd !== confirmPwd) {
+          $alert.removeClass('alert-success').addClass('alert-error').text('Xác nhận mật khẩu mới không khớp!').fadeIn();
+          return;
+        }
+
+        const origText = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang cập nhật mật khẩu...');
+        $alert.hide();
+
+        const ajaxUrl = getAjaxUrl();
+        const nonce = (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_reset_password_by_username',
+            username: username,
+            new_password: newPwd,
+            confirm_password: confirmPwd,
+            nonce: nonce
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html(origText);
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success) {
+              const successMsg = (res.data && res.data.message) ? res.data.message : 'Đặt lại mật khẩu thành công!';
+              $alert.removeClass('alert-error').addClass('alert-success').text(successMsg).fadeIn();
+
+              // Điền sẵn thông tin vào form đăng nhập và đóng modal sau 1 giây
+              $('#loginEmail').val(username);
+              $('#loginPassword').val(newPwd);
+              setTimeout(() => {
+                $('#modalForgotPassword').fadeOut(250);
+                $('#loginAlert').removeClass('alert-error').addClass('alert-success').text('Đặt lại mật khẩu thành công! Bạn có thể nhấn Đăng Nhập ngay.').fadeIn();
+              }, 1200);
+            } else {
+              const msg = (res && res.data && res.data.message) ? res.data.message : 'Không thể đặt lại mật khẩu!';
+              $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html(origText);
+            let msg = 'Lỗi kết nối máy chủ khi đổi mật khẩu!';
+            if (xhr && xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+              msg = xhr.responseJSON.data.message;
+            }
+            $alert.removeClass('alert-success').addClass('alert-error').text(msg).fadeIn();
+          }
+        });
+      });
+
       // Register Form
       $('#formMuopRegister').on('submit', function(e) {
         e.preventDefault();
@@ -2257,6 +2457,62 @@
         $('#isStoryDraftInput').val('0');
       });
 
+            // Tối ưu hóa ảnh bìa phía máy khách: Thu nhỏ nhanh ảnh chụp điện thoại (5-10MB) về chuẩn <350KB
+      function compressCoverImageIfNeeded(file, callback) {
+        if (!file || !file.type || !file.type.match(/^image\//i)) {
+          return callback(file);
+        }
+        if (file.size <= 150 * 1024) {
+          return callback(file);
+        }
+        try {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+              try {
+                const maxDim = 800;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                  if (w > h) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                  } else {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                  }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(function(blob) {
+                  if (blob && blob.size < file.size) {
+                    const newFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                      type: 'image/jpeg',
+                      lastModified: Date.now()
+                    });
+                    callback(newFile);
+                  } else {
+                    callback(file);
+                  }
+                }, 'image/jpeg', 0.82);
+              } catch(err) {
+                callback(file);
+              }
+            };
+            img.onerror = function() { callback(file); };
+            img.src = e.target.result;
+          };
+          reader.onerror = function() { callback(file); };
+          reader.readAsDataURL(file);
+        } catch(err) {
+          callback(file);
+        }
+      }
+
       $('#formSubmitStory').on('submit', function(e) {
         e.preventDefault();
         const $form = $(this);
@@ -2270,17 +2526,23 @@
         const nonce = $form.find('input[name="nonce"]').val() || (typeof muopConfig !== 'undefined' ? muopConfig.nonce : '');
         const ajaxUrl = getAjaxUrl();
 
-        const formData = new FormData(this);
-        if (!formData.has('action')) formData.append('action', 'muop_submit_story');
-        if (!formData.has('nonce') || !formData.get('nonce')) formData.append('nonce', nonce);
+        const coverFile = ($('#storyCover')[0] && $('#storyCover')[0].files) ? $('#storyCover')[0].files[0] : null;
+        compressCoverImageIfNeeded(coverFile, function(finalCover) {
+          const formData = new FormData($form[0]);
+          if (finalCover && finalCover !== coverFile) {
+            formData.set('cover_image', finalCover);
+            formData.set('story_cover', finalCover);
+          }
+          if (!formData.has('action')) formData.append('action', 'muop_submit_story');
+          if (!formData.has('nonce') || !formData.get('nonce')) formData.append('nonce', nonce);
 
-        $.ajax({
-          url: ajaxUrl,
-          type: 'POST',
-          data: formData,
-          contentType: false,
-          processData: false,
-          success: (res) => {
+          $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: (res) => {
             if (typeof res === 'string') {
               const start = res.indexOf('{');
               const end = res.lastIndexOf('}');
@@ -2317,7 +2579,7 @@
               // Tự động làm mới trang sau 2.5s nếu người dùng chưa bấm nút xác nhận
               setTimeout(() => {
                 window.location.href = window.location.pathname;
-              }, 2500);
+              }, 800);
             } else {
               $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Đăng Truyện');
               const errorMsg = getAjaxMsg(res, 'Lỗi đăng truyện!');
@@ -2337,6 +2599,7 @@
             }
             $alert.removeClass('alert-success').addClass('alert-error').text(errorMsg).fadeIn();
           }
+        });
         });
       });
 
@@ -2481,24 +2744,13 @@
               $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Thêm Chương Này');
               $alert.hide();
 
-              const doReload = () => {
-                const searchParams = new URLSearchParams(window.location.search);
-                if (curStoryId) searchParams.set('story_id', curStoryId);
-                searchParams.set('added', '1');
-                window.location.search = searchParams.toString();
-              };
-
-              // Hiển thị Popup Modal thông báo thành công
+              // Hiển thị thông báo thành công và cho phép đăng tiếp chương mới ngay lập tức
               if (typeof muopAlert === 'function') {
                 muopAlert(
-                  '<strong>' + successMsg + '</strong><br><span style="font-size: 13.5px; color: var(--text-muted); display: block; margin-top: 6px;">Hệ thống đã giữ lại bộ truyện và nạp số chương tiếp theo để bạn tiếp tục đăng.</span>',
-                  'success',
-                  doReload
+                  '<strong>' + successMsg + '</strong><br><span style="font-size: 13.5px; color: var(--text-muted); display: block; margin-top: 6px;">Đã tự động nạp sẵn <strong>Chương ' + nextNum + '</strong>. Bạn có thể dán tiếp nội dung để đăng chương mới ngay mà không phải chờ!</span>',
+                  'success'
                 );
               }
-
-              // Tự động làm mới sau 2.5s nếu chưa bấm xác nhận
-              setTimeout(doReload, 2500);
             } else {
               $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Thêm Chương Này');
               const errorMsg = getAjaxMsg(res, 'Lỗi thêm chương!');

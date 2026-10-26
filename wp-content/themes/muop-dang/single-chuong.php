@@ -102,7 +102,7 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
 
         <?php if ($story_post_status === 'future') : 
             $ch_sched_time = get_post_meta($story_id, '_truyen_scheduled_time', true) ?: ($story ? $story->post_date : '');
-            $ch_sched_fmt  = $ch_sched_time ? date_i18n('H:i - d/m/Y', strtotime($ch_sched_time)) : '';
+            $ch_sched_fmt  = muop_format_datetime($ch_sched_time, 'H:i - d/m/Y');
         ?>
             <div style="background: linear-gradient(135deg, #f5f3ff, #faf5ff); border: 1px solid #c4b5fd; border-radius: var(--radius-sm); padding: 10px 16px; margin-bottom: 16px; font-size: 13px; color: #5b21b6; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 4px rgba(124, 58, 237, 0.05);">
                 <i class="fa-solid fa-clock-rotate-left" style="font-size: 16px; color: #7c3aed;"></i>

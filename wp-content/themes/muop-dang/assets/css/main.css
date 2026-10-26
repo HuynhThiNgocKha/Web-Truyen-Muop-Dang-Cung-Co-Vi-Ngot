@@ -3,10 +3,14 @@
    Tone: Xanh mướp, xanh bơ, xanh lá tươi mát, chuẩn responsive UI
    ========================================================================== */
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+body, button, input, select, textarea, optgroup {
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 }
 
 /* Ẩn hoàn toàn WordPress Admin Bar trên giao diện */
@@ -20,7 +24,7 @@ html, html[lang] {
 }
 
 body {
-  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
   background-color: var(--bg-body);
   color: var(--text-main);
   line-height: 1.6;
@@ -29,6 +33,9 @@ body {
   display: flex;
   flex-direction: column;
   transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -159,8 +166,9 @@ img {
   font-size: 11px;
   font-weight: 700;
   border-radius: var(--radius-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  text-transform: none;
+  letter-spacing: 0.2px;
+  font-family: inherit;
 }
 
 .badge-green { background-color: var(--soft-green); color: var(--primary-green); }
@@ -9440,6 +9448,7 @@ body.page-template-page-quan-ly-admin {
   color: var(--text-muted);
   flex-wrap: wrap;
   transition: background-color 0.3s ease, border-color 0.3s ease;
+  font-family: inherit;
 }
 
 .admin-db-footer-left {

@@ -263,6 +263,16 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
         var titleEl = document.getElementById('scheduleModalStoryTitle');
         if (titleEl) titleEl.textContent = storyTitle || 'Bộ truyện';
 
+        if (!schedFmt && schedTime) {
+            var c = schedTime.replace('T', ' ').trim().split(' ');
+            if (c.length >= 2) {
+                var dp = c[0].split('-');
+                var tp = c[1].split(':');
+                if (dp.length === 3 && tp.length >= 2) {
+                    schedFmt = tp[0] + ':' + tp[1] + ' - ' + dp[2] + '/' + dp[1] + '/' + dp[0];
+                }
+            }
+        }
         var dtTextEl = document.getElementById('scheduleModalDatetimeText');
         if (dtTextEl) dtTextEl.textContent = schedFmt || schedTime || 'Chưa lên lịch';
 

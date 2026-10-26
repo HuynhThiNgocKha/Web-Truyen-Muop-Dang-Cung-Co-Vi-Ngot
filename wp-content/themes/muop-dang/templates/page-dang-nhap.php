@@ -57,6 +57,7 @@ get_header();
                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-muted);">
                     <input type="checkbox" name="remember" value="1" checked /> Ghi nhớ đăng nhập
                 </label>
+                <a href="javascript:void(0)" id="btnOpenForgotPasswordModal" style="color: var(--primary-green); font-weight: 600; text-decoration: none;" title="Khôi phục & đặt lại mật khẩu">Quên mật khẩu?</a>
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 15px;">
@@ -67,6 +68,96 @@ get_header();
         <div class="auth-footer-links">
             <span>Bạn chưa có tài khoản?</span> 
             <a href="<?php echo esc_url(home_url('/dang-ky/')); ?>">Đăng ký ngay</a>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL QUÊN MẬT KHẨU (XÁC NHẬN TÊN ĐĂNG NHẬP & ĐẶT LẠI MẬT KHẨU MỚI) -->
+<div id="modalForgotPassword" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card, #ffffff); width: 100%; max-width: 460px; border-radius: var(--radius-md, 12px); box-shadow: var(--shadow-lg, 0 10px 25px rgba(0,0,0,0.15)); border: 1.5px solid var(--primary-green, #3F7523); overflow: hidden; display: flex; flex-direction: column;">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #f0fdf4, var(--bg-card, #ffffff)); border-bottom: 1px solid var(--border-light, #e2e8f0); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: #dcfce7; color: var(--primary-green, #3F7523); display: flex; align-items: center; justify-content: center; font-size: 16px;">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-color, #1e293b);">Quên Mật Khẩu</h3>
+                    <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-muted, #64748b);">Khôi phục &amp; đặt lại mật khẩu mới cho tài khoản</p>
+                </div>
+            </div>
+            <button type="button" id="btnCloseForgotModal" style="background: none; border: none; font-size: 20px; color: var(--text-muted, #94a3b8); cursor: pointer; padding: 4px;" title="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 22px 20px;">
+            <div id="forgotAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+            <!-- BƯỚC 1: NHẬP TÊN ĐĂNG NHẬP -->
+            <form id="formForgotStep1">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" for="forgotUsername" style="font-weight: 600; font-size: 13.5px; margin-bottom: 6px; display: block;">
+                        <i class="fa-solid fa-user" style="color: var(--primary-green, #3F7523);"></i> Tên Đăng Nhập Hoặc Email (*):
+                    </label>
+                    <input type="text" id="forgotUsername" class="form-input" placeholder="Nhập tên đăng nhập hoặc email tài khoản" required style="width: 100%; height: 42px; font-size: 14px;" />
+                    <p style="font-size: 12px; color: var(--text-muted, #64748b); margin: 6px 0 0 0;">
+                        <i class="fa-solid fa-circle-info" style="color: var(--primary-green, #3F7523);"></i> Nhập đúng tên đăng nhập tài khoản của bạn để hệ thống cấp quyền đặt lại mật khẩu mới ngay lập tức.
+                    </p>
+                </div>
+
+                <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary btn-close-forgot-modal" style="padding: 8px 16px; font-size: 13.5px;">Hủy</button>
+                    <button type="submit" id="btnCheckForgotUser" class="btn btn-primary" style="padding: 8px 18px; font-size: 13.5px;">
+                        <i class="fa-solid fa-arrow-right"></i> Kiểm Tra &amp; Tiếp Tục
+                    </button>
+                </div>
+            </form>
+
+            <!-- BƯỚC 2: NHẬP MẬT KHẨU MỚI (ẨN MẶC ĐỊNH) -->
+            <form id="formForgotStep2" style="display: none;">
+                <input type="hidden" id="verifiedForgotUsername" value="" />
+
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm, 8px); padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: #166534; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-circle-check" style="font-size: 16px; color: #15803d;"></i>
+                    <span>Tài khoản: <strong id="displayVerifiedUser" style="color: #15803d;">...</strong>. Hãy đặt mật khẩu mới bên dưới:</span>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" for="forgotNewPassword" style="font-weight: 600; font-size: 13.5px; margin-bottom: 6px; display: block;">
+                        <i class="fa-solid fa-lock" style="color: var(--primary-green, #3F7523);"></i> Mật Khẩu Mới (*):
+                    </label>
+                    <div class="input-with-icon" style="position: relative;">
+                        <input type="password" id="forgotNewPassword" class="form-input" placeholder="Tối thiểu 6 ký tự" required minlength="6" style="width: 100%; height: 42px; font-size: 14px;" />
+                        <button type="button" class="input-icon-btn toggle-password-visibility" data-target="forgotNewPassword" title="Hiện/ẩn mật khẩu" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted, #94a3b8); padding: 4px;">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" for="forgotConfirmPassword" style="font-weight: 600; font-size: 13.5px; margin-bottom: 6px; display: block;">
+                        <i class="fa-solid fa-lock-open" style="color: var(--primary-green, #3F7523);"></i> Xác Nhận Mật Khẩu Mới (*):
+                    </label>
+                    <div class="input-with-icon" style="position: relative;">
+                        <input type="password" id="forgotConfirmPassword" class="form-input" placeholder="Nhập lại mật khẩu mới" required minlength="6" style="width: 100%; height: 42px; font-size: 14px;" />
+                        <button type="button" class="input-icon-btn toggle-password-visibility" data-target="forgotConfirmPassword" title="Hiện/ẩn mật khẩu" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted, #94a3b8); padding: 4px;">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" id="btnBackToForgotStep1" class="btn btn-outline" style="padding: 8px 14px; font-size: 13.5px;">
+                        <i class="fa-solid fa-chevron-left"></i> Quay lại
+                    </button>
+                    <button type="submit" id="btnSubmitResetPassword" class="btn btn-primary" style="padding: 8px 18px; font-size: 13.5px;">
+                        <i class="fa-solid fa-check"></i> Lưu Mật Khẩu Mới
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
