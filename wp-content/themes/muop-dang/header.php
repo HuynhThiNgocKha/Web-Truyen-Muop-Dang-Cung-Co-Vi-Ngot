@@ -4,15 +4,15 @@
  */
 if (!defined('ABSPATH')) exit;
 
-// Nạp ép buộc functions.php nếu WordPress chưa nạp (do cache, Recovery Mode hoặc cấu hình hosting)
-if (!function_exists('muop_get_effective_user_role')) {
-    $functions_file = get_template_directory() . '/functions.php';
-    if (file_exists($functions_file) && filesize($functions_file) > 0) {
+// Cưỡng chế nạp functions.php cùng thư mục nếu WordPress chưa nạp
+if (!defined('MUOP_THEME_VERSION')) {
+    $functions_file = __DIR__ . '/functions.php';
+    if (file_exists($functions_file)) {
         require_once $functions_file;
     }
 }
 
-// Fallback an toàn phòng khi functions.php bị lỗi/trống trên hosting
+// Fallback an toàn phòng khi functions.php chưa nạp kịp trên hosting
 if (!function_exists('muop_get_effective_user_role')) {
     function muop_get_effective_user_role() {
         if (!is_user_logged_in()) return 'guest';
@@ -25,6 +25,67 @@ if (!function_exists('muop_is_admin')) {
     function muop_is_admin($user_id = 0) {
         if (!$user_id) $user_id = get_current_user_id();
         return user_can($user_id, 'manage_options');
+    }
+}
+if (!function_exists('muop_get_unread_notification_count')) {
+    function muop_get_unread_notification_count($user_id = 0) {
+        return 0;
+    }
+}
+if (!function_exists('muop_user_is_translator')) {
+    function muop_user_is_translator($user_id = 0) {
+        if (!$user_id) $user_id = get_current_user_id();
+        $user = get_userdata($user_id);
+        return $user && (in_array('dich_gia', (array)$user->roles) || in_array('administrator', (array)$user->roles));
+    }
+}
+if (!function_exists('muop_format_salary')) {
+    function muop_format_salary($val) {
+        return number_format((float)$val, 0, ',', '.') . ' đ';
+    }
+}
+if (!function_exists('muop_get_story_views')) {
+    function muop_get_story_views($id) {
+        return (int) get_post_meta($id, '_truyen_views', true);
+    }
+}
+if (!function_exists('muop_get_story_last_updated')) {
+    function muop_get_story_last_updated($id) {
+        return array('display' => get_the_modified_date('d/m/Y', $id), 'timestamp' => get_post_modified_time('U', false, $id));
+    }
+}
+if (!function_exists('muop_get_story_chapters')) {
+    function muop_get_story_chapters($id, $order = 'ASC') {
+        return get_posts(array(
+            'post_type' => 'chuong',
+            'meta_key' => '_chuong_truyen_id',
+            'meta_value' => $id,
+            'posts_per_page' => -1,
+            'orderby' => 'menu_order',
+            'order' => $order
+        ));
+    }
+}
+if (!function_exists('muop_format_datetime')) {
+    function muop_format_datetime($str = '') {
+        if (empty($str)) return '';
+        $ts = is_numeric($str) ? (int)$str : strtotime($str);
+        return $ts ? date('H:i - d/m/Y', $ts) : (string)$str;
+    }
+}
+if (!function_exists('muop_can_user_manage_story_frontend')) {
+    function muop_can_user_manage_story_frontend($sid, $uid) {
+        return false;
+    }
+}
+if (!function_exists('muop_is_user_following_story')) {
+    function muop_is_user_following_story($uid, $sid) {
+        return false;
+    }
+}
+if (!function_exists('muop_is_user_favorited_story')) {
+    function muop_is_user_favorited_story($uid, $sid) {
+        return false;
     }
 }
 

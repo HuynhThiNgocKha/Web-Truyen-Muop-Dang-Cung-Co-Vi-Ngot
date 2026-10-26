@@ -7,17 +7,26 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('MUOP_THEME_VERSION', '2.5.0');
-define('MUOP_THEME_DIR', get_template_directory());
-define('MUOP_THEME_URI', get_template_directory_uri());
+if (!defined('MUOP_THEME_VERSION')) {
+    define('MUOP_THEME_VERSION', '2.5.0');
+}
+if (!defined('MUOP_THEME_DIR')) {
+    define('MUOP_THEME_DIR', __DIR__);
+}
+if (!defined('MUOP_THEME_URI')) {
+    define('MUOP_THEME_URI', get_template_directory_uri());
+}
 
 // Thiết lập múi giờ chuẩn Việt Nam (GMT+7)
 if (function_exists('date_default_timezone_set')) {
     date_default_timezone_set('Asia/Ho_Chi_Minh');
 }
 
-// Load MVC (Model - View - Controller) & Client-Server Architecture
-require_once MUOP_THEME_DIR . '/app/bootstrap.php';
+// Load MVC (Model - View - Controller) & Client-Server Architecture an toàn
+$muop_bootstrap_file = __DIR__ . '/app/bootstrap.php';
+if (file_exists($muop_bootstrap_file)) {
+    require_once $muop_bootstrap_file;
+}
 
 // 1. Theme Support Setup
 function muop_setup_theme() {
