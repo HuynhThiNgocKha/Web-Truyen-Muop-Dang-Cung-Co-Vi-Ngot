@@ -107,6 +107,31 @@ if ($wp_load_path) {
         require_once $wp_load_path;
         $wp_loaded = true;
         
+        global $wpdb;
+        if ($wpdb) {
+            $table_splitter = $wpdb->prefix . 'muop_splitter_history';
+            $wpdb->query("CREATE TABLE IF NOT EXISTS `$table_splitter` (
+              `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+              `session_key` varchar(64) NOT NULL,
+              `user_id` bigint(20) unsigned NOT NULL,
+              `title` varchar(255) NOT NULL,
+              `total_chapters` int(11) NOT NULL DEFAULT '0',
+              `total_words` int(11) NOT NULL DEFAULT '0',
+              `avg_words` int(11) NOT NULL DEFAULT '0',
+              `target_words` int(11) NOT NULL DEFAULT '2500',
+              `chapters_json` longtext NOT NULL,
+              `created_at` datetime NOT NULL,
+              PRIMARY KEY (`id`),
+              KEY `idx_user` (`user_id`),
+              KEY `idx_created` (`created_at`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;");
+            
+            if (function_exists('update_option')) {
+                update_option('posts_per_page', 24);
+            }
+            $results[] = 'Đã tự động đồng bộ Database: Bảng tách chương đồng bộ PC/Mobile & thiết lập 24 truyện/trang thành công!';
+        }
+
         if (function_exists('delete_transient')) {
             delete_transient('muop_all_genres_list');
             $results[] = 'Đã xóa transient cache giao diện thành công!';
