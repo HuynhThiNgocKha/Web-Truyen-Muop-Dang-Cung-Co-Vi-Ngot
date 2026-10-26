@@ -4,6 +4,30 @@
  */
 if (!defined('ABSPATH')) exit;
 
+// Nạp ép buộc functions.php nếu WordPress chưa nạp (do cache, Recovery Mode hoặc cấu hình hosting)
+if (!function_exists('muop_get_effective_user_role')) {
+    $functions_file = get_template_directory() . '/functions.php';
+    if (file_exists($functions_file) && filesize($functions_file) > 0) {
+        require_once $functions_file;
+    }
+}
+
+// Fallback an toàn phòng khi functions.php bị lỗi/trống trên hosting
+if (!function_exists('muop_get_effective_user_role')) {
+    function muop_get_effective_user_role() {
+        if (!is_user_logged_in()) return 'guest';
+        $user = wp_get_current_user();
+        $roles = (array) $user->roles;
+        return !empty($roles) ? $roles[0] : 'guest';
+    }
+}
+if (!function_exists('muop_is_admin')) {
+    function muop_is_admin($user_id = 0) {
+        if (!$user_id) $user_id = get_current_user_id();
+        return user_can($user_id, 'manage_options');
+    }
+}
+
 $current_user = wp_get_current_user();
 $is_logged_in = is_user_logged_in();
 $user_role    = muop_get_effective_user_role();
