@@ -211,7 +211,85 @@ if ($selected_story_id) {
                         </div>
                     </div>
                 </div>
+
+                <!-- Mục Tải Lên Audio Cho Chương (Hình 5) -->
+                <div class="form-group" style="margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--border-color); margin-bottom: 0;">
+                    <label class="form-label" style="font-weight: 700; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--primary-green); margin-bottom: 6px;">
+                        <i class="fa-solid fa-headphones" style="font-size: 16px;"></i>
+                        <span>Tải Lên Audio Cho Chương (Tùy chọn)</span>
+                        <span class="badge" style="background: #e0f2fe; color: #0284c7; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: normal;">Nghe đọc audio</span>
+                    </label>
+                    <p style="font-size: 12.5px; color: var(--text-muted); margin: 0 0 12px 0; line-height: 1.5;">
+                        Bạn có thể tải lên file âm thanh (.mp3, .m4a, .wav, .ogg, .aac) hoặc dán link audio. File âm thanh này sẽ hiển thị trong mục <strong>Nghe Audio</strong> tại trang đọc truyện và trang thông tin truyện.
+                    </p>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; background: var(--bg-card); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                        <!-- Upload File -->
+                        <div>
+                            <label class="form-label" for="inputChapterAudioFile" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Chọn file Audio từ thiết bị:
+                            </label>
+                            <input type="file" id="inputChapterAudioFile" name="chapter_audio" class="form-input" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" style="padding: 6px 10px; font-size: 13px;" onchange="window.muopPreviewChapterAudio && window.muopPreviewChapterAudio(this)" />
+                            <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">Hỗ trợ: MP3, M4A, WAV, AAC, OGG.</small>
+                        </div>
+
+                        <!-- Hoặc nhập link -->
+                        <div>
+                            <label class="form-label" for="inputChapterAudioUrl" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">
+                                <i class="fa-solid fa-link"></i> Hoặc dán đường dẫn link Audio:
+                            </label>
+                            <input type="url" id="inputChapterAudioUrl" name="chapter_audio_url" class="form-input" placeholder="https://.../audio.mp3" style="padding: 8px 12px; font-size: 13px;" oninput="window.muopPreviewChapterAudioUrl && window.muopPreviewChapterAudioUrl(this.value)" />
+                            <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">Link file âm thanh lưu trữ trực tuyến (nếu có).</small>
+                        </div>
+                    </div>
+
+                    <!-- Audio Preview Player -->
+                    <div id="chapterAudioPreviewWrap" style="display: none; margin-top: 12px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span style="font-size: 13px; font-weight: 600; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-circle-play" style="color: var(--primary-green);"></i> Nghe thử Audio:
+                        </span>
+                        <audio id="chapterAudioPreviewPlayer" controls style="height: 36px; max-width: 320px;"></audio>
+                        <button type="button" class="btn btn-outline btn-xs" onclick="window.muopClearChapterAudio && window.muopClearChapterAudio()" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11.5px;">
+                            <i class="fa-solid fa-trash-can"></i> Hủy audio đã chọn
+                        </button>
+                    </div>
+                </div>
             </div>
+
+            <script>
+            window.muopPreviewChapterAudio = function(input) {
+                var wrap = document.getElementById('chapterAudioPreviewWrap');
+                var player = document.getElementById('chapterAudioPreviewPlayer');
+                if (!wrap || !player) return;
+                if (input.files && input.files[0]) {
+                    var file = input.files[0];
+                    player.src = URL.createObjectURL(file);
+                    wrap.style.display = 'flex';
+                }
+            };
+            window.muopPreviewChapterAudioUrl = function(url) {
+                var wrap = document.getElementById('chapterAudioPreviewWrap');
+                var player = document.getElementById('chapterAudioPreviewPlayer');
+                if (!wrap || !player) return;
+                if (url && url.trim().length > 5) {
+                    player.src = url.trim();
+                    wrap.style.display = 'flex';
+                }
+            };
+            window.muopClearChapterAudio = function() {
+                var fileInput = document.getElementById('inputChapterAudioFile');
+                var urlInput = document.getElementById('inputChapterAudioUrl');
+                var wrap = document.getElementById('chapterAudioPreviewWrap');
+                var player = document.getElementById('chapterAudioPreviewPlayer');
+                if (fileInput) fileInput.value = '';
+                if (urlInput) urlInput.value = '';
+                if (player) {
+                    player.pause();
+                    player.src = '';
+                }
+                if (wrap) wrap.style.display = 'none';
+            };
+            </script>
 
             <input type="hidden" name="is_draft" id="isChapterDraftInput" value="0" />
 

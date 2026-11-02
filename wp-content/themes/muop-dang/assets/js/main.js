@@ -2741,6 +2741,9 @@
               $('#chapContent').val('');
               updateRealtimeWordCounter($('#chapContent'), $('#chapContentWordCount'), $('#chapContentCharCount'));
               $('#chapNumber').val(nextNum);
+              if (typeof window.muopClearChapterAudio === 'function') {
+                window.muopClearChapterAudio();
+              }
               $btn.prop('disabled', false).text(isDraft ? 'Lưu Nháp' : 'Thêm Chương Này');
               $alert.hide();
 
@@ -4789,6 +4792,8 @@
           const tabLabelMap = {
             'admTabStories': 'Quản lý truyện',
             'admTabAnalytics': 'Thống kê & Phân tích lượt đọc',
+            'admTabVisitorLogs': 'Quản lý khách đọc truyện',
+            'admTabAudio': 'Quản lý audio',
             'admTabTeams': 'Quản lý team dịch',
             'admTabSplitter': 'Tách truyện tự động',
             'admTabVivuCrawler': 'Công cụ lấy crawl tự động',
@@ -10225,9 +10230,13 @@
       });
 
       // 4. Bấm "Đổi Giờ Hẹn" trong Popup
-      $('#btnTriggerToggleChangeSchedule').on('click', function(e) {
+      $('#btnTriggerToggleChangeSchedule').off('click').on('click', function(e) {
         e.preventDefault();
-        $('#scheduleChangeFormWrap').slideToggle(200);
+        if (typeof window.muopToggleScheduleChangeForm === 'function') {
+          window.muopToggleScheduleChangeForm();
+        } else {
+          $('#scheduleChangeFormWrap').slideToggle(200);
+        }
       });
 
       $('#btnCancelToggleChangeSchedule').on('click', function(e) {

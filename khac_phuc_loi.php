@@ -159,10 +159,53 @@ if ($wp_load_path) {
               KEY `idx_created` (`created_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;");
             
+            $table_audio = $wpdb->prefix . 'muop_audio_logs';
+            $wpdb->query("CREATE TABLE IF NOT EXISTS `$table_audio` (
+              `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+              `story_id` bigint(20) unsigned NOT NULL,
+              `story_title` varchar(255) NOT NULL,
+              `chapter_id` bigint(20) unsigned NOT NULL,
+              `chapter_num` int(11) DEFAULT 1,
+              `chapter_title` varchar(255) DEFAULT '',
+              `user_id` bigint(20) unsigned DEFAULT 0,
+              `user_name` varchar(100) DEFAULT 'Khách vãng lai',
+              `ip_address` varchar(45) DEFAULT '',
+              `device_type` varchar(50) DEFAULT 'Máy tính',
+              `listen_date` date NOT NULL,
+              `listen_time` datetime NOT NULL,
+              PRIMARY KEY (`id`),
+              KEY `idx_story` (`story_id`),
+              KEY `idx_chapter` (`chapter_id`),
+              KEY `idx_user` (`user_id`),
+              KEY `idx_date` (`listen_date`),
+              KEY `idx_time` (`listen_time`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;");
+
+            $table_vlogs = $wpdb->prefix . 'muop_visitor_read_logs';
+            $wpdb->query("CREATE TABLE IF NOT EXISTS `$table_vlogs` (
+              `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+              `ip_address` varchar(45) NOT NULL,
+              `user_id` bigint(20) unsigned DEFAULT 0,
+              `user_name` varchar(100) DEFAULT 'Khách vãng lai',
+              `story_id` bigint(20) unsigned NOT NULL,
+              `story_title` varchar(255) NOT NULL,
+              `chapter_id` bigint(20) unsigned NOT NULL DEFAULT 0,
+              `chapter_num` int(11) DEFAULT 0,
+              `chapter_title` varchar(255) DEFAULT '',
+              `device_type` varchar(50) DEFAULT 'Máy tính',
+              `read_date` date NOT NULL,
+              `read_time` datetime NOT NULL,
+              PRIMARY KEY (`id`),
+              KEY `idx_ip` (`ip_address`),
+              KEY `idx_date` (`read_date`),
+              KEY `idx_story` (`story_id`),
+              KEY `idx_chapter` (`chapter_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;");
+
             if (function_exists('update_option')) {
                 update_option('posts_per_page', 24);
             }
-            $results[] = 'Đã đồng bộ Database: Bảng tách chương đa thiết bị & thiết lập 24 truyện/trang!';
+            $results[] = 'Đã đồng bộ Database: Bảng Audio, Khách đọc truyện, Tách chương đa thiết bị & 24 truyện/trang!';
         }
 
         // Làm mới permalinks rewrite rules

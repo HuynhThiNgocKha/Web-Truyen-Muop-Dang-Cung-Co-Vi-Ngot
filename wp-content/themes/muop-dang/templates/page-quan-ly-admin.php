@@ -299,6 +299,13 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                     <span class="badge" id="badgeTodayReaders" style="font-size: 10px; padding: 2px 6px; margin-left: auto; background: #e0f2fe; color: #0284c7; font-weight: 700;">Hôm nay</span>
                 </button>
 
+                <!-- 1.2 Quản lý audio (Hình 4) -->
+                <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabAudio" id="navItemAudio">
+                    <span class="nav-item-icon"><i class="fa-solid fa-headphones" style="color: #0891b2;"></i></span>
+                    <span class="nav-item-label">Quản lý audio</span>
+                    <span class="badge" id="badgeTodayAudios" style="font-size: 10px; padding: 2px 6px; margin-left: auto; background: #ecfeff; color: #0891b2; font-weight: 700;">Audio</span>
+                </button>
+
                 <!-- 2. Quản lý truyện -->
                 <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabStories" id="navItemStories">
                     <span class="nav-item-icon"><i class="fa-solid fa-book"></i></span>
@@ -1254,13 +1261,14 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     <label for="inputVisitorDate" style="font-size: 13px; font-weight: 700; color: var(--text-color); margin-bottom: 0;">
                                         <i class="fa-regular fa-calendar-days" style="color: #0284c7;"></i> Chọn ngày:
                                     </label>
-                                    <input type="date" id="inputVisitorDate" class="form-input" style="height: 36px; padding: 4px 10px; font-size: 13px; font-weight: 600; width: 150px;" value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>" />
+                                    <input type="date" id="inputVisitorDate" class="form-input" style="height: 36px; padding: 4px 10px; font-size: 13px; font-weight: 600; width: 150px;" value="<?php echo current_time('Y-m-d'); ?>" max="<?php echo current_time('Y-m-d'); ?>" />
                                     
                                     <!-- Nút chọn nhanh -->
                                     <div style="display: inline-flex; gap: 6px;" id="quickVisitorDateButtons">
-                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date active" data-date="<?php echo date('Y-m-d'); ?>">Hôm nay</button>
-                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date" data-date="<?php echo date('Y-m-d', strtotime('-1 day')); ?>">Hôm qua</button>
-                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date" data-date="<?php echo date('Y-m-d', strtotime('-2 day')); ?>">Hôm kia</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date" data-date="all">Tất cả</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date active" data-date="<?php echo current_time('Y-m-d'); ?>">Hôm nay</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date" data-date="<?php echo date('Y-m-d', strtotime('-1 day', strtotime(current_time('Y-m-d')))); ?>">Hôm qua</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-visitor-date" data-date="<?php echo date('Y-m-d', strtotime('-2 days', strtotime(current_time('Y-m-d')))); ?>">Hôm kia</button>
                                     </div>
                                 </div>
 
@@ -1316,6 +1324,174 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                 Hiển thị 0 / 0 lượt đọc
                             </div>
                             <div style="display: flex; gap: 6px;" id="visitorLogsPaginationBtns">
+                                <!-- Dynamic pagination buttons -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =================================================================
+                     TAB: QUẢN LÝ AUDIO TRUYỆN (HÌNH 4 MỚI)
+                     ================================================================= -->
+                <section id="admTabAudio" class="dash-tab-pane">
+                    <div class="adm-subview-panel">
+                        <!-- 1. Header & Giới thiệu tính năng -->
+                        <div class="db-splitter-container" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px 24px; box-shadow: var(--shadow-sm); margin-bottom: 20px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #ecfeff; color: #0891b2; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                                        <i class="fa-solid fa-headphones"></i>
+                                    </div>
+                                    <div>
+                                        <h3 style="margin: 0; font-size: 16.5px; font-weight: 700; color: var(--text-color);">Quản Lý Lượt Nghe Audio</h3>
+                                        <p style="margin: 3px 0 0; font-size: 13px; color: var(--text-muted);">
+                                            Theo dõi chi tiết số lượt đã nghe audio, số người nghe, truyện nào, chương nào, thiết bị và thời gian nghe cụ thể.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshAudioLogs">
+                                        <i class="fa-solid fa-arrow-rotate-right"></i> Làm mới
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Thẻ thống kê tổng quan -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Tổng Lượt Nghe</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #ecfeff; color: #0891b2; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-play"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #0891b2; margin-top: 6px;" id="statAudioTotalListens">0</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="statAudioDateLabel">Toàn bộ lượt nghe audio</div>
+                            </div>
+
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Lượt Nghe Hôm Nay</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-calendar-day"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #16a34a; margin-top: 6px;" id="statAudioTodayListens">0</div>
+                                <div style="font-size: 12px; color: #16a34a; margin-top: 4px;"><i class="fa-solid fa-bolt"></i> Cập nhật theo thời gian thực</div>
+                            </div>
+
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Số Người Nghe (IP)</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #faf5ff; color: #9333ea; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-users"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #9333ea; margin-top: 6px;" id="statAudioUniqueListeners">0</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Người nghe độc lập</div>
+                            </div>
+
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Truyện & Chương Audio</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #fff7ed; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-music"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #ea580c; margin-top: 6px;" id="statAudioStoriesChapters">0 / 0</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Bộ truyện / Chương có audio</div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Thanh điều hướng ngày & bộ lọc dữ liệu -->
+                        <div class="admin-table-toolbar" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; box-shadow: var(--shadow-sm); margin-bottom: 20px;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; width: 100%;">
+                                <!-- Bộ chọn ngày -->
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <label for="inputAudioDate" style="font-size: 13px; font-weight: 700; color: var(--text-color); margin-bottom: 0;">
+                                        <i class="fa-regular fa-calendar-days" style="color: #0891b2;"></i> Chọn ngày:
+                                    </label>
+                                    <input type="date" id="inputAudioDate" class="form-input" style="height: 36px; padding: 4px 10px; font-size: 13px; font-weight: 600; width: 150px;" value="" max="<?php echo current_time('Y-m-d'); ?>" />
+                                    
+                                    <!-- Nút chọn nhanh -->
+                                    <div style="display: inline-flex; gap: 6px;" id="quickAudioDateButtons">
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-audio-date active" data-date="all">Tất cả các ngày</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-audio-date" data-date="<?php echo current_time('Y-m-d'); ?>">Hôm nay</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-audio-date" data-date="<?php echo date('Y-m-d', strtotime('-1 day', strtotime(current_time('Y-m-d')))); ?>">Hôm qua</button>
+                                        <button type="button" class="btn btn-outline btn-xs btn-quick-audio-date" data-date="<?php echo date('Y-m-d', strtotime('-2 days', strtotime(current_time('Y-m-d')))); ?>">Hôm kia</button>
+                                    </div>
+                                </div>
+
+                                <!-- Tìm kiếm & Chọn chế độ xem -->
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; justify-content: flex-end; min-width: 260px;">
+                                    <div style="position: relative; min-width: 200px; flex: 1; max-width: 280px;">
+                                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-muted); pointer-events: none;"></i>
+                                        <input type="text" id="inputAudioSearch" class="form-input" placeholder="Tìm IP, tên truyện, chương..." style="height: 36px; padding-left: 30px; font-size: 13px;" />
+                                    </div>
+
+                                    <div style="display: inline-flex; border: 1px solid var(--border-color); border-radius: var(--radius-sm); overflow: hidden;">
+                                        <button type="button" class="btn btn-xs btn-audio-view active" data-view="logs" style="padding: 6px 12px; font-weight: 600;">
+                                            <i class="fa-solid fa-list-ul"></i> Chi tiết lượt nghe
+                                        </button>
+                                        <button type="button" class="btn btn-xs btn-audio-view" data-view="stories" style="padding: 6px 12px; font-weight: 600; background: #fff; color: var(--text-muted);">
+                                            <i class="fa-solid fa-book"></i> Theo bộ truyện
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4.1. Bảng 1: Danh sách chi tiết lượt nghe audio -->
+                        <div id="audioViewLogs" class="table-responsive db-table-container" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto;">
+                            <table class="data-table db-data-table" style="width: 100%; min-width: 880px; font-size: 13px;" id="tableAudioLogs">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px; text-align: center;">STT</th>
+                                        <th style="width: 135px; text-align: center;">Thời Gian Nghe</th>
+                                        <th style="width: 150px;">Người Nghe (IP)</th>
+                                        <th style="width: 110px; text-align: center;">Thiết Bị</th>
+                                        <th style="min-width: 220px;">Bộ Truyện</th>
+                                        <th style="width: 130px; text-align: center;">Chương Nghe</th>
+                                        <th style="width: 140px; text-align: center;">Nghe Thử / Link</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audioLogsListBody">
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px; display: block; color: #0891b2;"></i>
+                                            Đang tải dữ liệu lượt nghe audio...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div id="audioLogsEmpty" style="display: none; padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13.5px;">
+                                <i class="fa-solid fa-headphones-simple" style="font-size: 32px; margin-bottom: 10px; display: block; opacity: 0.4;"></i>
+                                Chưa có lượt nghe audio nào phù hợp với bộ lọc hoặc khoảng thời gian đã chọn.
+                            </div>
+                        </div>
+
+                        <!-- 4.2. Bảng 2: Thống kê tổng hợp theo bộ truyện -->
+                        <div id="audioViewStories" style="display: none;" class="table-responsive db-table-container" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow-x: auto;">
+                            <table class="data-table db-data-table" style="width: 100%; min-width: 750px; font-size: 13px;" id="tableAudioStoryStats">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px; text-align: center;">STT</th>
+                                        <th style="min-width: 240px;">Tên Bộ Truyện</th>
+                                        <th style="width: 150px; text-align: center;">Số Chương Đã Có Audio</th>
+                                        <th style="width: 140px; text-align: center;">Tổng Lượt Nghe</th>
+                                        <th style="width: 140px; text-align: center;">Số Người Nghe</th>
+                                        <th style="width: 120px; text-align: center;">Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audioStoryStatsListBody">
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                            Đang thống kê theo từng bộ truyện...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 5. Phân trang -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; flex-wrap: wrap; gap: 10px;" id="audioLogsPaginationWrap">
+                            <div style="font-size: 13px; color: var(--text-muted);" id="audioLogsPaginationInfo">
+                                Hiển thị 0 / 0 lượt nghe
+                            </div>
+                            <div style="display: flex; gap: 6px;" id="audioLogsPaginationBtns">
                                 <!-- Dynamic pagination buttons -->
                             </div>
                         </div>
@@ -2228,12 +2404,109 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                             </div>
 
                             <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 0;">
-                                <i class="fa-solid fa-circle-info"></i> Hệ thống tự động ghi nhận địa chỉ IP, trình duyệt và chương truyện khi độc giả click mở khóa.
+                                <i class="fa-solid fa-circle-info"></i> Hệ thống tự động ghi nhận lượt click, thiết bị và chương truyện khi độc giả tương tác mở khóa.
                             </p>
                         </div>
                     </div>
 
-                    <!-- Bảng Nhật ký Clicks Gần Nhất -->
+                    <!-- Tra Cứu & Thống Kê Chi Tiết Lượt Click Theo Bộ Truyện & Chương (Mới) -->
+                    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                            <div>
+                                <h3 style="font-size: 15px; font-weight: 700; color: var(--text-color); margin: 0;">
+                                    <i class="fa-solid fa-magnifying-glass-chart" style="color: #ea580c;"></i> Tra Cứu Lượt Click Theo Bộ Truyện & Từng Chương
+                                </h3>
+                                <p style="font-size: 12.5px; color: var(--text-muted); margin: 3px 0 0;">
+                                    Tìm kiếm truyện để xem tổng click, chi tiết từng chương và số lượt click hôm nay, hôm qua, hôm kia.
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Ô Tìm kiếm truyện -->
+                        <div style="position: relative; max-width: 520px; margin-bottom: 18px;">
+                            <div style="display: flex; gap: 8px;">
+                                <div style="position: relative; flex: 1;">
+                                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
+                                    <input type="text" id="inputAffiliateStorySearch" class="form-input" placeholder="Gõ tên truyện cần tra cứu click..." style="padding-left: 34px; height: 38px; font-size: 13.5px;" autocomplete="off" />
+                                </div>
+                                <button type="button" class="btn btn-primary" id="btnAffiliateSearchStory" style="padding: 0 16px; height: 38px;">
+                                    Tìm Kiếm
+                                </button>
+                            </div>
+                            <!-- Dropdown kết quả gợi ý truyện -->
+                            <div id="affiliateStoryDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 100; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-md); max-height: 280px; overflow-y: auto; margin-top: 4px;"></div>
+                        </div>
+
+                        <!-- Kết quả thống kê của truyện đã chọn -->
+                        <div id="affiliateStoryStatsResult" style="display: none;">
+                            <!-- Header thông tin truyện -->
+                            <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="width: 38px; height: 38px; border-radius: 8px; background: #ffedd5; color: #ea580c; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                                        <i class="fa-solid fa-book-bookmark"></i>
+                                    </div>
+                                    <div>
+                                        <h4 id="affiliateSelectedStoryTitle" style="margin: 0; font-size: 15.5px; font-weight: 700; color: #9a3412;">--</h4>
+                                        <span style="font-size: 12px; color: #c2410c;">Thống kê lượt click Shopee & TikTok Shop</span>
+                                    </div>
+                                </div>
+                                <div id="affiliateSelectedStoryActions"></div>
+                            </div>
+
+                            <!-- 4 Thẻ KPI của truyện này -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px;">
+                                    <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Tổng Click Truyện Này</div>
+                                    <div style="font-size: 22px; font-weight: 800; color: #ea580c; margin-top: 4px;" id="statAffStoryTotal">0</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);" id="statAffStorySubTotal">Shopee: 0 | TikTok: 0</div>
+                                </div>
+
+                                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px;">
+                                    <div style="font-size: 11.5px; color: #16a34a; font-weight: 600;"><i class="fa-solid fa-calendar-day"></i> Click Hôm Nay</div>
+                                    <div style="font-size: 22px; font-weight: 800; color: #16a34a; margin-top: 4px;" id="statAffStoryToday">0</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);" id="statAffStoryTodayDate">--</div>
+                                </div>
+
+                                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px;">
+                                    <div style="font-size: 11.5px; color: #0284c7; font-weight: 600;"><i class="fa-solid fa-calendar-minus"></i> Click Hôm Qua</div>
+                                    <div style="font-size: 22px; font-weight: 800; color: #0284c7; margin-top: 4px;" id="statAffStoryYesterday">0</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);" id="statAffStoryYesterdayDate">--</div>
+                                </div>
+
+                                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px;">
+                                    <div style="font-size: 11.5px; color: #7c3aed; font-weight: 600;"><i class="fa-solid fa-clock-rotate-left"></i> Click Hôm Kia</div>
+                                    <div style="font-size: 22px; font-weight: 800; color: #7c3aed; margin-top: 4px;" id="statAffStoryDayBefore">0</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);" id="statAffStoryDayBeforeDate">--</div>
+                                </div>
+                            </div>
+
+                            <!-- Bảng chi tiết click từng chương của truyện -->
+                            <h4 style="font-size: 14px; font-weight: 700; color: var(--text-color); margin-bottom: 10px;">
+                                <i class="fa-solid fa-list-ol"></i> Chi Tiết Lượt Click Từng Chương Của Truyện
+                            </h4>
+                            <div class="table-responsive db-table-container">
+                                <table class="data-table db-data-table" style="width: 100%; font-size: 13px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 110px; text-align: center;">Chương</th>
+                                            <th style="width: 110px; text-align: center;">Tổng Lượt Click</th>
+                                            <th style="width: 110px; text-align: center;">Click Shopee</th>
+                                            <th style="width: 110px; text-align: center;">Click TikTok</th>
+                                            <th style="width: 110px; text-align: center; color: #16a34a;">Hôm Nay</th>
+                                            <th style="width: 110px; text-align: center; color: #0284c7;">Hôm Qua</th>
+                                            <th style="width: 110px; text-align: center; color: #7c3aed;">Hôm Kia</th>
+                                            <th style="min-width: 130px; text-align: center;">Click Gần Nhất</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="affiliateStoryChaptersBody">
+                                        <!-- Rendered by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bảng Nhật ký Clicks Gần Nhất (Không hiển thị IP theo yêu cầu) -->
                     <h3 style="font-size: 15px; font-weight: 700; color: var(--primary-green); margin-bottom: 12px;">
                         <i class="fa-solid fa-list-check"></i> Nhật Ký Lượt Click Gần Đây Nhất
                     </h3>
@@ -2244,7 +2517,6 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     <th>ID</th>
                                     <th>Nền Tảng</th>
                                     <th>Chương Mở Khóa</th>
-                                    <th>Địa Chỉ IP</th>
                                     <th>Thời Gian</th>
                                     <th>Liên Kết</th>
                                 </tr>
@@ -2262,16 +2534,15 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                                 <?php endif; ?>
                                             </td>
                                             <td>Chương <?php echo $clk->chapter_num ?: 'Chung'; ?></td>
-                                            <td style="font-family: monospace; font-size: 12px;"><?php echo esc_html($clk->ip ?: '127.0.0.1'); ?></td>
                                             <td style="font-size: 12px; color: var(--text-muted);"><?php echo date('d/m/Y H:i:s', strtotime($clk->created_at)); ?></td>
-                                            <td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;">
+                                            <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;">
                                                 <a href="<?php echo esc_url($clk->url); ?>" target="_blank" style="color: var(--primary-green);"><?php echo esc_html($clk->url); ?></a>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else : ?>
                                     <tr>
-                                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có lượt click nào được ghi nhận.</td>
+                                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">Chưa có lượt click nào được ghi nhận.</td>
                                     </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -3528,6 +3799,7 @@ jQuery(document).ready(function($) {
         'admTabStories': 'Quản lý truyện',
         'admTabAnalytics': 'Thống kê & Phân tích lượt đọc',
         'admTabVisitorLogs': 'Quản lý khách đọc truyện',
+        'admTabAudio': 'Quản lý audio',
         'admTabTeams': 'Quản lý team dịch',
         'admTabSplitter': 'Tách truyện tự động',
         'admTabVivuCrawler': 'Công cụ lấy crawl tự động',
@@ -3561,6 +3833,8 @@ jQuery(document).ready(function($) {
         if (typeof syncSplitterHistoryFromDB === 'function') syncSplitterHistoryFromDB();
       } else if (cleanId === 'admTabVisitorLogs') {
         if (typeof loadVisitorLogs === 'function') loadVisitorLogs(1);
+      } else if (cleanId === 'admTabAudio') {
+        if (typeof loadAudioLogs === 'function') loadAudioLogs(1);
       } else if (cleanId === 'admTabVivuCrawler') {
         $('#toolbarGroupVivuCrawler').show();
       } else if (cleanId === 'admTabAnalytics') {
@@ -4421,7 +4695,11 @@ jQuery(document).ready(function($) {
   function loadVisitorLogs(page) {
     page = page || 1;
     visitorLogsCurrentPage = page;
-    const selectedDate = $('#inputVisitorDate').val() || '';
+    const activeQuickBtn = $('.btn-quick-visitor-date.active').data('date');
+    let selectedDate = $('#inputVisitorDate').val() || '';
+    if (activeQuickBtn === 'all' && !selectedDate) {
+      selectedDate = 'all';
+    }
     const searchVal = $('#inputVisitorSearch').val() || '';
     const userType = $('#selectVisitorUserType').val() || 'all';
 
@@ -4438,7 +4716,7 @@ jQuery(document).ready(function($) {
       type: 'POST',
       data: {
         action: 'muop_get_visitor_read_logs',
-        date: selectedDate,
+        date: selectedDate || 'all',
         search: searchVal,
         user_type: userType,
         page: page,
@@ -4463,6 +4741,11 @@ jQuery(document).ready(function($) {
         $('#statVisitorMembers').text(Number(summary.member_readers || 0).toLocaleString());
         if (summary.date_formatted) {
           $('#statVisitorDateLabel').html('<i class="fa-regular fa-calendar-check"></i> Ngày: ' + escapeVisitorHtml(summary.date_formatted));
+        }
+
+        // Cập nhật badge ở menu sidebar
+        if (summary.today_unique_readers !== undefined) {
+          $('#badgeTodayReaders').text(summary.today_unique_readers > 0 ? (summary.today_unique_readers + ' hôm nay') : 'Hôm nay');
         }
 
         // 2. Render danh sách nhật ký
@@ -4492,7 +4775,14 @@ jQuery(document).ready(function($) {
             devIcon = '<i class="fa-solid fa-tablet-screen-button" style="color: #10b981;" title="Máy tính bảng"></i> Tablet';
           }
 
-          const chapNumBadge = '<span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11.5px; padding: 3px 8px; border-radius: 4px;">Chương ' + (row.chapter_num || 1) + '</span>';
+          const isStoryOnly = (!row.chapter_id || row.chapter_id == 0 || row.chapter_num == 0);
+          const chapNumBadge = isStoryOnly 
+            ? '<span class="badge" style="background: #fef3c7; color: #b45309; font-weight: 700; font-size: 11.5px; padding: 3px 8px; border-radius: 4px;"><i class="fa-solid fa-circle-info"></i> Giới thiệu truyện</span>' 
+            : '<span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 11.5px; padding: 3px 8px; border-radius: 4px;">Chương ' + (row.chapter_num || 1) + '</span>';
+
+          const readUrl = isStoryOnly ? (row.story_url || '#') : (row.chapter_url || row.story_url || '#');
+          const readTitle = isStoryOnly ? 'Xem trang truyện' : escapeVisitorHtml(row.chapter_title);
+          const actionBtnText = isStoryOnly ? '<i class="fa-solid fa-arrow-up-right-from-square"></i> Xem truyện' : '<i class="fa-solid fa-arrow-up-right-from-square"></i> Xem';
 
           rowsHtml += '<tr>' +
             '<td style="text-align: center; color: var(--text-muted); font-size: 12px;">' + stt + '</td>' +
@@ -4513,13 +4803,13 @@ jQuery(document).ready(function($) {
               '</a>' +
             '</td>' +
             '<td style="text-align: center;">' +
-              '<a href="' + escapeVisitorHtml(row.chapter_url) + '" target="_blank" style="text-decoration: none;" title="' + escapeVisitorHtml(row.chapter_title) + '">' +
+              '<a href="' + escapeVisitorHtml(readUrl) + '" target="_blank" style="text-decoration: none;" title="' + escapeVisitorHtml(readTitle) + '">' +
                 chapNumBadge +
               '</a>' +
             '</td>' +
             '<td style="text-align: center; white-space: nowrap;">' +
-              '<a href="' + escapeVisitorHtml(row.chapter_url) + '" target="_blank" class="btn btn-outline btn-xs" style="padding: 2px 8px; font-size: 11.5px;" title="Xem chương vừa đọc">' +
-                '<i class="fa-solid fa-arrow-up-right-from-square"></i> Xem' +
+              '<a href="' + escapeVisitorHtml(readUrl) + '" target="_blank" class="btn btn-outline btn-xs" style="padding: 2px 8px; font-size: 11.5px;" title="' + escapeVisitorHtml(readTitle) + '">' +
+                actionBtnText +
               '</a>' +
             '</td>' +
           '</tr>';
@@ -4578,12 +4868,15 @@ jQuery(document).ready(function($) {
     loadVisitorLogs(1);
   });
 
-  // Nút chọn ngày nhanh (Hôm nay, Hôm qua, Hôm kia)
+  // Nút chọn ngày nhanh (Tất cả, Hôm nay, Hôm qua, Hôm kia)
   $(document).on('click', '.btn-quick-visitor-date', function() {
     $('.btn-quick-visitor-date').removeClass('active');
     $(this).addClass('active');
     const d = $(this).data('date');
-    if (d) {
+    if (d === 'all') {
+      $('#inputVisitorDate').val('');
+      loadVisitorLogs(1);
+    } else if (d) {
       $('#inputVisitorDate').val(d);
       loadVisitorLogs(1);
     }
@@ -4623,6 +4916,451 @@ jQuery(document).ready(function($) {
       loadVisitorLogs(1);
     }
   });
+
+  // =========================================================================
+  // QUẢN LÝ LƯỢT NGHE AUDIO (AUDIO LOGS - HÌNH 4 MỚI)
+  // =========================================================================
+  let audioLogsCurrentPage = 1;
+  let audioLogsSearchTimer = null;
+  let activeAudioPlayer = null;
+
+  function loadAudioLogs(page) {
+    page = page || 1;
+    audioLogsCurrentPage = page;
+    const activeQuickBtn = $('.btn-quick-audio-date.active').data('date');
+    let selectedDate = $('#inputAudioDate').val() || '';
+    if (activeQuickBtn === 'all' && !selectedDate) {
+      selectedDate = 'all';
+    }
+    const searchVal = $('#inputAudioSearch').val() || '';
+
+    const $tbody = $('#audioLogsListBody');
+    const $storyBody = $('#audioStoryStatsListBody');
+    const $empty = $('#audioLogsEmpty');
+    const $info = $('#audioLogsPaginationInfo');
+    const $btns = $('#audioLogsPaginationBtns');
+
+    $tbody.html('<tr><td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px; display: block; color: #0891b2;"></i>Đang tải dữ liệu lượt nghe audio...</td></tr>');
+    $empty.hide();
+
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_audio_logs',
+        date: selectedDate || 'all',
+        search: searchVal,
+        page: page,
+        per_page: 25,
+        nonce: muopConfig.nonce
+      },
+      success: function(res) {
+        if (!res || !res.success || !res.data) {
+          $tbody.html('<tr><td colspan="7" style="text-align: center; padding: 25px; color: #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> Có lỗi khi tải dữ liệu audio! Vui lòng thử lại.</td></tr>');
+          return;
+        }
+
+        const data = res.data;
+        const summary = data.summary || {};
+        const logs = data.logs || [];
+        const storyStats = data.story_stats || [];
+        const pag = data.pagination || {};
+
+        // 1. Cập nhật các thẻ KPI
+        $('#statAudioTotalListens').text(Number(summary.total_listens || 0).toLocaleString());
+        $('#statAudioTodayListens').text(Number(summary.today_listens || 0).toLocaleString());
+        $('#statAudioUniqueListeners').text(Number(summary.unique_listeners || 0).toLocaleString());
+        $('#statAudioStoriesChapters').text((summary.stories_with_audio || 0) + ' truyện / ' + (summary.chapters_with_audio || 0) + ' chương');
+        if (summary.date_formatted) {
+          $('#statAudioDateLabel').html('<i class="fa-regular fa-calendar-check"></i> ' + escapeVisitorHtml(summary.date_formatted));
+        }
+
+        // Cập nhật badge trên sidebar
+        if (summary.today_listens !== undefined) {
+          $('#badgeTodayAudios').text(summary.today_listens > 0 ? (summary.today_listens + ' hôm nay') : 'Audio');
+        }
+
+        // 2. Render danh sách nhật ký nghe chi tiết
+        if (!logs.length) {
+          $tbody.empty();
+          $empty.show();
+          $info.text('Hiển thị 0 / 0 lượt nghe');
+          $btns.empty();
+        } else {
+          $empty.hide();
+          let rowsHtml = '';
+          const offset = ((pag.current_page || 1) - 1) * (pag.per_page || 25);
+
+          logs.forEach(function(row, idx) {
+            const stt = offset + idx + 1;
+            const isGuest = row.is_guest;
+            const userBadge = isGuest 
+              ? '<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-user-secret"></i> Vãng lai</span>' 
+              : '<span class="badge" style="background: #ede9fe; color: #7c3aed; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa-solid fa-user-check"></i> ' + escapeVisitorHtml(row.user_name || 'Thành viên') + '</span>';
+
+            let devIcon = '<i class="fa-solid fa-desktop" title="Máy tính"></i> Desktop';
+            if (row.device_type === 'Mobile') {
+              devIcon = '<i class="fa-solid fa-mobile-screen-button" style="color: #0284c7;" title="Điện thoại"></i> Mobile';
+            } else if (row.device_type === 'Tablet') {
+              devIcon = '<i class="fa-solid fa-tablet-screen-button" style="color: #10b981;" title="Máy tính bảng"></i> Tablet';
+            }
+
+            const chapBadge = '<span class="badge" style="background: #ecfeff; color: #0891b2; font-weight: 700; font-size: 11.5px; padding: 3px 8px; border-radius: 4px;"><i class="fa-solid fa-headphones"></i> Chương ' + (row.chapter_num || 1) + '</span>';
+
+            let audioActionHtml = '';
+            if (row.audio_url) {
+              audioActionHtml = '<button type="button" class="btn btn-outline btn-xs btn-admin-play-audio" data-url="' + escapeVisitorHtml(row.audio_url) + '" data-title="' + escapeVisitorHtml(row.story_title + ' - Chương ' + row.chapter_num) + '" style="padding: 3px 9px; font-size: 11.5px; color: #0891b2; border-color: #0891b2;"><i class="fa-solid fa-play"></i> Nghe thử</button>';
+            } else {
+              audioActionHtml = '<a href="' + escapeVisitorHtml(row.chapter_url) + '" target="_blank" class="btn btn-outline btn-xs" style="padding: 2px 8px; font-size: 11.5px;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Xem</a>';
+            }
+
+            rowsHtml += '<tr>' +
+              '<td style="text-align: center; color: var(--text-muted); font-size: 12px;">' + stt + '</td>' +
+              '<td style="text-align: center; white-space: nowrap; font-size: 12px;">' +
+                '<div style="font-weight: 700; color: var(--text-color);">' + escapeVisitorHtml(row.time_only || '') + '</div>' +
+                '<div style="font-size: 11px; color: var(--text-muted);">' + escapeVisitorHtml(row.time_ago || '') + '</div>' +
+              '</td>' +
+              '<td>' +
+                '<div style="font-family: monospace; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 2px;">' +
+                  '<i class="fa-solid fa-network-wired" style="color: #64748b; margin-right: 4px;"></i>' + escapeVisitorHtml(row.ip_address || '127.0.0.1') +
+                '</div>' +
+                '<div>' + userBadge + '</div>' +
+              '</td>' +
+              '<td style="text-align: center; font-size: 12px; color: var(--text-muted); white-space: nowrap;">' + devIcon + '</td>' +
+              '<td>' +
+                '<a href="' + escapeVisitorHtml(row.story_url) + '" target="_blank" style="font-weight: 600; color: var(--text-color); text-decoration: none; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;" title="' + escapeVisitorHtml(row.story_title) + '">' +
+                  '<i class="fa-solid fa-book" style="color: #0891b2; margin-right: 4px;"></i>' + escapeVisitorHtml(row.story_title || ('Truyện #' + row.story_id)) +
+                '</a>' +
+              '</td>' +
+              '<td style="text-align: center;">' +
+                '<a href="' + escapeVisitorHtml(row.chapter_url) + '" target="_blank" style="text-decoration: none;" title="' + escapeVisitorHtml(row.chapter_title) + '">' +
+                  chapBadge +
+                '</a>' +
+              '</td>' +
+              '<td style="text-align: center; white-space: nowrap;">' + audioActionHtml + '</td>' +
+            '</tr>';
+          });
+          $tbody.html(rowsHtml);
+
+          // Phân trang
+          const totalLogs = pag.total_logs || logs.length;
+          const totalPages = pag.total_pages || 1;
+          const curPage = pag.current_page || 1;
+          const startItem = offset + 1;
+          const endItem = Math.min(offset + logs.length, totalLogs);
+
+          $info.text('Hiển thị ' + startItem + ' - ' + endItem + ' trên tổng số ' + totalLogs.toLocaleString() + ' lượt nghe');
+
+          let btnsHtml = '';
+          if (totalPages > 1) {
+            btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-audio-page" data-page="' + (curPage - 1) + '" ' + (curPage <= 1 ? 'disabled style="opacity: 0.5;"' : '') + '><i class="fa-solid fa-chevron-left"></i> Trước</button>';
+
+            let startPage = Math.max(1, curPage - 2);
+            let endPage = Math.min(totalPages, curPage + 2);
+            if (startPage > 1) {
+              btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-audio-page" data-page="1">1</button>';
+              if (startPage > 2) btnsHtml += '<span style="padding: 0 4px; color: var(--text-muted);">...</span>';
+            }
+            for (let p = startPage; p <= endPage; p++) {
+              const isAct = (p === curPage);
+              btnsHtml += '<button type="button" class="btn ' + (isAct ? 'btn-primary' : 'btn-outline') + ' btn-xs btn-audio-page" data-page="' + p + '" ' + (isAct ? 'style="font-weight: 700;"' : '') + '>' + p + '</button>';
+            }
+            if (endPage < totalPages) {
+              if (endPage < totalPages - 1) btnsHtml += '<span style="padding: 0 4px; color: var(--text-muted);">...</span>';
+              btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-audio-page" data-page="' + totalPages + '">' + totalPages + '</button>';
+            }
+
+            btnsHtml += '<button type="button" class="btn btn-outline btn-xs btn-audio-page" data-page="' + (curPage + 1) + '" ' + (curPage >= totalPages ? 'disabled style="opacity: 0.5;"' : '') + '>Sau <i class="fa-solid fa-chevron-right"></i></button>';
+          }
+          $btns.html(btnsHtml);
+        }
+
+        // 3. Render bảng thống kê theo từng bộ truyện
+        if (!storyStats.length) {
+          $storyBody.html('<tr><td colspan="6" style="text-align: center; padding: 25px; color: var(--text-muted);">Chưa có thống kê theo bộ truyện.</td></tr>');
+        } else {
+          let storiesHtml = '';
+          storyStats.forEach(function(st, sidx) {
+            storiesHtml += '<tr>' +
+              '<td style="text-align: center; color: var(--text-muted); font-size: 12px;">' + (sidx + 1) + '</td>' +
+              '<td>' +
+                '<div style="font-weight: 700; color: var(--text-color);">' + escapeVisitorHtml(st.story_title) + '</div>' +
+              '</td>' +
+              '<td style="text-align: center;"><span class="badge" style="background: #e0f2fe; color: #0369a1; font-weight: 700;">' + (st.chapters_listened || 0) + ' chương</span></td>' +
+              '<td style="text-align: center; font-weight: 800; color: #0891b2; font-size: 14px;">' + Number(st.total_listens || 0).toLocaleString() + '</td>' +
+              '<td style="text-align: center; font-weight: 600; color: #9333ea;">' + Number(st.unique_listeners || 0).toLocaleString() + '</td>' +
+              '<td style="text-align: center;">' +
+                '<button type="button" class="btn btn-outline btn-xs btn-filter-audio-story" data-story="' + escapeVisitorHtml(st.story_title) + '" style="padding: 2px 8px; font-size: 11.5px;"><i class="fa-solid fa-filter"></i> Lọc lượt nghe</button>' +
+              '</td>' +
+            '</tr>';
+          });
+          $storyBody.html(storiesHtml);
+        }
+      },
+      error: function() {
+        $tbody.html('<tr><td colspan="7" style="text-align: center; padding: 25px; color: #dc2626;"><i class="fa-solid fa-triangle-exclamation"></i> Không thể kết nối máy chủ! Vui lòng thử lại.</td></tr>');
+      }
+    });
+  }
+
+  // Toggle giữa view Logs và view Stories
+  $(document).on('click', '.btn-audio-view', function() {
+    $('.btn-audio-view').removeClass('active').css({ background: '#fff', color: 'var(--text-muted)' });
+    $(this).addClass('active').css({ background: 'var(--primary-green)', color: '#fff' });
+    const view = $(this).data('view');
+    if (view === 'stories') {
+      $('#audioViewLogs').hide();
+      $('#audioLogsPaginationWrap').hide();
+      $('#audioViewStories').show();
+    } else {
+      $('#audioViewStories').hide();
+      $('#audioViewLogs').show();
+      $('#audioLogsPaginationWrap').show();
+    }
+  });
+
+  // Chọn ngày trong audio input
+  $('#inputAudioDate').on('change', function() {
+    const val = $(this).val();
+    $('.btn-quick-audio-date').each(function() {
+      if ($(this).data('date') === val) {
+        $(this).addClass('active');
+      } else {
+        $(this).removeClass('active');
+      }
+    });
+    loadAudioLogs(1);
+  });
+
+  // Chọn nút ngày nhanh audio
+  $(document).on('click', '.btn-quick-audio-date', function() {
+    $('.btn-quick-audio-date').removeClass('active');
+    $(this).addClass('active');
+    const d = $(this).data('date');
+    if (d === 'all') {
+      $('#inputAudioDate').val('');
+      loadAudioLogs(1);
+    } else if (d) {
+      $('#inputAudioDate').val(d);
+      loadAudioLogs(1);
+    }
+  });
+
+  // Search input audio
+  $('#inputAudioSearch').on('input', function() {
+    clearTimeout(audioLogsSearchTimer);
+    audioLogsSearchTimer = setTimeout(function() {
+      loadAudioLogs(1);
+    }, 350);
+  });
+
+  // Nút làm mới audio
+  $('#btnRefreshAudioLogs').on('click', function() {
+    loadAudioLogs(audioLogsCurrentPage);
+  });
+
+  // Phân trang audio
+  $(document).on('click', '.btn-audio-page', function() {
+    const p = parseInt($(this).data('page'), 10);
+    if (p && !$(this).prop('disabled')) {
+      loadAudioLogs(p);
+    }
+  });
+
+  // Nút lọc audio theo truyện từ bảng 2
+  $(document).on('click', '.btn-filter-audio-story', function() {
+    const title = $(this).data('story');
+    if (title) {
+      $('#inputAudioSearch').val(title);
+      $('.btn-audio-view[data-view="logs"]').click();
+      loadAudioLogs(1);
+    }
+  });
+
+  // Nghe thử Audio trong Admin Portal
+  $(document).on('click', '.btn-admin-play-audio', function() {
+    const url = $(this).data('url');
+    const title = $(this).data('title') || 'Nghe thử audio';
+    if (!url) return;
+
+    if (activeAudioPlayer) {
+      activeAudioPlayer.pause();
+      activeAudioPlayer = null;
+      $('.btn-admin-play-audio').html('<i class="fa-solid fa-play"></i> Nghe thử');
+    }
+
+    const audio = new Audio(url);
+    activeAudioPlayer = audio;
+    const $btn = $(this);
+    $btn.html('<i class="fa-solid fa-pause"></i> Đang phát...');
+
+    audio.play().catch(function(e) {
+      muopAlert('Không thể phát file âm thanh này!', 'error');
+      $btn.html('<i class="fa-solid fa-play"></i> Nghe thử');
+    });
+
+    audio.onended = function() {
+      $btn.html('<i class="fa-solid fa-play"></i> Nghe thử');
+      activeAudioPlayer = null;
+    };
+  });
+
+  // =========================================================================
+  // TRA CỨU & THỐNG KÊ LƯỢT CLICK THEO BỘ TRUYỆN (AFFILIATE STATS)
+  // =========================================================================
+  let affStorySearchTimer = null;
+
+  // Gõ từ khóa tìm truyện trong tab Affiliate
+  $('#inputAffiliateStorySearch').on('input', function() {
+    const kw = $(this).val().trim();
+    clearTimeout(affStorySearchTimer);
+    const $drop = $('#affiliateStoryDropdown');
+
+    if (!kw) {
+      $drop.hide().empty();
+      return;
+    }
+
+    affStorySearchTimer = setTimeout(function() {
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_get_affiliate_story_stats',
+          keyword: kw,
+          nonce: muopConfig.nonce
+        },
+        success: function(res) {
+          if (!res || !res.success || !res.data || !res.data.results) {
+            $drop.hide().empty();
+            return;
+          }
+          const list = res.data.results;
+          if (!list.length) {
+            $drop.html('<div style="padding: 12px; color: var(--text-muted); font-size: 13px; text-align: center;">Không tìm thấy truyện nào khớp!</div>').show();
+            return;
+          }
+          let itemsHtml = '';
+          list.forEach(function(item) {
+            itemsHtml += '<div class="aff-story-item" data-id="' + item.ID + '" data-title="' + escapeVisitorHtml(item.post_title) + '" style="padding: 10px 14px; border-bottom: 1px solid var(--border-light); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">' +
+              '<div>' +
+                '<span style="font-weight: 600; font-size: 13.5px; color: var(--text-color);">' + escapeVisitorHtml(item.post_title) + '</span>' +
+                '<span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">(ID: #' + item.ID + ')</span>' +
+              '</div>' +
+              '<span class="badge" style="background: #fff7ed; color: #ea580c; font-weight: 700; font-size: 11px;">' + (item.total_clicks || 0) + ' clicks</span>' +
+            '</div>';
+          });
+          $drop.html(itemsHtml).show();
+        }
+      });
+    }, 300);
+  });
+
+  // Bấm chọn truyện trong danh sách gợi ý
+  $(document).on('click', '.aff-story-item', function() {
+    const sId = $(this).data('id');
+    const sTitle = $(this).data('title');
+    $('#inputAffiliateStorySearch').val(sTitle);
+    $('#affiliateStoryDropdown').hide().empty();
+    loadAffiliateStoryStats(sId);
+  });
+
+  // Bấm nút Tìm kiếm
+  $('#btnAffiliateSearchStory').on('click', function() {
+    const kw = $('#inputAffiliateStorySearch').val().trim();
+    if (!kw) return;
+    const firstItem = $('#affiliateStoryDropdown .aff-story-item').first();
+    if (firstItem.length) {
+      firstItem.click();
+    } else {
+      $('#inputAffiliateStorySearch').trigger('input');
+    }
+  });
+
+  // Click ra ngoài để đóng dropdown
+  $(document).on('click', function(e) {
+    if (!$(e.target).closest('#inputAffiliateStorySearch, #affiliateStoryDropdown').length) {
+      $('#affiliateStoryDropdown').hide();
+    }
+  });
+
+  // Hàm tải chi tiết thống kê lượt click của truyện đã chọn
+  function loadAffiliateStoryStats(storyId) {
+    if (!storyId) return;
+    const $resBox = $('#affiliateStoryStatsResult');
+    const $chapBody = $('#affiliateStoryChaptersBody');
+
+    $chapBody.html('<tr><td colspan="8" style="text-align: center; padding: 25px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size: 18px; margin-bottom: 6px; display: block; color: #ea580c;"></i>Đang thống kê chi tiết lượt click của truyện...</td></tr>');
+    $resBox.show();
+
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_affiliate_story_stats',
+        story_id: storyId,
+        nonce: muopConfig.nonce
+      },
+      success: function(res) {
+        if (!res || !res.success || !res.data) {
+          $chapBody.html('<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc2626;">Không thể tải dữ liệu thống kê của bộ truyện này!</td></tr>');
+          return;
+        }
+
+        const data = res.data;
+        const story = data.story || {};
+        const sum = data.summary || {};
+        const dates = sum.dates || {};
+        const chapters = data.chapters || [];
+
+        // Tiêu đề & Link truyện
+        $('#affiliateSelectedStoryTitle').text(story.title || ('Truyện #' + storyId));
+        if (story.url) {
+          $('#affiliateSelectedStoryActions').html('<a href="' + escapeVisitorHtml(story.url) + '" target="_blank" class="btn btn-outline btn-xs" style="padding: 4px 10px; font-size: 12px; color: #ea580c; border-color: #fed7aa;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Xem truyện</a>');
+        }
+
+        // 4 Thẻ KPI
+        $('#statAffStoryTotal').text(Number(sum.total_clicks || 0).toLocaleString());
+        $('#statAffStorySubTotal').text('Shopee: ' + (sum.shopee_clicks || 0) + ' | TikTok: ' + (sum.tiktok_clicks || 0));
+
+        $('#statAffStoryToday').text(Number(sum.today_clicks || 0).toLocaleString());
+        $('#statAffStoryTodayDate').text('Ngày: ' + (dates.today ? dates.today.split('-').reverse().join('/') : '--'));
+
+        $('#statAffStoryYesterday').text(Number(sum.yesterday_clicks || 0).toLocaleString());
+        $('#statAffStoryYesterdayDate').text('Ngày: ' + (dates.yesterday ? dates.yesterday.split('-').reverse().join('/') : '--'));
+
+        $('#statAffStoryDayBefore').text(Number(sum.day_before_clicks || 0).toLocaleString());
+        $('#statAffStoryDayBeforeDate').text('Ngày: ' + (dates.day_before ? dates.day_before.split('-').reverse().join('/') : '--'));
+
+        // Bảng chi tiết từng chương
+        if (!chapters.length) {
+          $chapBody.html('<tr><td colspan="8" style="text-align: center; padding: 25px; color: var(--text-muted);"><i class="fa-solid fa-circle-info" style="margin-right: 6px;"></i>Bộ truyện này chưa ghi nhận lượt click mở khóa nào.</td></tr>');
+          return;
+        }
+
+        let chapRows = '';
+        chapters.forEach(function(ch) {
+          const cNum = ch.chapter_num ? ('Chương ' + ch.chapter_num) : 'Chung / Giới thiệu';
+          const lastTime = ch.last_clicked ? ch.last_clicked.split(' ')[1] + ' ' + ch.last_clicked.split(' ')[0].split('-').reverse().join('/') : '--';
+
+          chapRows += '<tr>' +
+            '<td style="text-align: center; font-weight: 700; color: var(--text-color);">' + escapeVisitorHtml(cNum) + '</td>' +
+            '<td style="text-align: center; font-weight: 800; color: #ea580c; font-size: 14px;">' + Number(ch.total_clicks || 0).toLocaleString() + '</td>' +
+            '<td style="text-align: center;"><span class="badge" style="background: #FFF3E0; color: #D84315; font-weight: 700;">' + (ch.shopee_clicks || 0) + '</span></td>' +
+            '<td style="text-align: center;"><span class="badge" style="background: #EDE7F6; color: #4A148C; font-weight: 700;">' + (ch.tiktok_clicks || 0) + '</span></td>' +
+            '<td style="text-align: center; font-weight: 700; color: #16a34a;">' + (ch.today_clicks || 0) + '</td>' +
+            '<td style="text-align: center; font-weight: 700; color: #0284c7;">' + (ch.yesterday_clicks || 0) + '</td>' +
+            '<td style="text-align: center; font-weight: 700; color: #7c3aed;">' + (ch.day_before_clicks || 0) + '</td>' +
+            '<td style="text-align: center; font-size: 12px; color: var(--text-muted);">' + escapeVisitorHtml(lastTime) + '</td>' +
+          '</tr>';
+        });
+        $chapBody.html(chapRows);
+      },
+      error: function() {
+        $chapBody.html('<tr><td colspan="8" style="text-align: center; padding: 20px; color: #dc2626;">Lỗi kết nối máy chủ khi tra cứu thống kê truyện!</td></tr>');
+      }
+    });
+  }
 
   const VIVU_HISTORY_KEY = 'muop_vivu_crawler_history';
   let currentVivuStory = null;

@@ -48,6 +48,7 @@ $is_own_story       = ($current_uid > 0 && ($current_uid === $story_post_author 
 
 $story_post_status = $story ? $story->post_status : 'publish';
 $is_story_hidden   = $story_id ? (bool) get_post_meta($story_id, '_truyen_is_hidden', true) : false;
+$chapter_audio_url = get_post_meta($chapter_id, '_chuong_audio_url', true);
 
 // Nếu truyện chưa công khai (future, draft, trash hoặc bị ẩn) mà người xem KHÔNG PHẢI là Admin và KHÔNG PHẢI chính dịch giả truyện:
 if (!$is_admin_user && !$is_own_story && ($story_post_status === 'future' || $story_post_status === 'draft' || $story_post_status === 'trash' || $is_story_hidden)) {
@@ -113,6 +114,71 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 <i class="fa-solid fa-eye-slash" style="font-size: 16px; color: #d97706;"></i>
                 <span><strong>Chế độ xem trước (Dịch giả / Quản trị viên):</strong> Bộ truyện này đang ở trạng thái Ẩn (Bản nháp). Độc giả bình thường chưa thể xem chương này.</span>
             </div>
+        <?php endif; ?>
+ 
+        <!-- Audio Player Chương Này (Hình 1 & 5) -->
+        <?php if (!empty($chapter_audio_url)) : ?>
+            <div class="chapter-audio-player-banner" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1.5px solid #bae6fd; border-radius: var(--radius-md); padding: 12px 18px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: #0284c7; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);">
+                        <i class="fa-solid fa-headphones"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 13.5px; font-weight: 700; color: #0369a1; display: flex; align-items: center; gap: 6px;">
+                            <span>Nghe Audio Chương <?php echo esc_html($chap_order); ?></span>
+                            <span class="badge" style="background: #0284c7; color: #fff; font-size: 10.5px; padding: 2px 6px; border-radius: 4px;">Giọng đọc</span>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 1px;">
+                            Bạn có thể vừa nghe đọc vừa cuộn đọc nội dung bên dưới.
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <audio id="currentChapterAudioEl" src="<?php echo esc_url($chapter_audio_url); ?>" preload="metadata" style="height: 36px; outline: none;"></audio>
+                    <button type="button" id="btnPlayCurrentChapterAudio" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0284c7, #0369a1); border: none; font-weight: 700; padding: 6px 16px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);">
+                        <i class="fa-solid fa-play"></i> <span>Phát Audio</span>
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="window.muopOpenStoryAudioPlayer && window.muopOpenStoryAudioPlayer(<?php echo intval($story_id); ?>, '<?php echo esc_js($story_title); ?>', <?php echo intval($chapter_id); ?>)" style="padding: 6px 12px; font-size: 12.5px; border-color: #7dd3fc; color: #0284c7;" title="Mở danh sách phát audio đầy đủ">
+                        <i class="fa-solid fa-list-ul"></i> Toàn bộ audio
+                    </button>
+                </div>
+            </div>
+
+            <script>
+            (function() {
+                var audio = document.getElementById('currentChapterAudioEl');
+                var btn = document.getElementById('btnPlayCurrentChapterAudio');
+                if (!audio || !btn) return;
+                var hasLogged = false;
+
+                btn.addEventListener('click', function() {
+                    if (audio.paused) {
+                        audio.play();
+                    } else {
+                        audio.pause();
+                    }
+                });
+
+                audio.addEventListener('play', function() {
+                    btn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Tạm dừng</span>';
+                    if (!hasLogged) {
+                        hasLogged = true;
+                        var fd = new FormData();
+                        fd.append('action', 'muop_record_audio_listen');
+                        fd.append('story_id', <?php echo intval($story_id); ?>);
+                        fd.append('chapter_id', <?php echo intval($chapter_id); ?>);
+                        fd.append('chapter_num', <?php echo intval($chap_order); ?>);
+                        var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
+                        fetch(ajaxUrl, { method: 'POST', body: fd }).catch(function(){});
+                    }
+                });
+
+                audio.addEventListener('pause', function() {
+                    btn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Phát Audio</span>';
+                });
+            })();
+            </script>
         <?php endif; ?>
 
         <!-- CENTER 2: TOOLBAR ĐIỀU HƯỚNG CHƯƠNG TRƯỚC, 3 GẠCH DANH SÁCH, CHƯƠNG SAU & ĐIỀU CHỈNH CỠ CHỮ -->
@@ -536,4 +602,5 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
 </div>
 
 <?php
+get_template_part('templates/modal-story-audio');
 get_footer();

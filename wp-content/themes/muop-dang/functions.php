@@ -607,6 +607,51 @@ function muop_setup_tables() {
         KEY idx_created (created_at)
     ) $charset_collate;";
 
+    // Table: Audio Logs (Quản lý lượt nghe Audio)
+    $table_audio_logs = $wpdb->prefix . 'muop_audio_logs';
+    $sql_audio_logs = "CREATE TABLE IF NOT EXISTS $table_audio_logs (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        story_id BIGINT(20) UNSIGNED NOT NULL,
+        story_title VARCHAR(255) NOT NULL,
+        chapter_id BIGINT(20) UNSIGNED NOT NULL,
+        chapter_num INT(11) DEFAULT 1,
+        chapter_title VARCHAR(255) DEFAULT '',
+        user_id BIGINT(20) UNSIGNED DEFAULT 0,
+        user_name VARCHAR(100) DEFAULT 'Khách vãng lai',
+        ip_address VARCHAR(45) DEFAULT '',
+        device_type VARCHAR(50) DEFAULT 'Máy tính',
+        listen_date DATE NOT NULL,
+        listen_time DATETIME NOT NULL,
+        PRIMARY KEY (id),
+        KEY idx_story (story_id),
+        KEY idx_chapter (chapter_id),
+        KEY idx_user (user_id),
+        KEY idx_date (listen_date),
+        KEY idx_time (listen_time)
+    ) $charset_collate;";
+
+    // Table: Visitor Read Logs (Quản lý khách đọc truyện)
+    $table_vlogs = $wpdb->prefix . 'muop_visitor_read_logs';
+    $sql_vlogs = "CREATE TABLE IF NOT EXISTS $table_vlogs (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        ip_address VARCHAR(45) NOT NULL,
+        user_id BIGINT(20) UNSIGNED DEFAULT 0,
+        user_name VARCHAR(100) DEFAULT 'Khách vãng lai',
+        story_id BIGINT(20) UNSIGNED NOT NULL,
+        story_title VARCHAR(255) NOT NULL,
+        chapter_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+        chapter_num INT(11) DEFAULT 0,
+        chapter_title VARCHAR(255) DEFAULT '',
+        device_type VARCHAR(50) DEFAULT 'Máy tính',
+        read_date DATE NOT NULL,
+        read_time DATETIME NOT NULL,
+        PRIMARY KEY (id),
+        KEY idx_ip (ip_address),
+        KEY idx_date (read_date),
+        KEY idx_story (story_id),
+        KEY idx_chapter (chapter_id)
+    ) $charset_collate;";
+
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql_clicks);
     dbDelta($sql_history);
@@ -615,6 +660,8 @@ function muop_setup_tables() {
     dbDelta($sql_reports);
     dbDelta($sql_payments);
     dbDelta($sql_splitter);
+    dbDelta($sql_audio_logs);
+    dbDelta($sql_vlogs);
 
     // Initial Options
     if (!get_option('muop_shopee_url')) {
@@ -1913,6 +1960,9 @@ function muop_ajax_record_view_handler() {
         } else {
             $chap_t = 'Chương ' . $chap_n;
         }
+    } else {
+        $chap_n = 0;
+        $chap_t = 'Xem giới thiệu truyện';
     }
 
     $u_agent = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '';
@@ -1926,10 +1976,10 @@ function muop_ajax_record_view_handler() {
     $now_date = current_time('Y-m-d');
     $now_dt   = current_time('mysql');
 
-    // Chống flood: Nếu cùng 1 IP đọc cùng 1 chương trong vòng 15 giây, chỉ update thời gian
+    // Chống flood: Nếu cùng 1 IP đọc cùng 1 chương hoặc xem truyện trong vòng 15 giây, chỉ update thời gian
     $recent_log_id = $wpdb->get_var($wpdb->prepare(
-        "SELECT id FROM $table_vlogs WHERE ip_address = %s AND chapter_id = %d AND read_date = %s AND read_time >= DATE_SUB(%s, INTERVAL 15 SECOND) ORDER BY id DESC LIMIT 1",
-        $client_ip, $chapter_id, $now_date, $now_dt
+        "SELECT id FROM $table_vlogs WHERE ip_address = %s AND story_id = %d AND chapter_id = %d AND read_date = %s AND read_time >= DATE_SUB(%s, INTERVAL 15 SECOND) ORDER BY id DESC LIMIT 1",
+        $client_ip, $story_id, $chapter_id, $now_date, $now_dt
     ));
 
     if ($recent_log_id) {
@@ -2463,6 +2513,32 @@ function muop_ajax_submit_chapter_handler() {
     update_post_meta($chapter_id, '_chuong_truyen_id', $story_id);
     update_post_meta($chapter_id, '_chuong_number', $chap_num);
     update_post_meta($chapter_id, '_chuong_views', 0);
+
+    // Xử lý upload file Audio hoặc link Audio cho chương (Hình 5)
+    $chapter_audio_url = '';
+    if (!empty($_FILES['chapter_audio']) && !empty($_FILES['chapter_audio']['name'])) {
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+        
+        $audio_file = $_FILES['chapter_audio'];
+        $allowed_types = array('mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac');
+        $file_ext = strtolower(pathinfo($audio_file['name'], PATHINFO_EXTENSION));
+        
+        if (in_array($file_ext, $allowed_types)) {
+            $upload_overrides = array('test_form' => false);
+            $moved = wp_handle_upload($audio_file, $upload_overrides);
+            if ($moved && !isset($moved['error'])) {
+                $chapter_audio_url = $moved['url'];
+            }
+        }
+    } elseif (!empty($_POST['chapter_audio_url'])) {
+        $chapter_audio_url = esc_url_raw($_POST['chapter_audio_url']);
+    }
+
+    if (!empty($chapter_audio_url)) {
+        update_post_meta($chapter_id, '_chuong_audio_url', $chapter_audio_url);
+    }
 
     // Update story modified time (giữ nguyên trạng thái future / draft của truyện)
     wp_update_post(array('ID' => $story_id, 'post_status' => $story->post_status));
@@ -7261,16 +7337,30 @@ function muop_ajax_get_visitor_read_logs_handler() {
     $per_page = max(10, isset($_POST['per_page']) ? intval($_POST['per_page']) : 30);
     $offset = ($page - 1) * $per_page;
 
-    // 1. Thống kê tổng quan trong ngày
-    $summary = array(
-        'date'                 => $date,
-        'date_formatted'       => date_i18n('d/m/Y', strtotime($date)),
-        'total_unique_readers' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT ip_address) FROM $table WHERE read_date = %s", $date)),
-        'total_chapter_reads'  => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE read_date = %s", $date)),
-        'guest_readers'        => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT ip_address) FROM $table WHERE read_date = %s AND user_id = 0", $date)),
-        'member_readers'       => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT user_id) FROM $table WHERE read_date = %s AND user_id > 0", $date)),
-        'stories_count'        => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT story_id) FROM $table WHERE read_date = %s", $date)),
-    );
+    $is_all_dates = ($date === 'all');
+
+    // 1. Thống kê tổng quan
+    if ($is_all_dates) {
+        $summary = array(
+            'date'                 => 'all',
+            'date_formatted'       => 'Tất cả các ngày',
+            'total_unique_readers' => (int) $wpdb->get_var("SELECT COUNT(DISTINCT ip_address) FROM $table"),
+            'total_chapter_reads'  => (int) $wpdb->get_var("SELECT COUNT(*) FROM $table"),
+            'guest_readers'        => (int) $wpdb->get_var("SELECT COUNT(DISTINCT ip_address) FROM $table WHERE user_id = 0"),
+            'member_readers'       => (int) $wpdb->get_var("SELECT COUNT(DISTINCT user_id) FROM $table WHERE user_id > 0"),
+            'stories_count'        => (int) $wpdb->get_var("SELECT COUNT(DISTINCT story_id) FROM $table"),
+        );
+    } else {
+        $summary = array(
+            'date'                 => $date,
+            'date_formatted'       => date_i18n('d/m/Y', strtotime($date)),
+            'total_unique_readers' => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT ip_address) FROM $table WHERE read_date = %s", $date)),
+            'total_chapter_reads'  => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE read_date = %s", $date)),
+            'guest_readers'        => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT ip_address) FROM $table WHERE read_date = %s AND user_id = 0", $date)),
+            'member_readers'       => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT user_id) FROM $table WHERE read_date = %s AND user_id > 0", $date)),
+            'stories_count'        => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(DISTINCT story_id) FROM $table WHERE read_date = %s", $date)),
+        );
+    }
 
     // 2. Thống kê nhanh các ngày gần đây để chuyển ngày tiện lợi
     $recent_dates = $wpdb->get_results(
@@ -7283,7 +7373,10 @@ function muop_ajax_get_visitor_read_logs_handler() {
     );
 
     // 3. Xây dựng điều kiện lọc danh sách
-    $where_clauses = array($wpdb->prepare("read_date = %s", $date));
+    $where_clauses = array();
+    if (!$is_all_dates) {
+        $where_clauses[] = $wpdb->prepare("read_date = %s", $date);
+    }
 
     if (!empty($search)) {
         $like = '%' . $wpdb->esc_like($search) . '%';
@@ -7508,7 +7601,472 @@ function muop_ajax_delete_splitter_history_handler() {
     wp_send_json_error(array('message' => 'Yêu cầu không hợp lệ!'));
 }
 
+/**
+ * =========================================================================
+ * 21. HỆ THỐNG AUDIO TRUYỆN (NGHE AUDIO, QUẢN LÝ AUDIO, THỐNG KÊ LƯỢT NGHE)
+ * =========================================================================
+ */
 
+// 21.1 AJAX: Ghi nhận lượt nghe Audio của độc giả
+add_action('wp_ajax_nopriv_muop_record_audio_listen', 'muop_ajax_record_audio_listen_handler');
+add_action('wp_ajax_muop_record_audio_listen', 'muop_ajax_record_audio_listen_handler');
+function muop_ajax_record_audio_listen_handler() {
+    $story_id   = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $chapter_id = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
 
+    if (!$story_id || !$chapter_id) {
+        wp_send_json_error(array('message' => 'Thông tin không hợp lệ!'));
+    }
 
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_audio_logs';
 
+    $story = get_post($story_id);
+    $stitle = $story ? $story->post_title : ('Truyện #' . $story_id);
+
+    $chapter = get_post($chapter_id);
+    $chap_n = isset($_POST['chapter_num']) ? intval($_POST['chapter_num']) : ((int) get_post_meta($chapter_id, '_chuong_number', true) ?: 1);
+    $chap_t = $chapter ? (function_exists('muop_get_clean_chapter_title') ? muop_get_clean_chapter_title($chapter->post_title) : $chapter->post_title) : ('Chương ' . $chap_n);
+
+    $client_ip = function_exists('muop_get_real_client_ip') ? muop_get_real_client_ip() : (isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '127.0.0.1');
+    $current_u = wp_get_current_user();
+    $uid = is_user_logged_in() ? (int) $current_u->ID : 0;
+    $uname = is_user_logged_in() ? $current_u->display_name : 'Khách vãng lai';
+
+    $u_agent = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '';
+    $device = 'Máy tính';
+    if (preg_match('/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i', $u_agent)) {
+        $device = 'Máy tính bảng';
+    } elseif (preg_match('/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Opera M(obi|ini)/i', $u_agent)) {
+        $device = 'Điện thoại';
+    }
+
+    $now_date = current_time('Y-m-d');
+    $now_dt   = current_time('mysql');
+
+    // Chống flood: cùng IP nghe cùng 1 chương trong 15s chỉ update thời gian
+    $recent_id = $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM $table WHERE ip_address = %s AND story_id = %d AND chapter_id = %d AND listen_date = %s AND listen_time >= DATE_SUB(%s, INTERVAL 15 SECOND) ORDER BY id DESC LIMIT 1",
+        $client_ip, $story_id, $chapter_id, $now_date, $now_dt
+    ));
+
+    if ($recent_id) {
+        $wpdb->update($table, array('listen_time' => $now_dt), array('id' => $recent_id));
+    } else {
+        $wpdb->insert($table, array(
+            'story_id'      => $story_id,
+            'story_title'   => $stitle,
+            'chapter_id'    => $chapter_id,
+            'chapter_num'   => $chap_n,
+            'chapter_title' => $chap_t,
+            'user_id'       => $uid,
+            'user_name'     => $uname,
+            'ip_address'    => $client_ip,
+            'device_type'   => $device,
+            'listen_date'   => $now_date,
+            'listen_time'   => $now_dt
+        ));
+
+        // Tăng đếm lượt nghe audio
+        $cur_chap_audio_views = (int) get_post_meta($chapter_id, '_chuong_audio_views', true);
+        update_post_meta($chapter_id, '_chuong_audio_views', $cur_chap_audio_views + 1);
+
+        $cur_story_audio_views = (int) get_post_meta($story_id, '_truyen_audio_views', true);
+        update_post_meta($story_id, '_truyen_audio_views', $cur_story_audio_views + 1);
+    }
+
+    wp_send_json_success(array('logged' => true));
+}
+
+// 21.2 AJAX: Lấy danh sách Audio của một bộ truyện (Dành cho Player & Modal Quản Lý Audio)
+add_action('wp_ajax_nopriv_muop_get_story_audio_list', 'muop_ajax_get_story_audio_list_handler');
+add_action('wp_ajax_muop_get_story_audio_list', 'muop_ajax_get_story_audio_list_handler');
+function muop_ajax_get_story_audio_list_handler() {
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : (isset($_GET['story_id']) ? intval($_GET['story_id']) : 0);
+    if (!$story_id) {
+        wp_send_json_error(array('message' => 'Không tìm thấy ID truyện!'));
+    }
+
+    $story = get_post($story_id);
+    if (!$story || $story->post_type !== 'truyen') {
+        wp_send_json_error(array('message' => 'Bộ truyện không tồn tại!'));
+    }
+
+    $current_uid = get_current_user_id();
+    $can_manage = muop_can_user_manage_story_frontend($story_id, $current_uid);
+
+    // Lấy tất cả các chương của bộ truyện này
+    $post_statuses = $can_manage ? array('publish', 'draft', 'future') : array('publish');
+    $chapters_query = new WP_Query(array(
+        'post_type'      => 'chuong',
+        'post_status'    => $post_statuses,
+        'posts_per_page' => -1,
+        'meta_key'       => '_chuong_number',
+        'orderby'        => 'meta_value_num',
+        'order'          => 'ASC',
+        'meta_query'     => array(
+            array(
+                'key'     => '_chuong_truyen_id',
+                'value'   => $story_id,
+                'compare' => '='
+            )
+        )
+    ));
+
+    $audio_chapters = array();
+    $all_chapters = array();
+
+    if ($chapters_query->have_posts()) {
+        while ($chapters_query->have_posts()) {
+            $chapters_query->the_post();
+            $cid = get_the_ID();
+            $cnum = (int) get_post_meta($cid, '_chuong_number', true) ?: 1;
+            $raw_title = get_the_title();
+            $ctitle = function_exists('muop_get_clean_chapter_title') ? muop_get_clean_chapter_title($raw_title) : $raw_title;
+            $audio_url = get_post_meta($cid, '_chuong_audio_url', true) ?: '';
+            $audio_views = (int) get_post_meta($cid, '_chuong_audio_views', true);
+            $curl = get_permalink($cid);
+
+            $item = array(
+                'id'          => $cid,
+                'chapter_num' => $cnum,
+                'title'       => $ctitle,
+                'url'         => $curl,
+                'audio_url'   => $audio_url,
+                'has_audio'   => !empty($audio_url),
+                'audio_views' => $audio_views,
+                'post_status' => get_post_status($cid)
+            );
+
+            if (!empty($audio_url)) {
+                $audio_chapters[] = $item;
+            }
+            $all_chapters[] = $item;
+        }
+        wp_reset_postdata();
+    }
+
+    wp_send_json_success(array(
+        'story_id'       => $story_id,
+        'story_title'    => $story->post_title,
+        'story_url'      => get_permalink($story_id),
+        'can_manage'     => $can_manage,
+        'audio_count'    => count($audio_chapters),
+        'total_chapters' => count($all_chapters),
+        'audio_chapters' => $audio_chapters,
+        'all_chapters'   => $all_chapters
+    ));
+}
+
+// 21.3 AJAX: Thêm/Sửa/Xóa Audio cho từng chương (Dịch giả & Admin)
+add_action('wp_ajax_muop_save_chapter_audio', 'muop_ajax_save_chapter_audio_handler');
+function muop_ajax_save_chapter_audio_handler() {
+    $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '');
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5)!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện!'));
+    }
+
+    $story_id   = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $chapter_id = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
+    $action_type = isset($_POST['action_type']) ? sanitize_text_field($_POST['action_type']) : 'save';
+
+    if (!$story_id || !$chapter_id) {
+        wp_send_json_error(array('message' => 'Thông tin truyện hoặc chương không hợp lệ!'));
+    }
+
+    $current_uid = get_current_user_id();
+    $is_from_admin = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+    if (!muop_can_user_manage_story_action($story_id, $current_uid, $is_from_admin)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền quản lý audio cho bộ truyện này!'));
+    }
+
+    // Nếu là thao tác xóa Audio
+    if ($action_type === 'delete') {
+        delete_post_meta($chapter_id, '_chuong_audio_url');
+        wp_send_json_success(array(
+            'message'    => 'Đã xóa audio của chương này thành công!',
+            'chapter_id' => $chapter_id,
+            'has_audio'  => false
+        ));
+    }
+
+    // Nếu là thao tác lưu Audio: Kiểm tra file upload hoặc link trực tiếp
+    $audio_url = '';
+    if (!empty($_FILES['audio_file']) && !empty($_FILES['audio_file']['name'])) {
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        $file = $_FILES['audio_file'];
+        $allowed = array('mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac');
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+
+        if (!in_array($ext, $allowed)) {
+            wp_send_json_error(array('message' => 'Định dạng file âm thanh không hợp lệ! Vui lòng chọn file .mp3, .m4a, .wav, .ogg, .aac.'));
+        }
+
+        $upload = wp_handle_upload($file, array('test_form' => false));
+        if ($upload && !isset($upload['error'])) {
+            $audio_url = $upload['url'];
+        } else {
+            $err = isset($upload['error']) ? $upload['error'] : 'Không thể lưu file tải lên!';
+            wp_send_json_error(array('message' => 'Lỗi tải lên: ' . $err));
+        }
+    } elseif (!empty($_POST['audio_url'])) {
+        $audio_url = esc_url_raw(trim($_POST['audio_url']));
+    }
+
+    if (empty($audio_url)) {
+        wp_send_json_error(array('message' => 'Vui lòng chọn file âm thanh để tải lên hoặc nhập đường dẫn audio trực tiếp!'));
+    }
+
+    update_post_meta($chapter_id, '_chuong_audio_url', $audio_url);
+
+    wp_send_json_success(array(
+        'message'    => 'Đã cập nhật audio cho chương thành công!',
+        'chapter_id' => $chapter_id,
+        'audio_url'  => $audio_url,
+        'has_audio'  => true
+    ));
+}
+
+// 21.4 AJAX: Lấy dữ liệu Quản Lý Audio cho Admin Portal (Hình 4)
+add_action('wp_ajax_muop_get_audio_logs', 'muop_ajax_get_audio_logs_handler');
+function muop_ajax_get_audio_logs_handler() {
+    if (!is_user_logged_in() || !muop_is_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền truy cập dữ liệu này!'));
+    }
+
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_audio_logs';
+
+    $date = !empty($_POST['date']) ? sanitize_text_field($_POST['date']) : 'all';
+    $search = !empty($_POST['search']) ? sanitize_text_field(wp_unslash($_POST['search'])) : '';
+    $page = max(1, isset($_POST['page']) ? intval($_POST['page']) : 1);
+    $per_page = max(10, isset($_POST['per_page']) ? intval($_POST['per_page']) : 25);
+    $offset = ($page - 1) * $per_page;
+
+    $is_all_dates = ($date === 'all');
+    $today = current_time('Y-m-d');
+
+    // 1. Thống kê KPI tổng quan
+    $total_listens = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table");
+    $today_listens = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table WHERE listen_date = %s", $today));
+    $unique_listeners = (int) $wpdb->get_var("SELECT COUNT(DISTINCT ip_address) FROM $table");
+    $stories_with_audio = (int) $wpdb->get_var("SELECT COUNT(DISTINCT post_id) FROM {$wpdb->postmeta} WHERE meta_key = '_chuong_audio_url' AND meta_value != ''");
+
+    // Lấy số bộ truyện có ít nhất 1 chương có audio
+    $stories_count_audio = (int) $wpdb->get_var("
+        SELECT COUNT(DISTINCT pm_story.meta_value) 
+        FROM {$wpdb->postmeta} pm_audio
+        JOIN {$wpdb->postmeta} pm_story ON pm_story.post_id = pm_audio.post_id AND pm_story.meta_key = '_chuong_truyen_id'
+        WHERE pm_audio.meta_key = '_chuong_audio_url' AND pm_audio.meta_value != ''
+    ");
+
+    $summary = array(
+        'total_listens'        => $total_listens,
+        'today_listens'        => $today_listens,
+        'unique_listeners'     => $unique_listeners,
+        'stories_with_audio'   => $stories_count_audio,
+        'chapters_with_audio'  => $stories_with_audio,
+        'date'                 => $date,
+        'date_formatted'       => $is_all_dates ? 'Tất cả các ngày' : date_i18n('d/m/Y', strtotime($date))
+    );
+
+    // 2. Thống kê nhanh các ngày có lượt nghe
+    $recent_dates = $wpdb->get_results(
+        "SELECT listen_date, COUNT(DISTINCT ip_address) as unique_listeners, COUNT(*) as total_listens 
+         FROM $table 
+         GROUP BY listen_date 
+         ORDER BY listen_date DESC 
+         LIMIT 10",
+        ARRAY_A
+    );
+
+    // 3. Xây dựng điều kiện lọc danh sách
+    $where_clauses = array();
+    if (!$is_all_dates) {
+        $where_clauses[] = $wpdb->prepare("listen_date = %s", $date);
+    }
+
+    if (!empty($search)) {
+        $like = '%' . $wpdb->esc_like($search) . '%';
+        $where_clauses[] = $wpdb->prepare(
+            "(ip_address LIKE %s OR story_title LIKE %s OR chapter_title LIKE %s OR user_name LIKE %s)",
+            $like, $like, $like, $like
+        );
+    }
+
+    $where_sql = !empty($where_clauses) ? ('WHERE ' . implode(' AND ', $where_clauses)) : '';
+
+    $total_logs = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table $where_sql");
+    $total_pages = ceil($total_logs / $per_page);
+
+    $logs = $wpdb->get_results($wpdb->prepare(
+        "SELECT * FROM $table $where_sql ORDER BY listen_time DESC LIMIT %d OFFSET %d",
+        $per_page, $offset
+    ));
+
+    $formatted_logs = array();
+    foreach ($logs as $row) {
+        $audio_url = get_post_meta($row->chapter_id, '_chuong_audio_url', true) ?: '';
+        $formatted_logs[] = array(
+            'id'             => (int) $row->id,
+            'story_id'       => (int) $row->story_id,
+            'story_title'    => $row->story_title,
+            'story_url'      => get_permalink($row->story_id),
+            'chapter_id'     => (int) $row->chapter_id,
+            'chapter_num'    => (int) $row->chapter_num,
+            'chapter_title'  => $row->chapter_title ?: ('Chương ' . $row->chapter_num),
+            'chapter_url'    => get_permalink($row->chapter_id),
+            'audio_url'      => $audio_url,
+            'user_id'        => (int) $row->user_id,
+            'user_name'      => $row->user_name,
+            'is_guest'       => ((int)$row->user_id === 0),
+            'ip_address'     => $row->ip_address,
+            'device_type'    => $row->device_type,
+            'listen_date'    => $row->listen_date,
+            'listen_time'    => $row->listen_time,
+            'time_only'      => date('H:i:s', strtotime($row->listen_time)),
+            'time_formatted' => date_i18n('H:i:s - d/m/Y', strtotime($row->listen_time)),
+            'time_ago'       => function_exists('muop_time_ago') ? muop_time_ago(strtotime($row->listen_time)) : date('d/m/Y H:i', strtotime($row->listen_time))
+        );
+    }
+
+    // 4. Bảng tổng hợp theo từng bộ truyện
+    $story_stats = $wpdb->get_results(
+        "SELECT story_id, story_title, COUNT(*) as total_listens, COUNT(DISTINCT ip_address) as unique_listeners, COUNT(DISTINCT chapter_id) as chapters_listened
+         FROM $table 
+         GROUP BY story_id, story_title 
+         ORDER BY total_listens DESC 
+         LIMIT 15",
+        ARRAY_A
+    );
+
+    wp_send_json_success(array(
+        'summary'      => $summary,
+        'recent_dates' => $recent_dates,
+        'logs'         => $formatted_logs,
+        'story_stats'  => $story_stats,
+        'pagination'   => array(
+            'total_logs'   => $total_logs,
+            'total_pages'  => max(1, $total_pages),
+            'current_page' => $page,
+            'per_page'     => $per_page
+        )
+    ));
+}
+
+// 21.5 AJAX: Lấy thống kê chi tiết Click Shopee & TikTok theo Truyện / Chương / Ngày (Hình 4 / Affiliate)
+add_action('wp_ajax_muop_get_affiliate_story_stats', 'muop_ajax_get_affiliate_story_stats_handler');
+function muop_ajax_get_affiliate_story_stats_handler() {
+    if (!is_user_logged_in() || !muop_is_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền truy cập dữ liệu này!'));
+    }
+
+    global $wpdb;
+    $table_clicks = $wpdb->prefix . 'affiliate_clicks';
+
+    $keyword = !empty($_POST['keyword']) ? sanitize_text_field(wp_unslash($_POST['keyword'])) : '';
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+
+    // 1. Nếu tìm kiếm truyện theo từ khóa: Trả về danh sách truyện khớp
+    if (!empty($keyword)) {
+        $like = '%' . $wpdb->esc_like($keyword) . '%';
+        $stories = $wpdb->get_results($wpdb->prepare(
+            "SELECT p.ID, p.post_title, 
+                    (SELECT COUNT(*) FROM $table_clicks c WHERE c.story_id = p.ID) as total_clicks
+             FROM {$wpdb->posts} p
+             WHERE p.post_type = 'truyen' AND p.post_status IN ('publish', 'draft', 'future')
+               AND p.post_title LIKE %s
+             ORDER BY total_clicks DESC, p.post_title ASC
+             LIMIT 15",
+            $like
+        ), ARRAY_A);
+
+        wp_send_json_success(array('results' => $stories));
+    }
+
+    // 2. Nếu đã chọn story_id cụ thể: Trả về chi tiết click của truyện đó
+    if (!$story_id) {
+        wp_send_json_error(array('message' => 'Vui lòng chọn bộ truyện cần xem thống kê click!'));
+    }
+
+    $story = get_post($story_id);
+    if (!$story) {
+        wp_send_json_error(array('message' => 'Truyện không tồn tại!'));
+    }
+
+    // Tính mốc ngày hôm nay, hôm qua, hôm kia theo múi giờ hệ thống
+    $today_date     = current_time('Y-m-d');
+    $yesterday_date = date('Y-m-d', strtotime('-1 day', strtotime($today_date)));
+    $day_before_yesterday = date('Y-m-d', strtotime('-2 days', strtotime($today_date)));
+
+    // Tổng số click của truyện
+    $total_clicks = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_clicks WHERE story_id = %d", $story_id));
+    $shopee_clicks = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_clicks WHERE story_id = %d AND link_type = 'shopee'", $story_id));
+    $tiktok_clicks = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_clicks WHERE story_id = %d AND link_type = 'tiktok'", $story_id));
+
+    // Thống kê theo ngày hôm nay, hôm qua, hôm kia
+    $today_clicks = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $table_clicks WHERE story_id = %d AND DATE(created_at) = %s",
+        $story_id, $today_date
+    ));
+    $yesterday_clicks = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $table_clicks WHERE story_id = %d AND DATE(created_at) = %s",
+        $story_id, $yesterday_date
+    ));
+    $day_before_clicks = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $table_clicks WHERE story_id = %d AND DATE(created_at) = %s",
+        $story_id, $day_before_yesterday
+    ));
+
+    // Thống kê chi tiết từng chương của truyện này
+    $chapters_stats = $wpdb->get_results($wpdb->prepare(
+        "SELECT chapter_num, 
+                COUNT(*) as total_clicks,
+                SUM(CASE WHEN link_type = 'shopee' THEN 1 ELSE 0 END) as shopee_clicks,
+                SUM(CASE WHEN link_type = 'tiktok' THEN 1 ELSE 0 END) as tiktok_clicks,
+                SUM(CASE WHEN DATE(created_at) = %s THEN 1 ELSE 0 END) as today_clicks,
+                SUM(CASE WHEN DATE(created_at) = %s THEN 1 ELSE 0 END) as yesterday_clicks,
+                SUM(CASE WHEN DATE(created_at) = %s THEN 1 ELSE 0 END) as day_before_clicks,
+                MAX(created_at) as last_clicked
+         FROM $table_clicks 
+         WHERE story_id = %d
+         GROUP BY chapter_num 
+         ORDER BY chapter_num ASC",
+        $today_date, $yesterday_date, $day_before_yesterday, $story_id
+    ), ARRAY_A);
+
+    // Lịch sử các ngày gần đây của truyện này
+    $daily_stats = $wpdb->get_results($wpdb->prepare(
+        "SELECT DATE(created_at) as click_date, COUNT(*) as clicks,
+                SUM(CASE WHEN link_type = 'shopee' THEN 1 ELSE 0 END) as shopee,
+                SUM(CASE WHEN link_type = 'tiktok' THEN 1 ELSE 0 END) as tiktok
+         FROM $table_clicks 
+         WHERE story_id = %d
+         GROUP BY DATE(created_at) 
+         ORDER BY click_date DESC 
+         LIMIT 10",
+        $story_id
+    ), ARRAY_A);
+
+    wp_send_json_success(array(
+        'story_id'             => $story_id,
+        'story_title'          => $story->post_title,
+        'total_clicks'         => $total_clicks,
+        'shopee_clicks'        => $shopee_clicks,
+        'tiktok_clicks'        => $tiktok_clicks,
+        'today_clicks'         => $today_clicks,
+        'yesterday_clicks'     => $yesterday_clicks,
+        'day_before_clicks'    => $day_before_clicks,
+        'today_date'           => $today_date,
+        'yesterday_date'       => $yesterday_date,
+        'day_before_date'      => $day_before_yesterday,
+        'chapters_stats'       => $chapters_stats,
+        'daily_stats'          => $daily_stats
+    ));
+}

@@ -326,7 +326,17 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                         <span class="follow-btn-label"><?php echo $is_following ? 'Đang Theo Dõi' : 'Theo Dõi'; ?></span>
                     </button>
 
+                    <!-- Nút Nghe Audio (Hình 1 - Dành cho tất cả người đọc) -->
+                    <button type="button" class="btn btn-listen-story-audio" id="btnListenStoryAudio" data-story-id="<?php echo $story_id; ?>" data-story-title="<?php echo esc_attr(get_the_title()); ?>" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; border: none; font-weight: 700; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);" title="Nghe Audio các chương của bộ truyện này">
+                        <i class="fa-solid fa-headphones"></i> Nghe Audio
+                    </button>
+
                     <?php if ($can_manage_story) : ?>
+                        <!-- Nút Thêm Audio (Hình 1 - Dành cho Dịch giả & Admin) -->
+                        <button type="button" class="btn btn-outline btn-manage-story-audio" id="btnManageStoryAudio" data-story-id="<?php echo $story_id; ?>" data-story-title="<?php echo esc_attr(get_the_title()); ?>" style="border-color: #0284c7; color: #0284c7; font-weight: 600;" title="Thêm và quản lý file audio cho từng chương của truyện">
+                            <i class="fa-solid fa-file-audio"></i> Thêm Audio
+                        </button>
+
                         <button type="button" class="btn btn-outline btn-edit-story" data-story-id="<?php echo $story_id; ?>" title="Chỉnh sửa toàn bộ thông tin truyện (Dịch giả)">
                             <i class="fa-solid fa-pen-to-square"></i> Chỉnh Sửa Truyện
                         </button>
@@ -524,4 +534,25 @@ if ($is_exempt) {
     get_template_part('templates/modal-schedule-story');
 }
 
+// Modal Nghe Audio và Quản Lý Audio
+get_template_part('templates/modal-story-audio');
+?>
+
+<script>
+// Tự động ghi nhận lượt xem trang truyện vào CSDL (Khách đọc truyện)
+(function() {
+    try {
+        var sId = <?php echo intval($story_id); ?>;
+        var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
+        var fd = new FormData();
+        fd.append('action', 'muop_record_view');
+        fd.append('story_id', sId);
+        fd.append('chapter_id', 0);
+        fd.append('chapter_num', 0);
+        fetch(ajaxUrl, { method: 'POST', body: fd }).catch(function(){});
+    } catch(e) {}
+})();
+</script>
+
+<?php
 get_footer();

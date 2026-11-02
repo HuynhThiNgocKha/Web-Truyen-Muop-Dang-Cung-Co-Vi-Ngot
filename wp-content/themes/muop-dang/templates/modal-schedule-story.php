@@ -122,7 +122,7 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
                 <button type="button" class="btn btn-secondary btn-close-schedule-modal" onclick="window.muopCloseScheduleModal && window.muopCloseScheduleModal()" style="padding: 7px 16px; font-size: 13px;">
                     Đóng
                 </button>
-                <button type="button" id="btnTriggerToggleChangeSchedule" onclick="var w = document.getElementById('scheduleChangeFormWrap'); if(w) { w.style.display = (w.style.display==='none'?'block':'none'); }" class="btn btn-outline" style="padding: 7px 14px; font-size: 13px; color: #7c3aed; border-color: #c4b5fd;">
+                <button type="button" id="btnTriggerToggleChangeSchedule" onclick="window.muopToggleScheduleChangeForm && window.muopToggleScheduleChangeForm(); return false;" class="btn btn-outline" style="padding: 7px 14px; font-size: 13px; color: #7c3aed; border-color: #c4b5fd;">
                     <i class="fa-solid fa-pen-to-square"></i> Đổi Giờ Hẹn
                 </button>
                 <button type="button" id="btnPopupCancelScheduleToDraft" class="btn btn-outline" style="padding: 7px 14px; font-size: 13px; color: #b45309; border-color: #fde68a;" title="Hủy hẹn giờ và chuyển truyện về mục Bản Nháp">
@@ -210,6 +210,22 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
         }
 
         window.muopSyncPopupScheduleTime();
+    };
+
+    // Hàm chuyển đổi bật/tắt form đổi giờ hẹn
+    window.muopToggleScheduleChangeForm = function() {
+        var formWrap = document.getElementById('scheduleChangeFormWrap');
+        if (!formWrap) return;
+        var isHidden = (formWrap.style.display === 'none' || window.getComputedStyle(formWrap).display === 'none');
+        if (isHidden) {
+            formWrap.style.display = 'block';
+            window.muopSyncPopupScheduleTime && window.muopSyncPopupScheduleTime();
+            try {
+                formWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch(e) {}
+        } else {
+            formWrap.style.display = 'none';
+        }
     };
 
     // Hàm đếm ngược
