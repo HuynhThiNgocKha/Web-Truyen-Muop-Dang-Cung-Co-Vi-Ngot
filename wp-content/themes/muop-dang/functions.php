@@ -652,6 +652,24 @@ function muop_setup_tables() {
         KEY idx_chapter (chapter_id)
     ) $charset_collate;";
 
+    // Table: Online Visitors (Số người đang truy cập web thời gian thực)
+    $table_online = $wpdb->prefix . 'muop_online_visitors';
+    $sql_online = "CREATE TABLE IF NOT EXISTS $table_online (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        session_key VARCHAR(64) NOT NULL,
+        ip_address VARCHAR(45) NOT NULL,
+        user_id BIGINT(20) UNSIGNED DEFAULT 0,
+        user_name VARCHAR(100) DEFAULT 'Khách vãng lai',
+        page_url VARCHAR(255) NOT NULL DEFAULT '',
+        page_title VARCHAR(255) NOT NULL DEFAULT '',
+        device_type VARCHAR(50) DEFAULT 'Máy tính',
+        last_active DATETIME NOT NULL,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_session (session_key),
+        KEY idx_active (last_active),
+        KEY idx_ip (ip_address)
+    ) $charset_collate;";
+
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql_clicks);
     dbDelta($sql_history);
@@ -662,6 +680,7 @@ function muop_setup_tables() {
     dbDelta($sql_splitter);
     dbDelta($sql_audio_logs);
     dbDelta($sql_vlogs);
+    dbDelta($sql_online);
 
     // Initial Options
     if (!get_option('muop_shopee_url')) {
@@ -2529,7 +2548,14 @@ function muop_ajax_submit_chapter_handler() {
             $upload_overrides = array('test_form' => false);
             $moved = wp_handle_upload($audio_file, $upload_overrides);
             if ($moved && !isset($moved['error'])) {
-                $chapter_audio_url = $moved['url'];
+                $compressed_file = muop_compress_audio_file($moved['file']);
+                if ($compressed_file !== $moved['file']) {
+                    $upload_dir = wp_upload_dir();
+                    $chapter_audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $compressed_file);
+                    $chapter_audio_url = str_replace('\\', '/', $chapter_audio_url);
+                } else {
+                    $chapter_audio_url = $moved['url'];
+                }
             }
         }
     } elseif (!empty($_POST['chapter_audio_url'])) {
@@ -4553,7 +4579,14 @@ function muop_ajax_update_chapter_handler() {
         require_once(ABSPATH . 'wp-admin/includes/media.php');
         $upload = wp_handle_upload($_FILES['chapter_audio'], array('test_form' => false));
         if ($upload && !isset($upload['error'])) {
-            $update_audio_url = $upload['url'];
+            $compressed_file = muop_compress_audio_file($upload['file']);
+            if ($compressed_file !== $upload['file']) {
+                $upload_dir = wp_upload_dir();
+                $update_audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $compressed_file);
+                $update_audio_url = str_replace('\\', '/', $update_audio_url);
+            } else {
+                $update_audio_url = $upload['url'];
+            }
         }
     } elseif (isset($_POST['chapter_audio_url'])) {
         $update_audio_url = esc_url_raw(trim($_POST['chapter_audio_url']));
@@ -7782,6 +7815,60 @@ function muop_ajax_get_story_audio_list_handler() {
 }
 
 /**
+ * Nén file âm thanh MP3 đến mức dung lượng thấp nhất có thể cho giọng nói (Speech-Optimized)
+ * Giảm 75% - 90% dung lượng trong khi giọng đọc vẫn mượt mà, rõ ràng và không bị rè.
+ * Cấu hình: Mono (1 kênh), 24,000 Hz, 40 kbps LAME CBR, Highpass 65Hz, Lowpass 11.5kHz, Loudnorm.
+ */
+function muop_compress_audio_file($file_path) {
+    if (!file_exists($file_path) || filesize($file_path) < 30000) {
+        return $file_path; // File quá nhỏ hoặc không tồn tại
+    }
+
+    $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+    $allowed = array('mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac');
+    if (!in_array($ext, $allowed)) {
+        return $file_path;
+    }
+
+    $temp_out = dirname($file_path) . '/cmp_' . uniqid() . '.mp3';
+
+    // Xây dựng bộ lọc làm sạch âm thanh và nén giọng nói tối đa
+    $filter = 'highpass=f=65,lowpass=f=11500,loudnorm=I=-16:TP=-1.5:LRA=11';
+
+    $cmd = sprintf(
+        'ffmpeg -y -i %s -af %s -ac 1 -ar 24000 -c:a libmp3lame -b:a 40k %s 2>&1',
+        escapeshellarg($file_path),
+        escapeshellarg($filter),
+        escapeshellarg($temp_out)
+    );
+
+    @exec($cmd, $out, $ret);
+
+    if ($ret === 0 && file_exists($temp_out) && filesize($temp_out) > 1000) {
+        // Nếu file nén nhỏ hơn file gốc hoặc file gốc không phải MP3
+        if (filesize($temp_out) < filesize($file_path) || $ext !== 'mp3') {
+            @unlink($file_path);
+            if ($ext === 'mp3') {
+                @rename($temp_out, $file_path);
+                return $file_path;
+            } else {
+                $new_mp3_path = preg_replace('/\.[^.]+$/', '.mp3', $file_path);
+                @rename($temp_out, $new_mp3_path);
+                return $new_mp3_path;
+            }
+        } else {
+            @unlink($temp_out);
+        }
+    } else {
+        if (file_exists($temp_out)) {
+            @unlink($temp_out);
+        }
+    }
+
+    return $file_path;
+}
+
+/**
  * Xóa file âm thanh vật lý trên máy chủ của chương truyện khi bị xóa hoặc tải file mới lên thay thế
  */
 function muop_delete_chapter_audio_file($chapter_id) {
@@ -7884,7 +7971,14 @@ function muop_ajax_save_chapter_audio_handler() {
 
         $upload = wp_handle_upload($file, array('test_form' => false));
         if ($upload && !isset($upload['error'])) {
-            $audio_url = $upload['url'];
+            $compressed_file = muop_compress_audio_file($upload['file']);
+            if ($compressed_file !== $upload['file']) {
+                $upload_dir = wp_upload_dir();
+                $audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $compressed_file);
+                $audio_url = str_replace('\\', '/', $audio_url);
+            } else {
+                $audio_url = $upload['url'];
+            }
         } else {
             $err = isset($upload['error']) ? $upload['error'] : 'Không thể lưu file tải lên!';
             wp_send_json_error(array('message' => 'Lỗi tải lên: ' . $err));
@@ -8267,5 +8361,208 @@ function muop_ajax_get_affiliate_story_stats_handler() {
         'day_before_date'      => $day_before_yesterday,
         'chapters_stats'       => $chapters_stats,
         'daily_stats'          => $daily_stats
+    ));
+}
+
+// =========================================================================
+// 22. HỆ THỐNG THEO DÕI & THỐNG KÊ NGƯỜI ĐANG TRUY CẬP WEB THỜI GIAN THỰC
+// =========================================================================
+
+/**
+ * 22.1 Theo dõi khách truy cập web thời gian thực (Frontend Tracking)
+ */
+function muop_track_online_visitor() {
+    if (is_admin() || wp_doing_ajax() || (defined('DOING_CRON') && DOING_CRON) || (defined('WP_CLI') && WP_CLI)) {
+        return;
+    }
+
+    $u_agent = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '';
+    if (empty($u_agent) || preg_match('/(bot|crawl|spider|slurp|facebookexternalhit|whatsapp|googlebot|bingbot|yandex)/i', $u_agent)) {
+        return;
+    }
+
+    $ip = function_exists('muop_get_real_client_ip') ? muop_get_real_client_ip() : (isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '127.0.0.1');
+    $session_key = hash('sha256', $ip . '_' . $u_agent);
+
+    $current_u = wp_get_current_user();
+    $uid = is_user_logged_in() ? (int) $current_u->ID : 0;
+    $uname = is_user_logged_in() ? $current_u->display_name : 'Khách vãng lai';
+
+    $device = 'Máy tính';
+    if (preg_match('/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i', $u_agent)) {
+        $device = 'Máy tính bảng';
+    } elseif (preg_match('/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Opera M(obi|ini)/i', $u_agent)) {
+        $device = 'Điện thoại';
+    }
+
+    $page_url = '';
+    if (isset($_SERVER['REQUEST_URI'])) {
+        $page_url = esc_url_raw($_SERVER['REQUEST_URI']);
+    }
+
+    $page_title = 'Trang chủ';
+    if (is_front_page() || is_home()) {
+        $page_title = 'Trang chủ website';
+    } elseif (is_singular('chuong')) {
+        $page_title = get_the_title();
+    } elseif (is_singular('truyen')) {
+        $page_title = 'Truyện: ' . get_the_title();
+    } elseif (is_page()) {
+        $page_title = get_the_title();
+    } elseif (is_tax()) {
+        $term = get_queried_object();
+        $page_title = $term ? ('Thể loại: ' . $term->name) : 'Danh mục';
+    }
+
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_online_visitors';
+    $now_dt = current_time('mysql');
+
+    $wpdb->query($wpdb->prepare(
+        "INSERT INTO {$table} (session_key, ip_address, user_id, user_name, page_url, page_title, device_type, last_active)
+         VALUES (%s, %s, %d, %s, %s, %s, %s, %s)
+         ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            user_name = VALUES(user_name),
+            page_url = VALUES(page_url),
+            page_title = VALUES(page_title),
+            device_type = VALUES(device_type),
+            last_active = VALUES(last_active)",
+        $session_key,
+        $ip,
+        $uid,
+        $uname,
+        $page_url,
+        $page_title,
+        $device,
+        $now_dt
+    ));
+
+    // Dọn dẹp ngẫu nhiên (xác suất 2%) các session cũ hơn 1 giờ
+    if (mt_rand(1, 50) === 1) {
+        $wpdb->query("DELETE FROM {$table} WHERE last_active < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+    }
+}
+add_action('template_redirect', 'muop_track_online_visitor');
+
+/**
+ * 22.2 AJAX: Heartbeat Ping định kỳ giữ trạng thái Online khi đang mở trang đọc truyện
+ */
+add_action('wp_ajax_muop_online_heartbeat', 'muop_ajax_online_heartbeat_handler');
+add_action('wp_ajax_nopriv_muop_online_heartbeat', 'muop_ajax_online_heartbeat_handler');
+function muop_ajax_online_heartbeat_handler() {
+    $u_agent = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field($_SERVER['HTTP_USER_AGENT']) : '';
+    if (empty($u_agent) || preg_match('/(bot|crawl|spider|slurp|facebookexternalhit|whatsapp|googlebot|bingbot|yandex)/i', $u_agent)) {
+        wp_send_json_success(array('status' => 'bot_ignored'));
+    }
+
+    $ip = function_exists('muop_get_real_client_ip') ? muop_get_real_client_ip() : (isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '127.0.0.1');
+    $session_key = hash('sha256', $ip . '_' . $u_agent);
+
+    $current_u = wp_get_current_user();
+    $uid = is_user_logged_in() ? (int) $current_u->ID : 0;
+    $uname = is_user_logged_in() ? $current_u->display_name : 'Khách vãng lai';
+
+    $device = 'Máy tính';
+    if (preg_match('/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i', $u_agent)) {
+        $device = 'Máy tính bảng';
+    } elseif (preg_match('/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Opera M(obi|ini)/i', $u_agent)) {
+        $device = 'Điện thoại';
+    }
+
+    $page_url = isset($_POST['page_url']) ? esc_url_raw($_POST['page_url']) : '';
+    $page_title = isset($_POST['page_title']) ? sanitize_text_field(wp_unslash($_POST['page_title'])) : 'Đang đọc truyện';
+
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_online_visitors';
+    $now_dt = current_time('mysql');
+
+    $wpdb->query($wpdb->prepare(
+        "INSERT INTO {$table} (session_key, ip_address, user_id, user_name, page_url, page_title, device_type, last_active)
+         VALUES (%s, %s, %d, %s, %s, %s, %s, %s)
+         ON DUPLICATE KEY UPDATE
+            user_id = VALUES(user_id),
+            user_name = VALUES(user_name),
+            page_url = VALUES(page_url),
+            page_title = VALUES(page_title),
+            device_type = VALUES(device_type),
+            last_active = VALUES(last_active)",
+        $session_key,
+        $ip,
+        $uid,
+        $uname,
+        $page_url,
+        $page_title,
+        $device,
+        $now_dt
+    ));
+
+    wp_send_json_success(array('status' => 'alive'));
+}
+
+/**
+ * 22.3 AJAX: Lấy dữ liệu người đang truy cập web thời gian thực cho Admin
+ */
+add_action('wp_ajax_muop_get_realtime_online_visitors', 'muop_ajax_get_realtime_online_visitors_handler');
+function muop_ajax_get_realtime_online_visitors_handler() {
+    if (!is_user_logged_in() || !muop_is_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền truy cập dữ liệu này!'));
+    }
+
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_online_visitors';
+
+    // Ngưỡng tính là đang online: 5 phút gần nhất
+    $threshold_time = date('Y-m-d H:i:s', strtotime('-5 minutes', strtotime(current_time('mysql'))));
+
+    $total_online = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(DISTINCT session_key) FROM {$table} WHERE last_active >= %s",
+        $threshold_time
+    ));
+
+    $guest_online = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(DISTINCT session_key) FROM {$table} WHERE last_active >= %s AND user_id = 0",
+        $threshold_time
+    ));
+
+    $member_online = (int) $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(DISTINCT session_key) FROM {$table} WHERE last_active >= %s AND user_id > 0",
+        $threshold_time
+    ));
+
+    // Lấy danh sách 50 khách online gần nhất
+    $visitors = $wpdb->get_results($wpdb->prepare(
+        "SELECT id, ip_address, user_id, user_name, page_url, page_title, device_type, last_active,
+                TIMESTAMPDIFF(SECOND, last_active, %s) AS seconds_ago
+         FROM {$table}
+         WHERE last_active >= %s
+         ORDER BY last_active DESC
+         LIMIT 50",
+        current_time('mysql'),
+        $threshold_time
+    ), ARRAY_A);
+
+    if (!$visitors) $visitors = array();
+
+    foreach ($visitors as &$v) {
+        $sec = max(0, intval($v['seconds_ago']));
+        if ($sec < 15) {
+            $v['active_time_text'] = 'Vừa xong';
+        } elseif ($sec < 60) {
+            $v['active_time_text'] = $sec . ' giây trước';
+        } else {
+            $mins = floor($sec / 60);
+            $v['active_time_text'] = $mins . ' phút trước';
+        }
+        $v['ip_display'] = $v['ip_address'];
+    }
+    unset($v);
+
+    wp_send_json_success(array(
+        'total_online'  => $total_online,
+        'guest_online'  => $guest_online,
+        'member_online' => $member_online,
+        'visitors'      => $visitors,
+        'server_time'   => current_time('H:i:s d/m/Y')
     ));
 }

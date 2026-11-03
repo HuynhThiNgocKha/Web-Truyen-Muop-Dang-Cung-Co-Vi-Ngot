@@ -412,6 +412,12 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                 </div>
 
                 <div class="admin-db-topbar-right">
+                    <!-- Nút Thống Kê Người Đang Online Thời Gian Thực -->
+                    <button type="button" class="btn-top-live-online" id="btnOpenRealtimeOnlineModal" title="Bấm để xem danh sách khách đang truy cập web thời gian thực" style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 20px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #166534; cursor: pointer; transition: all 0.2s ease;">
+                        <span class="live-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+                        <span><strong id="topbarLiveOnlineCount" style="color: #15803d; font-size: 14px;">0</strong> online</span>
+                    </button>
+
                     <!-- Nút Chuyển Đổi Sáng / Tối (Hình 3) -->
                     <button type="button" class="theme-toggle-btn admin-theme-toggle" aria-label="Đổi giao diện sáng tối" title="Đổi giao diện Sáng / Tối">
                         <i class="fa-solid fa-moon"></i>
@@ -1005,6 +1011,11 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                     <div class="adm-subview-panel">
                         <!-- 1. COMPACT KPI COUNTER STRIP (CHUYỂN TỪ TRÊN XUỐNG ĐÂY THEO HÌNH 4) -->
                         <div class="admin-db-kpi-strip" style="margin-bottom: 24px;">
+                            <div class="db-kpi-chip" style="background: #f0fdf4; border-color: #86efac; cursor: pointer;" onclick="$('#btnOpenRealtimeOnlineModal').click();" title="Bấm để xem danh sách chi tiết khách online">
+                                <span class="db-kpi-icon" style="color: #16a34a;"><i class="fa-solid fa-users-viewfinder"></i></span>
+                                <span class="db-kpi-num" id="statAnalyticsLiveOnlineChip" style="color: #16a34a;">0</span>
+                                <span class="db-kpi-lbl" style="color: #166534;"><span class="live-pulse-dot" style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#22c55e; margin-right:3px;"></span>Online</span>
+                            </div>
                             <div class="db-kpi-chip">
                                 <span class="db-kpi-icon"><i class="fa-solid fa-book"></i></span>
                                 <span class="db-kpi-num"><?php echo number_format($total_stories); ?></span>
@@ -1039,6 +1050,20 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
 
                         <!-- 2. PHÂN TÍCH TỔNG QUAN TĂNG TRƯỞNG & LƯỢT ĐỌC TOÀN TRANG -->
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                            <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm); cursor: pointer;" onclick="$('#btnOpenRealtimeOnlineModal').click();" title="Bấm xem danh sách khách online">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="font-size: 12px; color: #166534; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                                        <span class="live-pulse-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+                                        <span>Đang Online Hiện Tại</span>
+                                    </div>
+                                    <span class="badge" style="background: #16a34a; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px;">Thời gian thực</span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #15803d; margin-top: 6px;" id="statAnalyticsLiveOnline">0</div>
+                                <div style="font-size: 12px; color: #166534; margin-top: 4px; display: flex; justify-content: space-between;">
+                                    <span>Khách: <strong id="statAnalyticsLiveGuests">0</strong> | TV: <strong id="statAnalyticsLiveMembers">0</strong></span>
+                                    <span style="text-decoration: underline;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Xem</span>
+                                </div>
+                            </div>
                             <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
                                 <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">Tổng Lượt Xem Toàn Trang</div>
                                 <div style="font-size: 24px; font-weight: 800; color: #0284c7;"><?php echo number_format($total_views_all); ?></div>
@@ -1250,6 +1275,18 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                 </div>
                                 <div style="font-size: 26px; font-weight: 800; color: #7c3aed; margin-top: 6px;" id="statVisitorMembers">0</div>
                                 <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Tài khoản độc giả & dịch giả</div>
+                            </div>
+
+                            <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm); cursor: pointer;" onclick="$('#btnOpenRealtimeOnlineModal').click();" title="Bấm xem chi tiết danh sách">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: #166534; font-weight: 700;">Đang Online (Trực Tiếp)</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-signal"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #15803d; margin-top: 6px;" id="statVisitorLiveOnline">0</div>
+                                <div style="font-size: 12px; color: #166534; margin-top: 4px; display: flex; justify-content: space-between;">
+                                    <span>Khách: <strong id="statVisitorLiveGuests">0</strong> | TV: <strong id="statVisitorLiveMembers">0</strong></span>
+                                    <span style="text-decoration: underline;"><i class="fa-solid fa-eye"></i> Xem</span>
+                                </div>
                             </div>
                         </div>
 
@@ -3707,6 +3744,72 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
     </div>
 </div>
 
+<!-- =========================================================================
+     MODAL: DANH SÁCH KHÁCH ĐANG TRUY CẬP WEB THỜI GIAN THỰC (REAL-TIME ONLINE)
+========================================================================== -->
+<div id="modalRealtimeOnlineVisitors" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 900px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column;">
+        <!-- Modal Header -->
+        <div class="modal-header-top-box" style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: #f0fdf4;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="live-pulse-dot" style="width: 10px; height: 10px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-users-viewfinder"></i> Khách Đang Truy Cập Website Hiện Tại (Thời Gian Thực)
+                </h3>
+            </div>
+            <button type="button" class="btn-close-modal-online" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Summary Bar -->
+        <div style="background: #ffffff; padding: 12px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 13.5px; flex-wrap: wrap;">
+                <span>Tổng online: <strong id="modalOnlineTotalCount" style="color: #16a34a; font-size: 16px; font-weight: 800;">0</strong> người</span>
+                <span style="color: var(--border-color);">|</span>
+                <span style="color: #ea580c;">Khách vãng lai: <strong id="modalOnlineGuestsCount">0</strong></span>
+                <span style="color: var(--border-color);">|</span>
+                <span style="color: #7c3aed;">Thành viên: <strong id="modalOnlineMembersCount">0</strong></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 11.5px; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> <span id="modalOnlineServerTime">--:--:--</span></span>
+                <button type="button" class="btn btn-outline btn-xs" id="btnRefreshOnlineVisitorsList" style="padding: 4px 10px; font-size: 12px; border-color: #86efac; color: #16a34a; font-weight: 600;">
+                    <i class="fa-solid fa-rotate-right"></i> Làm mới
+                </button>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+            <div class="table-responsive db-table-container">
+                <table class="data-table db-data-table" style="width: 100%; font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 45px; text-align: center;">STT</th>
+                            <th style="width: 160px;">Người Đọc</th>
+                            <th style="width: 120px;">Địa Chỉ IP</th>
+                            <th style="width: 105px;">Thiết Bị</th>
+                            <th>Trang Đang Xem</th>
+                            <th style="width: 115px; text-align: center;">Hoạt Động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalOnlineVisitorsTbody">
+                        <tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách người online...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="padding: 12px 20px; border-top: 1px solid var(--border-color); background: var(--bg-card); display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 12px; color: var(--text-muted);">
+                <i class="fa-solid fa-circle-info" style="color: #16a34a;"></i> Danh sách tự động đếm các phiên hoạt động trong 5 phút gần nhất.
+            </span>
+            <button type="button" class="btn btn-secondary btn-close-modal-online" style="padding: 6px 18px; font-size: 13px;">Đóng</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // Inline JS for Admin Portal interactions
 jQuery(document).ready(function($) {
@@ -5203,6 +5306,131 @@ jQuery(document).ready(function($) {
       $btn.html('<i class="fa-solid fa-play"></i> Nghe thử');
       activeAudioPlayer = null;
     };
+  });
+
+  // =========================================================================
+  // THỐNG KÊ NGƯỜI ĐANG TRUY CẬP WEB THỜI GIAN THỰC (REAL-TIME ONLINE VISITORS)
+  // =========================================================================
+  let onlineVisitorsPollingTimer = null;
+
+  function loadRealtimeOnlineVisitors(renderTable = false) {
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_realtime_online_visitors',
+        nonce: muopConfig.nonce
+      },
+      success: function(res) {
+        if (typeof res === 'string') {
+          try { res = JSON.parse(res); } catch (e) {}
+        }
+        if (res && res.success && res.data) {
+          const d = res.data;
+          const total = Number(d.total_online || 0);
+          const guests = Number(d.guest_online || 0);
+          const members = Number(d.member_online || 0);
+
+          // Cập nhật Topbar
+          $('#topbarLiveOnlineCount').text(total.toLocaleString());
+
+          // Cập nhật Tab Thống kê & Phân tích
+          $('#statAnalyticsLiveOnlineChip').text(total.toLocaleString());
+          $('#statAnalyticsLiveOnline').text(total.toLocaleString());
+          $('#statAnalyticsLiveGuests').text(guests.toLocaleString());
+          $('#statAnalyticsLiveMembers').text(members.toLocaleString());
+
+          // Cập nhật Tab Khách đọc truyện
+          $('#statVisitorLiveOnline').text(total.toLocaleString());
+          $('#statVisitorLiveGuests').text(guests.toLocaleString());
+          $('#statVisitorLiveMembers').text(members.toLocaleString());
+
+          // Cập nhật Modal
+          $('#modalOnlineTotalCount').text(total.toLocaleString());
+          $('#modalOnlineGuestsCount').text(guests.toLocaleString());
+          $('#modalOnlineMembersCount').text(members.toLocaleString());
+          if (d.server_time) {
+            $('#modalOnlineServerTime').text(d.server_time);
+          }
+
+          // Render bảng nếu modal đang mở hoặc được yêu cầu
+          if (renderTable || $('#modalRealtimeOnlineVisitors').is(':visible')) {
+            const $tbody = $('#modalOnlineVisitorsTbody');
+            const visitors = d.visitors || [];
+            if (visitors.length === 0) {
+              $tbody.html('<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted); font-style: italic;">Hiện chưa ghi nhận khách đang truy cập trong 5 phút gần đây.</td></tr>');
+            } else {
+              let rowsHtml = '';
+              visitors.forEach(function(v, idx) {
+                const isMember = Number(v.user_id) > 0;
+                const userBadge = isMember 
+                  ? `<span class="badge" style="background:#faf5ff;color:#7c3aed;border:1px solid #e9d5ff;font-weight:700;"><i class="fa-solid fa-id-badge"></i> ${escapeVisitorHtml(v.user_name)}</span>`
+                  : `<span class="badge" style="background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb;"><i class="fa-solid fa-user-secret"></i> Khách vãng lai</span>`;
+
+                const pageLink = v.page_url 
+                  ? `<a href="${escapeVisitorHtml(v.page_url)}" target="_blank" style="color:var(--primary-green);font-weight:600;display:inline-flex;align-items:center;gap:4px;" title="Mở trang này"><i class="fa-solid fa-link" style="font-size:11px;"></i> ${escapeVisitorHtml(v.page_title || v.page_url)}</a>`
+                  : `<span style="color:var(--text-muted);">${escapeVisitorHtml(v.page_title || 'Trang chủ')}</span>`;
+
+                let devIcon = 'fa-desktop';
+                if (v.device_type === 'Điện thoại') devIcon = 'fa-mobile-screen-button';
+                else if (v.device_type === 'Máy tính bảng') devIcon = 'fa-tablet-screen-button';
+
+                rowsHtml += `
+                  <tr>
+                    <td style="text-align: center; color: var(--text-muted); font-weight: 600;">${idx + 1}</td>
+                    <td>${userBadge}</td>
+                    <td><code style="background:var(--bg-card);padding:2px 6px;border-radius:4px;border:1px solid var(--border-color);font-size:12px;">${escapeVisitorHtml(v.ip_display || v.ip_address)}</code></td>
+                    <td><span style="font-size:12.5px;color:var(--text-main);display:inline-flex;align-items:center;gap:5px;"><i class="fa-solid ${devIcon}" style="color:var(--text-muted);"></i> ${escapeVisitorHtml(v.device_type || 'Máy tính')}</span></td>
+                    <td>${pageLink}</td>
+                    <td style="text-align: center;"><span class="badge" style="background:#dcfce7;color:#15803d;font-size:11.5px;padding:3px 8px;border-radius:12px;font-weight:600;"><i class="fa-solid fa-circle-dot" style="font-size:8px;"></i> ${escapeVisitorHtml(v.active_time_text || 'Vừa xong')}</span></td>
+                  </tr>
+                `;
+              });
+              $tbody.html(rowsHtml);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Khởi động load số người online ngay khi mở trang admin
+  loadRealtimeOnlineVisitors(false);
+
+  // Tự động polling cập nhật số người online mỗi 20 giây
+  clearInterval(onlineVisitorsPollingTimer);
+  onlineVisitorsPollingTimer = setInterval(function() {
+    loadRealtimeOnlineVisitors(false);
+  }, 20000);
+
+  // Bấm nút Topbar hoặc các thẻ KPI để mở Popup danh sách chi tiết
+  $(document).on('click', '#btnOpenRealtimeOnlineModal', function(e) {
+    e.preventDefault();
+    $('#modalRealtimeOnlineVisitors').css('display', 'flex');
+    $('#modalOnlineVisitorsTbody').html('<tr><td colspan="6" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin" style="font-size: 20px; margin-bottom: 8px; display: block; color: #16a34a;"></i>Đang tải danh sách người online...</td></tr>');
+    loadRealtimeOnlineVisitors(true);
+  });
+
+  // Đóng Popup Online
+  $(document).on('click', '.btn-close-modal-online', function(e) {
+    e.preventDefault();
+    $('#modalRealtimeOnlineVisitors').hide();
+  });
+
+  $('#modalRealtimeOnlineVisitors').on('click', function(e) {
+    if (e.target === this) {
+      $(this).hide();
+    }
+  });
+
+  // Bấm nút Làm mới trong Popup Online
+  $('#btnRefreshOnlineVisitorsList').on('click', function() {
+    const $btn = $(this);
+    $btn.prop('disabled', true).html('<i class="fa-solid fa-rotate-right fa-spin"></i> Đang tải...');
+    loadRealtimeOnlineVisitors(true);
+    setTimeout(function() {
+      $btn.prop('disabled', false).html('<i class="fa-solid fa-rotate-right"></i> Làm mới');
+    }, 600);
   });
 
   // =========================================================================

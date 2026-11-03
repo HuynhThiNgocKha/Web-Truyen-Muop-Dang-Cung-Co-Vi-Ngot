@@ -257,8 +257,10 @@ def synthesize_chapter_audio(text, ref_audio_path, output_mp3_path, speed=1.0):
 
         filter_parts = [
             f"asetrate={target_sample_rate}",
-            "aresample=22050",
+            "aresample=24000",
             f"atempo={final_tempo:.4f}",
+            "highpass=f=65",
+            "lowpass=f=11500",
             f"equalizer=f=180:width_type=o:width=1.2:g={eq_gains[0]:.1f}",
             f"equalizer=f=400:width_type=o:width=1.2:g={eq_gains[1]:.1f}",
             f"equalizer=f=1200:width_type=o:width=1.2:g={eq_gains[2]:.1f}",
@@ -271,24 +273,29 @@ def synthesize_chapter_audio(text, ref_audio_path, output_mp3_path, speed=1.0):
         # Đảm bảo thư mục đích tồn tại
         os.makedirs(os.path.dirname(os.path.abspath(output_mp3_path)), exist_ok=True)
 
+        # Nén tối đa dung lượng MP3 cho giọng nói (Speech-Optimized: Mono 1 kênh, 24kHz, 40kbps LAME)
         ffmpeg_cmd = [
             "ffmpeg", "-y",
             "-i", raw_wav_path,
             "-af", filter_str,
+            "-ac", "1",
+            "-ar", "24000",
             "-c:a", "libmp3lame",
-            "-b:a", "128k",
+            "-b:a", "40k",
             output_mp3_path
         ]
 
         res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
         if res.returncode != 0:
-            simple_filter = f"asetrate={target_sample_rate},aresample=22050,atempo={final_tempo:.4f}"
+            simple_filter = f"asetrate={target_sample_rate},aresample=24000,atempo={final_tempo:.4f},highpass=f=65,lowpass=f=11500"
             ffmpeg_fallback = [
                 "ffmpeg", "-y",
                 "-i", raw_wav_path,
                 "-af", simple_filter,
+                "-ac", "1",
+                "-ar", "24000",
                 "-c:a", "libmp3lame",
-                "-b:a", "128k",
+                "-b:a", "40k",
                 output_mp3_path
             ]
             subprocess.run(ffmpeg_fallback, check=True)

@@ -10899,6 +10899,53 @@
     }
   };
 
+  // 24. REAL-TIME ONLINE VISITOR TRACKER (Heartbeat ping định kỳ khi đang đọc web)
+  const OnlineVisitorTracker = {
+    heartbeatInterval: null,
+    init: function() {
+      // Không cần ping ở trang quản trị admin portal (admin portal đã có controller polling riêng)
+      const path = window.location.pathname || '';
+      if (path.indexOf('quan-ly-admin') !== -1 || path.indexOf('wp-admin') !== -1) {
+        return;
+      }
+
+      const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
+
+      const sendHeartbeat = () => {
+        // Chỉ gửi ping khi tab đang hiển thị
+        if (document.hidden) return;
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          dataType: 'json',
+          data: {
+            action: 'muop_online_heartbeat',
+            page_url: window.location.href,
+            page_title: document.title
+          },
+          success: function() {
+            // Heartbeat ghi nhận thành công
+          },
+          error: function() {
+            // Bỏ qua lỗi mạng chập chờn
+          }
+        });
+      };
+
+      // Gửi ping đều đặn mỗi 60 giây để duy trì trạng thái online
+      if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = setInterval(sendHeartbeat, 60000);
+
+      // Khi người dùng quay lại tab sau khi ẩn, gửi ping ngay
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          sendHeartbeat();
+        }
+      });
+    }
+  };
+
   // INITIALIZE ALL
   $(document).ready(() => {
     try {
@@ -10946,6 +10993,8 @@
     safeInit('SpotlightCarouselManager', () => SpotlightCarouselManager.init());
     safeInit('ScheduleStoryManager', () => ScheduleStoryManager.init());
     safeInit('NominatedCarouselManager', () => NominatedCarouselManager.init());
+    safeInit('OnlineVisitorTracker', () => OnlineVisitorTracker.init());
   });
 
 })(jQuery);
+
