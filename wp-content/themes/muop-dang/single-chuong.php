@@ -117,40 +117,91 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
         <?php endif; ?>
  
         <!-- Audio Player Chương Này (Hình 1 & 5) -->
+        <!-- Audio Player Chương Này (Hình 3 màu Xanh Lá) -->
         <?php if (!empty($chapter_audio_url)) : ?>
-            <div class="chapter-audio-player-banner" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1.5px solid #bae6fd; border-radius: var(--radius-md); padding: 12px 18px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background: #0284c7; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);">
-                        <i class="fa-solid fa-headphones"></i>
+            <div class="muop-fig3-audio-card" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 18px 22px; margin-bottom: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.05);">
+                <!-- Header -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-headphones" style="font-size: 15px; color: #6b7280;"></i>
+                        <span>AUDIO CHƯƠNG NÀY</span>
                     </div>
-                    <div>
-                        <div style="font-size: 13.5px; font-weight: 700; color: #0369a1; display: flex; align-items: center; gap: 6px;">
-                            <span>Nghe Audio Chương <?php echo esc_html($chap_order); ?></span>
-                            <span class="badge" style="background: #0284c7; color: #fff; font-size: 10.5px; padding: 2px 6px; border-radius: 4px;">Giọng đọc</span>
-                        </div>
-                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 1px;">
-                            Bạn có thể vừa nghe đọc vừa cuộn đọc nội dung bên dưới.
-                        </div>
+                    <button type="button" onclick="window.muopOpenStoryAudioPlayer && window.muopOpenStoryAudioPlayer(<?php echo intval($story_id); ?>, '<?php echo esc_js($story_title); ?>', <?php echo intval($chapter_id); ?>)" style="background: none; border: none; font-size: 12px; color: #16a34a; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                        <i class="fa-solid fa-list-ul"></i> Toàn bộ audio truyện
+                    </button>
+                </div>
+
+                <!-- Thẻ audio ẩn -->
+                <audio id="currentChapterAudioEl" src="<?php echo esc_url($chapter_audio_url); ?>" preload="metadata" style="display: none;"></audio>
+
+                <!-- Nút lớn màu xanh lá theo Hình 3 -->
+                <button type="button" id="btnPlayCurrentChapterAudio" style="width: 100%; height: 52px; border-radius: 12px; background: #16a34a; color: #ffffff; font-size: 16px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3); transition: all 0.2s ease;">
+                    <i class="fa-solid fa-volume-high" id="iconPlayChapterAudio" style="font-size: 18px;"></i>
+                    <span id="textPlayChapterAudio">Nghe chương này</span>
+                </button>
+
+                <!-- Thanh tua thời gian (Seekbar) -->
+                <div style="display: flex; align-items: center; gap: 12px; margin: 14px 0 10px 0;">
+                    <span id="audioCurrentTime" style="font-size: 13px; font-weight: 700; color: #4b5563; min-width: 42px;">00:00</span>
+                    <div style="flex: 1; position: relative; display: flex; align-items: center;">
+                        <input type="range" id="audioSeekBar" min="0" max="100" value="0" style="width: 100%; accent-color: #16a34a; cursor: pointer; height: 6px; border-radius: 3px;" />
+                    </div>
+                    <span id="audioDuration" style="font-size: 13px; font-weight: 700; color: #4b5563; min-width: 42px; text-align: right;">00:00</span>
+                </div>
+
+                <!-- Thanh trạng thái & Tốc độ phát -->
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px;">
+                    <span id="audioStatusText" style="font-weight: 700; color: #4b5563;">Sẵn sàng phát</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 13px; color: #4b5563; font-weight: 600;">Tốc độ</span>
+                        <select id="audioSpeedSelect" style="border: 1px solid #d1d5db; border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 700; background: #fff; color: #111827; cursor: pointer; outline: none;">
+                            <option value="0.75">0.75x</option>
+                            <option value="1.0" selected>1.0x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="1.75">1.75x</option>
+                            <option value="2.0">2.0x</option>
+                        </select>
                     </div>
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <audio id="currentChapterAudioEl" src="<?php echo esc_url($chapter_audio_url); ?>" preload="metadata" style="height: 36px; outline: none;"></audio>
-                    <button type="button" id="btnPlayCurrentChapterAudio" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0284c7, #0369a1); border: none; font-weight: 700; padding: 6px 16px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);">
-                        <i class="fa-solid fa-play"></i> <span>Phát Audio</span>
-                    </button>
-                    <button type="button" class="btn btn-outline btn-sm" onclick="window.muopOpenStoryAudioPlayer && window.muopOpenStoryAudioPlayer(<?php echo intval($story_id); ?>, '<?php echo esc_js($story_title); ?>', <?php echo intval($chapter_id); ?>)" style="padding: 6px 12px; font-size: 12.5px; border-color: #7dd3fc; color: #0284c7;" title="Mở danh sách phát audio đầy đủ">
-                        <i class="fa-solid fa-list-ul"></i> Toàn bộ audio
-                    </button>
-                </div>
+                <!-- Chuyển tiếp sang chương tiếp theo (Chương 2, 3, 4...) -->
+                <?php if (!empty($next_chap_url)) : ?>
+                    <div class="audio-next-chapter-strip" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <span style="font-size: 12.5px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-circle-check" style="color: #16a34a;"></i> Tự động chuyển tiếp khi nghe xong
+                        </span>
+                        <a href="<?php echo esc_url($next_chap_url); ?>" id="btnNextChapterAudioLink" class="btn btn-outline btn-sm" style="border-color: #86efac; color: #16a34a; font-weight: 700; padding: 4px 14px; font-size: 12.5px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>Sang Chương <?php echo ($chap_order + 1); ?> tiếp theo</span>
+                            <i class="fa-solid fa-forward-step"></i>
+                        </a>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <script>
             (function() {
                 var audio = document.getElementById('currentChapterAudioEl');
                 var btn = document.getElementById('btnPlayCurrentChapterAudio');
+                var icon = document.getElementById('iconPlayChapterAudio');
+                var text = document.getElementById('textPlayChapterAudio');
+                var seekBar = document.getElementById('audioSeekBar');
+                var curTime = document.getElementById('audioCurrentTime');
+                var durTime = document.getElementById('audioDuration');
+                var statusText = document.getElementById('audioStatusText');
+                var speedSelect = document.getElementById('audioSpeedSelect');
+                var nextLink = document.getElementById('btnNextChapterAudioLink');
                 if (!audio || !btn) return;
+
                 var hasLogged = false;
+                var isSeeking = false;
+
+                function formatTime(sec) {
+                    if (isNaN(sec) || !isFinite(sec)) return '00:00';
+                    var m = Math.floor(sec / 60);
+                    var s = Math.floor(sec % 60);
+                    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+                }
 
                 btn.addEventListener('click', function() {
                     if (audio.paused) {
@@ -161,7 +212,11 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 });
 
                 audio.addEventListener('play', function() {
-                    btn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Tạm dừng</span>';
+                    if (icon) icon.className = 'fa-solid fa-pause';
+                    if (text) text.textContent = 'Tạm dừng';
+                    if (statusText) statusText.textContent = 'Đang phát...';
+                    btn.style.background = '#15803d';
+
                     if (!hasLogged) {
                         hasLogged = true;
                         var fd = new FormData();
@@ -175,7 +230,64 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 });
 
                 audio.addEventListener('pause', function() {
-                    btn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Phát Audio</span>';
+                    if (icon) icon.className = 'fa-solid fa-volume-high';
+                    if (text) text.textContent = 'Tiếp tục nghe';
+                    if (statusText) statusText.textContent = 'Đã tạm dừng';
+                    btn.style.background = '#16a34a';
+                });
+
+                audio.addEventListener('loadedmetadata', function() {
+                    if (durTime && audio.duration) {
+                        durTime.textContent = formatTime(audio.duration);
+                    }
+                });
+
+                audio.addEventListener('timeupdate', function() {
+                    if (!isSeeking && audio.duration) {
+                        var percent = (audio.currentTime / audio.duration) * 100;
+                        if (seekBar) seekBar.value = percent;
+                        if (curTime) curTime.textContent = formatTime(audio.currentTime);
+                        if (durTime && (!durTime.textContent || durTime.textContent === '00:00')) {
+                            durTime.textContent = formatTime(audio.duration);
+                        }
+                    }
+                });
+
+                if (seekBar) {
+                    seekBar.addEventListener('input', function() {
+                        isSeeking = true;
+                        if (audio.duration) {
+                            var seekTo = (seekBar.value / 100) * audio.duration;
+                            if (curTime) curTime.textContent = formatTime(seekTo);
+                        }
+                    });
+                    seekBar.addEventListener('change', function() {
+                        if (audio.duration) {
+                            audio.currentTime = (seekBar.value / 100) * audio.duration;
+                        }
+                        isSeeking = false;
+                    });
+                }
+
+                if (speedSelect) {
+                    speedSelect.addEventListener('change', function() {
+                        audio.playbackRate = parseFloat(this.value) || 1.0;
+                    });
+                }
+
+                audio.addEventListener('ended', function() {
+                    if (icon) icon.className = 'fa-solid fa-rotate-right';
+                    if (text) text.textContent = 'Nghe lại chương này';
+                    if (statusText) statusText.textContent = 'Đã nghe xong!';
+                    btn.style.background = '#16a34a';
+
+                    // Chuyển tiếp sang chương tiếp theo nếu có
+                    if (nextLink && nextLink.href) {
+                        if (statusText) statusText.textContent = 'Đang chuyển sang chương tiếp theo sau 3s...';
+                        setTimeout(function() {
+                            window.location.href = nextLink.href;
+                        }, 2500);
+                    }
                 });
             })();
             </script>

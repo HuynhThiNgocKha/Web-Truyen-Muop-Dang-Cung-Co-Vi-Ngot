@@ -4215,11 +4215,27 @@
             }
             if (res && res.success && res.data) {
               const data = res.data;
+              $('#editChapterStoryId').val(storyId || data.story_id || '');
               $('#editChapterId').val(data.id || chapterId);
               $('#editChapterNumber').val(data.chapter_number || data.number || 1);
               $('#editChapterTitle').val(data.title || '');
               $('#editChapterContent').val(data.content || '');
               $('#editChapterIsDraftInput').val(data.status === 'draft' ? '1' : '0');
+
+              // Audio reset & display
+              $('#editChapterDeleteAudioHidden').val('0');
+              $('#editChapterUploadAudioDirect').val('');
+              $('#editChapterRefVoiceFile').val('');
+              $('#editChapterTtsAlert').hide();
+              if (data.audio_url) {
+                $('#editChapterAudioCurrentEl').attr('src', data.audio_url);
+                $('#editChapterAudioUrlHidden').val(data.audio_url);
+                $('#editChapterAudioCurrentBox').css('display', 'flex');
+              } else {
+                $('#editChapterAudioCurrentEl').attr('src', '');
+                $('#editChapterAudioUrlHidden').val('');
+                $('#editChapterAudioCurrentBox').hide();
+              }
 
               try {
                 updateRealtimeWordCounter($('#editChapterContent'), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
@@ -6301,6 +6317,22 @@
               $('#editChapterNumber').val(data.chapter_number || data.number || 1);
               $('#editChapterTitle').val(data.title || '');
               $('#editChapterContent').val(data.content || '');
+
+              // Audio reset & display
+              $('#editChapterDeleteAudioHidden').val('0');
+              $('#editChapterUploadAudioDirect').val('');
+              $('#editChapterRefVoiceFile').val('');
+              $('#editChapterTtsAlert').hide();
+              if (data.audio_url) {
+                $('#editChapterAudioCurrentEl').attr('src', data.audio_url);
+                $('#editChapterAudioUrlHidden').val(data.audio_url);
+                $('#editChapterAudioCurrentBox').css('display', 'flex');
+              } else {
+                $('#editChapterAudioCurrentEl').attr('src', '');
+                $('#editChapterAudioUrlHidden').val('');
+                $('#editChapterAudioCurrentBox').hide();
+              }
+
               try {
                 updateRealtimeWordCounter($('#editChapterContent'), $('#editChapterContentWordCount'), $('#editChapterContentCharCount'));
               } catch (cntErr) {}
@@ -6359,10 +6391,20 @@
         $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
         $alert.hide();
 
+        const formData = new FormData(this);
+        if (!formData.get('action')) {
+          formData.append('action', 'muop_update_chapter');
+        }
+        if (typeof muopConfig !== 'undefined' && muopConfig.nonce && !formData.get('nonce')) {
+          formData.append('nonce', muopConfig.nonce);
+        }
+
         $.ajax({
-          url: muopConfig.ajaxUrl,
+          url: (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : getAjaxUrl(),
           type: 'POST',
-          data: $form.serialize(),
+          data: formData,
+          processData: false,
+          contentType: false,
           success: (res) => {
             $btn.prop('disabled', false).html(isDraft ? '<i class="fa-solid fa-file-pen"></i> Lưu Nháp Chương' : '<i class="fa-solid fa-check"></i> Cập Nhật Chương');
             if (typeof res === 'string') {
@@ -6479,6 +6521,7 @@
             if (res && res.success && res.data) {
               const data = res.data;
               $('#editChapterAlert').hide();
+              $('#editChapterStoryId').val(storyId || data.story_id || '');
               $('#editChapterId').val(data.id || chapterId);
               $('#editChapterNumber').val(data.chapter_number || data.number || chapterNum || 1);
               $('#editChapterTitle').val(data.title || chapterTitle || '');
@@ -6489,6 +6532,21 @@
                 console.warn('Word counter error:', cntErr);
               }
               $('#editChapterIsDraftInput').val(data.status === 'draft' ? '1' : '0');
+
+              // Audio reset & display
+              $('#editChapterDeleteAudioHidden').val('0');
+              $('#editChapterUploadAudioDirect').val('');
+              $('#editChapterRefVoiceFile').val('');
+              $('#editChapterTtsAlert').hide();
+              if (data.audio_url) {
+                $('#editChapterAudioCurrentEl').attr('src', data.audio_url);
+                $('#editChapterAudioUrlHidden').val(data.audio_url);
+                $('#editChapterAudioCurrentBox').css('display', 'flex');
+              } else {
+                $('#editChapterAudioCurrentEl').attr('src', '');
+                $('#editChapterAudioUrlHidden').val('');
+                $('#editChapterAudioCurrentBox').hide();
+              }
 
               if (data.status === 'draft') {
                 $('#btnSaveDraftChapterAction').html('<i class="fa-solid fa-file-pen"></i> Tiếp Tục Lưu Nháp');
@@ -6508,6 +6566,85 @@
             let msg = 'Lỗi kết nối khi tải nội dung chương!';
             if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
             $('#editChapterAlert').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).removeClass('alert-info').addClass('alert-error').show();
+          }
+        });
+      });
+
+      // Xóa Audio hiện tại trong Modal Chỉnh Sửa Chương
+      $(document).on('click', '#btnDeleteCurrentChapterAudio', function(e) {
+        e.preventDefault();
+        $('#editChapterAudioCurrentEl').attr('src', '');
+        $('#editChapterAudioCurrentBox').hide();
+        $('#editChapterAudioUrlHidden').val('');
+        $('#editChapterDeleteAudioHidden').val('1');
+        muopAlert('Đã đánh dấu xóa audio này. Vui lòng bấm "Cập Nhật Chương" để lưu lại và xóa vĩnh viễn khỏi máy chủ.', 'info');
+      });
+
+      // Chuyển đổi Văn Bản sang Audio mới (Voice Clone TTS) trong Modal Chỉnh Sửa Chương
+      $(document).on('click', '#btnConvertTtsInEditChapter', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const $alert = $('#editChapterTtsAlert');
+        const textContent = ($('#editChapterContent').val() || '').trim();
+        const refFileInput = document.getElementById('editChapterRefVoiceFile');
+        const chapterId = $('#editChapterId').val() || '';
+        const storyId = $('#editChapterStoryId').val() || $('#modalEditChapterContent').data('story-id') || '';
+
+        if (!textContent) {
+          $alert.removeClass('alert-success alert-info').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> Vui lòng nhập nội dung chương trước khi chuyển đổi giọng nói!').show();
+          return;
+        }
+
+        if (!refFileInput || !refFileInput.files || !refFileInput.files[0]) {
+          $alert.removeClass('alert-success alert-info').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> Vui lòng chọn 1 file giọng mẫu (.mp3, .wav) để hệ thống bắt chước giọng đọc!').show();
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang bắt chước giọng...');
+        $alert.removeClass('alert-error alert-success').addClass('alert-info').html('<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích cao độ, âm sắc giọng mẫu và tạo file audio chương mới...').show();
+
+        const formData = new FormData();
+        formData.append('action', 'muop_convert_tts_chapter_audio');
+        formData.append('chapter_id', chapterId);
+        formData.append('story_id', storyId);
+        formData.append('chapter_text', textContent);
+        formData.append('ref_voice', refFileInput.files[0]);
+        if (typeof muopConfig !== 'undefined' && muopConfig.nonce) {
+          formData.append('nonce', muopConfig.nonce);
+        }
+
+        $.ajax({
+          url: (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : getAjaxUrl(),
+          type: 'POST',
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Đổi Audio Mới');
+            if (typeof res === 'string') {
+              try { res = JSON.parse(res); } catch (e) {}
+            }
+            if (res && res.success && res.data && res.data.audio_url) {
+              const audioUrl = res.data.audio_url;
+              $('#editChapterAudioUrlHidden').val(audioUrl);
+              $('#editChapterDeleteAudioHidden').val('0');
+              $('#editChapterAudioCurrentEl').attr('src', audioUrl);
+              $('#editChapterAudioCurrentBox').css('display', 'flex');
+
+              $alert.removeClass('alert-info alert-error').addClass('alert-success').html(
+                '<i class="fa-solid fa-circle-check"></i> ' + (res.data.message || 'Chuyển đổi thành công!') +
+                ' (Đã tự động thay thế audio cũ). Bấm <strong>"Cập Nhật Chương"</strong> để lưu lại hoàn tất.'
+              ).show();
+            } else {
+              const msg = (res && res.data && res.data.message) || (res && res.message) || 'Lỗi khi chuyển đổi giọng nói!';
+              $alert.removeClass('alert-info alert-success').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).show();
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Đổi Audio Mới');
+            let msg = 'Lỗi kết nối máy chủ khi chuyển đổi giọng nói!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $alert.removeClass('alert-info alert-success').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).show();
           }
         });
       });
@@ -7731,6 +7868,8 @@
         $('#modalChapterStoryTitleText').text(storyTitle);
         $('#wrapperSelectEditChapter').show();
         $('#selectEditChapter').html('<option value="">-- Đang nạp danh sách chương... --</option>');
+        $modal.data('story-id', storyId);
+        $('#editChapterStoryId').val(storyId);
 
         $modal.css('display', 'flex');
 
@@ -10229,116 +10368,8 @@
         }
       });
 
-      // 4. Bấm "Đổi Giờ Hẹn" trong Popup
-      $('#btnTriggerToggleChangeSchedule').off('click').on('click', function(e) {
-        e.preventDefault();
-        if (typeof window.muopToggleScheduleChangeForm === 'function') {
-          window.muopToggleScheduleChangeForm();
-        } else {
-          $('#scheduleChangeFormWrap').slideToggle(200);
-        }
-      });
-
-      $('#btnCancelToggleChangeSchedule').on('click', function(e) {
-        e.preventDefault();
-        $('#scheduleChangeFormWrap').slideUp(200);
-      });
-
-      // 5. Xác nhận lưu giờ hẹn mới từ Popup
-      $('#btnSubmitChangeScheduleTime').on('click', function(e) {
-        e.preventDefault();
-        const $modal = $('#modalScheduleStoryDetail');
-        const storyId = $modal.data('story-id');
-        const newTime = $('#inputQuickChangeScheduleTime').val();
-
-        if (!newTime) {
-          muopAlert('Vui lòng chọn thời gian hẹn giờ mới!', 'warning');
-          return;
-        }
-
-        const $btn = $(this);
-        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...');
-
-        $.ajax({
-          url: muopConfig.ajaxUrl,
-          type: 'POST',
-          data: {
-            action: 'muop_schedule_story',
-            nonce: muopConfig.nonce,
-            story_id: storyId,
-            scheduled_time: newTime
-          },
-          success: (res) => {
-            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Giờ Hẹn Mới');
-            if (typeof res === 'string') {
-              try { res = JSON.parse(res); } catch (e) {}
-            }
-            if (res && res.success) {
-              const data = res.data || {};
-              $('#scheduleModalDatetimeText').text(data.scheduled_formatted || newTime);
-              $('#scheduleChangeFormWrap').slideUp(200);
-              $modal.data('scheduled-time', data.scheduled_time || newTime);
-              self.startCountdown(data.scheduled_time || newTime);
-              muopAlert('Đã cập nhật giờ hẹn thành công!', 'success', () => {
-                window.location.reload();
-              });
-            } else {
-              muopAlert(getAjaxMsg(res, 'Không thể cập nhật giờ hẹn!'), 'error');
-            }
-          },
-          error: (xhr) => {
-            $btn.prop('disabled', false).html('<i class="fa-solid fa-check"></i> Lưu Giờ Hẹn Mới');
-            let err = 'Lỗi kết nối máy chủ!';
-            if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
-            muopAlert(err, 'error');
-          }
-        });
-      });
-
-      // 6. Đăng ngay bây giờ từ Popup
-      $('#btnPopupPublishScheduledNow').on('click', function(e) {
-        e.preventDefault();
-        const $modal = $('#modalScheduleStoryDetail');
-        const storyId = $modal.data('story-id');
-        if (!storyId) return;
-
-        muopConfirm('Bạn có chắc chắn muốn phát hành bộ truyện này ngay lập tức thay vì chờ đến giờ hẹn?', () => {
-          const $btn = $('#btnPopupPublishScheduledNow');
-          $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang đăng...');
-
-          $.ajax({
-            url: muopConfig.ajaxUrl,
-            type: 'POST',
-            data: {
-              action: 'muop_publish_draft',
-              nonce: muopConfig.nonce,
-              story_id: storyId
-            },
-            success: (res) => {
-              if (typeof res === 'string') {
-                try { res = JSON.parse(res); } catch (e) {}
-              }
-              if (res && res.success) {
-                muopAlert(getAjaxMsg(res, 'Đã phát hành truyện thành công!'), 'success', () => {
-                  window.location.reload();
-                });
-              } else {
-                $btn.prop('disabled', false).html('<i class="fa-solid fa-bolt"></i> Đăng Ngay');
-                muopAlert(getAjaxMsg(res, 'Lỗi đăng truyện!'), 'error');
-              }
-            },
-            error: (xhr) => {
-              $btn.prop('disabled', false).html('<i class="fa-solid fa-bolt"></i> Đăng Ngay');
-              let err = 'Lỗi kết nối!';
-              if (xhr && xhr.responseJSON) err = getAjaxMsg(xhr.responseJSON, err);
-              muopAlert(err, 'error');
-            }
-          });
-        });
-      });
-
-      // 7. Hủy hẹn giờ (về Bản Nháp)
-      $('#btnPopupCancelScheduleToDraft, .btn-cancel-schedule-action').on('click', function(e) {
+      // 4. Các nút tác vụ bên trong Popup modalScheduleStoryDetail đã được xử lý tự chủ trong templates/modal-schedule-story.php để đảm bảo không bị double-event.
+      $('.btn-cancel-schedule-action').on('click', function(e) {
         e.preventDefault();
         const storyId = $(this).data('story-id') || $('#modalScheduleStoryDetail').data('story-id');
         if (!storyId) return;

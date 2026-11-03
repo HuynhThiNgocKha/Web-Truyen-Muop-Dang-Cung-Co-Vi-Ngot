@@ -122,7 +122,7 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
                 <button type="button" class="btn btn-secondary btn-close-schedule-modal" onclick="window.muopCloseScheduleModal && window.muopCloseScheduleModal()" style="padding: 7px 16px; font-size: 13px;">
                     Đóng
                 </button>
-                <button type="button" id="btnTriggerToggleChangeSchedule" onclick="window.muopToggleScheduleChangeForm && window.muopToggleScheduleChangeForm(); return false;" class="btn btn-outline" style="padding: 7px 14px; font-size: 13px; color: #7c3aed; border-color: #c4b5fd;">
+                <button type="button" id="btnTriggerToggleChangeSchedule" class="btn btn-outline" style="padding: 7px 14px; font-size: 13px; color: #7c3aed; border-color: #c4b5fd;">
                     <i class="fa-solid fa-pen-to-square"></i> Đổi Giờ Hẹn
                 </button>
                 <button type="button" id="btnPopupCancelScheduleToDraft" class="btn btn-outline" style="padding: 7px 14px; font-size: 13px; color: #b45309; border-color: #fde68a;" title="Hủy hẹn giờ và chuyển truyện về mục Bản Nháp">
@@ -219,7 +219,14 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
         var isHidden = (formWrap.style.display === 'none' || window.getComputedStyle(formWrap).display === 'none');
         if (isHidden) {
             formWrap.style.display = 'block';
-            window.muopSyncPopupScheduleTime && window.muopSyncPopupScheduleTime();
+            var hiddenEl = document.getElementById('inputQuickChangeScheduleTime');
+            var nowTime = Date.now();
+            if (!hiddenEl || !hiddenEl.value || (new Date(hiddenEl.value.replace(/-/g, '/')).getTime() <= nowTime)) {
+                // Tự động gợi ý +1 giờ nếu thời gian đang ở quá khứ hoặc trống
+                window.muopSetPopupQuickSchedule && window.muopSetPopupQuickSchedule(1, null);
+            } else {
+                window.muopSyncPopupScheduleTime && window.muopSyncPopupScheduleTime();
+            }
             try {
                 formWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } catch(e) {}
@@ -383,6 +390,15 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
         alertEl.style.borderRadius = '6px';
         alertEl.style.fontSize = '13px';
         alertEl.innerHTML = (isError ? '<i class="fa-solid fa-triangle-exclamation"></i> ' : '<i class="fa-solid fa-circle-check"></i> ') + msg;
+    }
+
+    // Bật/tắt form đổi giờ hẹn
+    var btnToggleSched = document.getElementById('btnTriggerToggleChangeSchedule');
+    if (btnToggleSched) {
+        btnToggleSched.onclick = function(e) {
+            e.preventDefault();
+            window.muopToggleScheduleChangeForm();
+        };
     }
 
     // 1. Submit form đặt lịch / đổi giờ hẹn

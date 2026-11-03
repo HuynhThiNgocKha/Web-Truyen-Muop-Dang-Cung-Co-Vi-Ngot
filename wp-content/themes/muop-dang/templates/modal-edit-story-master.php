@@ -324,6 +324,7 @@ if (is_wp_error($all_genres)) $all_genres = array();
 
             <!-- Form Chỉnh Sửa Chương (khi đã chọn chương) -->
             <form id="formEditChapterFields" style="display: none;">
+                <input type="hidden" id="editChapterStoryId" name="story_id" value="" />
                 <input type="hidden" id="editChapterId" name="chapter_id" value="" />
                 <input type="hidden" id="editChapterIsDraftInput" name="is_draft" value="0" />
                 <input type="hidden" name="action" value="muop_update_chapter" />
@@ -363,6 +364,67 @@ if (is_wp_error($all_genres)) $all_genres = array();
                             <span style="font-size: 12px; color: var(--text-muted);"><span id="editChapterContentCharCount">0</span> ký tự</span>
                         </div>
                     </div>
+                <!-- Mục Quản Lý Audio & Voice Clone TTS Khi Chỉnh Sửa Chương -->
+                <div class="form-group" style="margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--border-color); margin-bottom: 18px;">
+                    <label class="form-label" style="font-weight: 700; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--primary-green); margin-bottom: 6px;">
+                        <i class="fa-solid fa-headphones"></i>
+                        <span>Audio Chương & Chuyển Giọng Nói (Bắt Chước Giọng Mẫu)</span>
+                    </label>
+
+                    <!-- Khung Audio hiện tại của chương (nếu có) -->
+                    <div id="editChapterAudioCurrentBox" style="display: none; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <span style="font-size: 13px; font-weight: 700; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-file-audio" style="color: #16a34a;"></i> Audio hiện tại:
+                            </span>
+                            <audio id="editChapterAudioCurrentEl" controls style="height: 32px; max-width: 280px;"></audio>
+                        </div>
+                        <button type="button" id="btnDeleteCurrentChapterAudio" class="btn btn-outline btn-xs" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11.5px;" title="Xóa audio cũ khỏi máy chủ">
+                            <i class="fa-solid fa-trash-can"></i> Xóa Audio Này
+                        </button>
+                    </div>
+
+                    <!-- Khung Chuyển đổi Văn Bản Sang Giọng Nói (Voice Clone TTS) -->
+                    <div style="background: var(--bg-card); border: 1.5px dashed #86efac; border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+                            <span style="font-weight: 700; font-size: 13px; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="color: #16a34a;"></i> Chuyển đổi văn bản thành audio mới (Bắt chước giọng mẫu):
+                            </span>
+                            <span class="badge" style="background: #16a34a; color: #fff; font-size: 10.5px; padding: 2px 6px; border-radius: 4px;">Tự chuyển đổi</span>
+                        </div>
+                        <p style="font-size: 11.5px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.5;">
+                            Khi chỉnh sửa văn bản, bạn có thể tải lên file giọng mẫu để chuyển đổi thành audio mới (audio mới sẽ chèn lên audio cũ và audio cũ trên máy chủ sẽ bị xóa hoàn toàn).
+                        </p>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; align-items: flex-end;">
+                            <div>
+                                <label class="form-label" for="editChapterRefVoiceFile" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Chọn file giọng mẫu (.mp3, .wav):</label>
+                                <input type="file" id="editChapterRefVoiceFile" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 5px 8px; font-size: 12px; height: 36px;" />
+                            </div>
+                            <div>
+                                <button type="button" id="btnConvertTtsInEditChapter" class="btn btn-primary" style="height: 36px; width: 100%; font-size: 12.5px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Đổi Audio Mới
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="editChapterTtsAlert" class="alert-box" style="display: none; margin-top: 10px; font-size: 12px; padding: 8px 12px;"></div>
+                    </div>
+
+                    <!-- Tải trực tiếp file Audio từ máy tính lên web -->
+                    <div style="margin-bottom: 4px;">
+                        <label class="form-label" for="editChapterUploadAudioDirect" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Hoặc tải trực tiếp file Audio từ máy tính lên web:
+                        </label>
+                        <input type="file" id="editChapterUploadAudioDirect" name="chapter_audio" class="form-input" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" style="padding: 5px 8px; font-size: 12px; height: 36px;" />
+                        <small style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 3px;">
+                            <i class="fa-solid fa-circle-check" style="color: #16a34a;"></i> Khi tải audio mới từ máy lên, file audio mới sẽ chèn lên file cũ và file cũ trên máy chủ sẽ bị xóa luôn.
+                        </small>
+                    </div>
+
+                    <!-- Inputs ẩn điều khiển audio -->
+                    <input type="hidden" id="editChapterAudioUrlHidden" name="chapter_audio_url" value="" />
+                    <input type="hidden" id="editChapterDeleteAudioHidden" name="delete_chapter_audio" value="0" />
                 </div>
 
                 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">

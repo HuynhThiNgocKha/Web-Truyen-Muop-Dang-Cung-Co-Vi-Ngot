@@ -4357,7 +4357,8 @@ function muop_ajax_get_chapter_data_handler() {
         'number'         => (int) $chapter_num,
         'title'          => $chapter->post_title,
         'content'        => $chapter->post_content,
-        'status'         => $chapter->post_status
+        'status'         => $chapter->post_status,
+        'audio_url'      => get_post_meta($chapter->ID, '_chuong_audio_url', true) ?: ''
     ));
 }
 
@@ -4543,6 +4544,28 @@ function muop_ajax_update_chapter_handler() {
     }
 
     update_post_meta($chapter_id, '_chuong_number', $chapter_num);
+
+    // Xử lý Audio khi chỉnh sửa chương (Tải file mới lên, nhận audio từ TTS, hoặc xóa audio)
+    $update_audio_url = '';
+    if (!empty($_FILES['chapter_audio']) && !empty($_FILES['chapter_audio']['name'])) {
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+        $upload = wp_handle_upload($_FILES['chapter_audio'], array('test_form' => false));
+        if ($upload && !isset($upload['error'])) {
+            $update_audio_url = $upload['url'];
+        }
+    } elseif (isset($_POST['chapter_audio_url'])) {
+        $update_audio_url = esc_url_raw(trim($_POST['chapter_audio_url']));
+    }
+
+    if (!empty($update_audio_url)) {
+        muop_delete_chapter_audio_file($chapter_id);
+        update_post_meta($chapter_id, '_chuong_audio_url', $update_audio_url);
+    } elseif (isset($_POST['delete_chapter_audio']) && $_POST['delete_chapter_audio'] === '1') {
+        muop_delete_chapter_audio_file($chapter_id);
+    }
+
     if ($story_id) {
         wp_update_post(array('ID' => $story_id)); // update story modified time
     }
@@ -7758,6 +7781,57 @@ function muop_ajax_get_story_audio_list_handler() {
     ));
 }
 
+/**
+ * Xóa file âm thanh vật lý trên máy chủ của chương truyện khi bị xóa hoặc tải file mới lên thay thế
+ */
+function muop_delete_chapter_audio_file($chapter_id) {
+    if (!$chapter_id) return;
+    $old_audio_url = get_post_meta($chapter_id, '_chuong_audio_url', true);
+    if (!$old_audio_url) {
+        $old_audio_url = get_post_meta($chapter_id, '_chapter_audio_url', true);
+    }
+    if (empty($old_audio_url)) return;
+
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+
+    // Trích xuất đường dẫn tương đối sau /wp-content/uploads/
+    $upload_pos = strpos($old_audio_url, '/wp-content/uploads/');
+    if ($upload_pos !== false) {
+        $rel_path = substr($old_audio_url, $upload_pos + strlen('/wp-content/uploads/'));
+        $rel_path = urldecode($rel_path);
+        $file_path = $base_dir . '/' . ltrim($rel_path, '/\\');
+        $file_path = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $file_path);
+        if (file_exists($file_path)) {
+            @unlink($file_path);
+        }
+    } elseif (strpos($old_audio_url, $upload_dir['baseurl']) === 0) {
+        $rel_path = substr($old_audio_url, strlen($upload_dir['baseurl']));
+        $file_path = $base_dir . '/' . ltrim($rel_path, '/\\');
+        $file_path = str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $file_path);
+        if (file_exists($file_path)) {
+            @unlink($file_path);
+        }
+    }
+
+    // Nếu file được đăng ký dưới dạng Media Attachment
+    global $wpdb;
+    $filename = basename(parse_url($old_audio_url, PHP_URL_PATH));
+    if (!empty($filename)) {
+        $attachment_id = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment' AND (guid LIKE %s OR guid = %s)",
+            '%' . $wpdb->esc_like($filename),
+            $old_audio_url
+        ));
+        if ($attachment_id > 0) {
+            wp_delete_attachment($attachment_id, true);
+        }
+    }
+
+    delete_post_meta($chapter_id, '_chuong_audio_url');
+    delete_post_meta($chapter_id, '_chapter_audio_url');
+}
+
 // 21.3 AJAX: Thêm/Sửa/Xóa Audio cho từng chương (Dịch giả & Admin)
 add_action('wp_ajax_muop_save_chapter_audio', 'muop_ajax_save_chapter_audio_handler');
 function muop_ajax_save_chapter_audio_handler() {
@@ -7783,11 +7857,11 @@ function muop_ajax_save_chapter_audio_handler() {
         wp_send_json_error(array('message' => 'Bạn không có quyền quản lý audio cho bộ truyện này!'));
     }
 
-    // Nếu là thao tác xóa Audio
+    // Nếu là thao tác xóa Audio: Xóa file vật lý trên đĩa
     if ($action_type === 'delete') {
-        delete_post_meta($chapter_id, '_chuong_audio_url');
+        muop_delete_chapter_audio_file($chapter_id);
         wp_send_json_success(array(
-            'message'    => 'Đã xóa audio của chương này thành công!',
+            'message'    => 'Đã xóa file audio của chương này khỏi máy chủ!',
             'chapter_id' => $chapter_id,
             'has_audio'  => false
         ));
@@ -7823,13 +7897,138 @@ function muop_ajax_save_chapter_audio_handler() {
         wp_send_json_error(array('message' => 'Vui lòng chọn file âm thanh để tải lên hoặc nhập đường dẫn audio trực tiếp!'));
     }
 
+    // Xóa file audio cũ trước khi cập nhật file mới
+    muop_delete_chapter_audio_file($chapter_id);
     update_post_meta($chapter_id, '_chuong_audio_url', $audio_url);
 
     wp_send_json_success(array(
-        'message'    => 'Đã cập nhật audio cho chương thành công!',
+        'message'    => 'Đã cập nhật audio cho chương thành công (file cũ đã được dọn sạch khỏi đĩa)!',
         'chapter_id' => $chapter_id,
         'audio_url'  => $audio_url,
         'has_audio'  => true
+    ));
+}
+
+// 21.3b AJAX: Chuyển văn bản thành giọng nói (Voice Clone TTS - Bắt chước giọng mẫu tải lên)
+add_action('wp_ajax_muop_convert_tts_chapter_audio', 'muop_ajax_convert_tts_chapter_audio_handler');
+function muop_ajax_convert_tts_chapter_audio_handler() {
+    $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '');
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5)!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện!'));
+    }
+
+    $story_id   = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    $chapter_id = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
+    $content = '';
+    if (!empty($_POST['content'])) {
+        $content = wp_unslash($_POST['content']);
+    } elseif (!empty($_POST['chapter_text'])) {
+        $content = wp_unslash($_POST['chapter_text']);
+    }
+    $speed = isset($_POST['speed']) ? floatval($_POST['speed']) : 1.0;
+    if ($speed < 0.5 || $speed > 2.0) $speed = 1.0;
+
+    $clean_content = trim(wp_strip_all_tags($content));
+    if (empty($clean_content) || mb_strlen($clean_content) < 5) {
+        wp_send_json_error(array('message' => 'Vui lòng nhập nội dung văn bản chương truyện trước khi chuyển đổi!'));
+    }
+
+    $current_uid = get_current_user_id();
+    $is_from_admin = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
+    if ($story_id > 0 && !muop_can_user_manage_story_action($story_id, $current_uid, $is_from_admin)) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền quản lý audio cho bộ truyện này!'));
+    }
+
+    // Xử lý file giọng đọc mẫu (Bắt buộc phải có giọng mẫu đưa lên để bắt chước)
+    $ref_audio_path = '';
+    $temp_ref_file = false;
+
+    $ref_file = null;
+    if (!empty($_FILES['reference_voice']) && !empty($_FILES['reference_voice']['name'])) {
+        $ref_file = $_FILES['reference_voice'];
+    } elseif (!empty($_FILES['ref_voice']) && !empty($_FILES['ref_voice']['name'])) {
+        $ref_file = $_FILES['ref_voice'];
+    }
+
+    if ($ref_file) {
+        $ext = strtolower(pathinfo($ref_file['name'], PATHINFO_EXTENSION));
+        $allowed = array('mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac');
+        if (!in_array($ext, $allowed)) {
+            wp_send_json_error(array('message' => 'Định dạng file giọng mẫu không hợp lệ! Vui lòng tải lên file âm thanh .mp3, .wav, .m4a.'));
+        }
+        $ref_audio_path = $ref_file['tmp_name'];
+    } elseif (!empty($_POST['sample_voice_url'])) {
+        $sample_url = esc_url_raw($_POST['sample_voice_url']);
+        $upload_dir = wp_upload_dir();
+        if (strpos($sample_url, $upload_dir['baseurl']) === 0) {
+            $ref_audio_path = $upload_dir['basedir'] . substr($sample_url, strlen($upload_dir['baseurl']));
+        }
+    }
+
+    if (empty($ref_audio_path) || !file_exists($ref_audio_path)) {
+        wp_send_json_error(array('message' => 'Vui lòng tải lên file âm thanh mẫu giọng đọc (.mp3, .wav) để hệ thống bắt chước giọng!'));
+    }
+
+    // Tạo thư mục lưu trữ wp-content/uploads/audio/
+    $upload_dir = wp_upload_dir();
+    $audio_dir = $upload_dir['basedir'] . '/audio';
+    if (!file_exists($audio_dir)) {
+        wp_mkdir_p($audio_dir);
+    }
+
+    $unique_suffix = time() . '_' . wp_generate_password(6, false);
+    $out_filename = 'tts_story_' . ($story_id ?: 'new') . '_chap_' . ($chapter_id ?: 'new') . '_' . $unique_suffix . '.mp3';
+    $output_file_path = $audio_dir . '/' . $out_filename;
+    $output_file_url  = $upload_dir['baseurl'] . '/audio/' . $out_filename;
+
+    // Ghi nội dung văn bản vào file tạm UTF-8
+    $temp_text_file = wp_tempnam('muop_tts_text_');
+    file_put_contents($temp_text_file, $clean_content);
+
+    // Đường dẫn script Python
+    $python_script = ABSPATH . 'utilities/voice_clone_tts.py';
+    if (!file_exists($python_script)) {
+        $python_script = dirname(__FILE__) . '/../../../utilities/voice_clone_tts.py';
+    }
+    $python_script = realpath($python_script);
+
+    if (!$python_script || !file_exists($python_script)) {
+        @unlink($temp_text_file);
+        wp_send_json_error(array('message' => 'Không tìm thấy công cụ Voice Clone TTS trên máy chủ!'));
+    }
+
+    // Thực thi lệnh Python
+    $cmd = 'python ' . escapeshellarg($python_script)
+         . ' --text-file ' . escapeshellarg($temp_text_file)
+         . ' --ref-audio ' . escapeshellarg($ref_audio_path)
+         . ' --output ' . escapeshellarg($output_file_path)
+         . ' --speed ' . escapeshellarg(strval($speed));
+
+    $output_str = shell_exec($cmd . ' 2>&1');
+    @unlink($temp_text_file);
+
+    $json_res = json_decode($output_str, true);
+
+    if (!$json_res || empty($json_res['success']) || !file_exists($output_file_path)) {
+        $err = ($json_res && !empty($json_res['error'])) ? $json_res['error'] : $output_str;
+        wp_send_json_error(array('message' => 'Lỗi chuyển đổi giọng nói: ' . $err));
+    }
+
+    // QUY TẮC: Chèn lên file cũ VÀ xóa file cũ hoàn toàn khỏi đĩa nếu đã có chapter_id
+    if ($chapter_id > 0) {
+        muop_delete_chapter_audio_file($chapter_id);
+        update_post_meta($chapter_id, '_chuong_audio_url', $output_file_url);
+    }
+
+    wp_send_json_success(array(
+        'message'       => 'Chuyển đổi văn bản thành giọng nói thành công (đã bắt chước đúng giọng mẫu)!',
+        'audio_url'     => $output_file_url,
+        'chapter_id'    => $chapter_id,
+        'duration'      => isset($json_res['duration']) ? $json_res['duration'] : 0,
+        'voice_profile' => isset($json_res['voice_profile']) ? $json_res['voice_profile'] : null
     ));
 }
 

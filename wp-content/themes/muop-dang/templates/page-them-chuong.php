@@ -243,6 +243,36 @@ if ($selected_story_id) {
                         </div>
                     </div>
 
+                    <!-- Chuyển đổi Văn Bản Sang Giọng Nói (Bắt chước giọng mẫu) -->
+                    <div style="margin-top: 14px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: var(--radius-sm); padding: 14px 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                            <span style="font-weight: 700; font-size: 13.5px; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-wand-magic-sparkles" style="color: #16a34a;"></i> Chuyển Văn Bản Thành Giọng Nói (Bắt Chước Giọng Mẫu):
+                            </span>
+                            <span class="badge" style="background: #16a34a; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 4px;">Voice Clone</span>
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.5;">
+                            Tải lên 1 file âm thanh mẫu (.mp3, .wav) để hệ thống phân tích và bắt chước giọng đọc đó cho nội dung chương ở trên. File audio mới tạo sẽ trở thành audio của chương này (người dịch bấm chuyển đổi chủ động, không ép tự động).
+                        </p>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; align-items: flex-end;">
+                            <div>
+                                <label class="form-label" for="inputTtsReferenceVoice" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+                                    Chọn file giọng đọc mẫu (.mp3, .wav):
+                                </label>
+                                <input type="file" id="inputTtsReferenceVoice" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 6px 10px; font-size: 12.5px; height: 38px;" />
+                            </div>
+
+                            <div>
+                                <button type="button" id="btnTriggerTtsConvert" class="btn btn-primary" style="height: 38px; width: 100%; font-size: 13px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Sang Giọng Nói
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="ttsConvertStatusBox" class="alert-box" style="display: none; margin-top: 10px; font-size: 12.5px; padding: 8px 12px;"></div>
+                    </div>
+
                     <!-- Audio Preview Player -->
                     <div id="chapterAudioPreviewWrap" style="display: none; margin-top: 12px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); align-items: center; gap: 12px; flex-wrap: wrap;">
                         <span style="font-size: 13px; font-weight: 600; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
@@ -289,6 +319,117 @@ if ($selected_story_id) {
                 }
                 if (wrap) wrap.style.display = 'none';
             };
+
+            // Bắt sự kiện bấm chuyển đổi Voice Clone TTS
+            (function() {
+                var btnConvert = document.getElementById('btnTriggerTtsConvert');
+                if (!btnConvert) return;
+
+                btnConvert.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var contentEl = document.getElementById('chapterContent');
+                    var refFileEl = document.getElementById('inputTtsReferenceVoice');
+                    var statusBox = document.getElementById('ttsConvertStatusBox');
+                    var storySelect = document.getElementById('selectStory');
+
+                    var contentText = contentEl ? contentEl.value.trim() : '';
+                    if (!contentText || contentText.length < 5) {
+                        if (statusBox) {
+                            statusBox.style.display = 'block';
+                            statusBox.className = 'alert-box alert-error';
+                            statusBox.style.background = '#fef2f2';
+                            statusBox.style.color = '#991b1b';
+                            statusBox.style.border = '1px solid #fecaca';
+                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Vui lòng nhập nội dung văn bản chương truyện ở trên trước khi chuyển đổi!';
+                        }
+                        return;
+                    }
+
+                    if (!refFileEl || !refFileEl.files || !refFileEl.files[0]) {
+                        if (statusBox) {
+                            statusBox.style.display = 'block';
+                            statusBox.className = 'alert-box alert-error';
+                            statusBox.style.background = '#fef2f2';
+                            statusBox.style.color = '#991b1b';
+                            statusBox.style.border = '1px solid #fecaca';
+                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Vui lòng chọn 1 file âm thanh mẫu giọng đọc (.mp3, .wav) để hệ thống bắt chước!';
+                        }
+                        return;
+                    }
+
+                    var storyId = storySelect ? storySelect.value : '<?php echo esc_js($story_id_param); ?>';
+
+                    var origHtml = btnConvert.innerHTML;
+                    btnConvert.disabled = true;
+                    btnConvert.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích giọng & chuyển đổi...';
+
+                    if (statusBox) {
+                        statusBox.style.display = 'block';
+                        statusBox.className = 'alert-box alert-info';
+                        statusBox.style.background = '#eff6ff';
+                        statusBox.style.color = '#1e40af';
+                        statusBox.style.border = '1px solid #bfdbfe';
+                        statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hệ thống đang trích xuất cao độ, âm sắc giọng mẫu và tổng hợp audio chương... Quá trình này có thể mất 5 - 15 giây tùy độ dài văn bản.';
+                    }
+
+                    var fd = new FormData();
+                    fd.append('action', 'muop_convert_tts_chapter_audio');
+                    fd.append('nonce', (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '');
+                    fd.append('story_id', storyId || 0);
+                    fd.append('chapter_id', 0);
+                    fd.append('content', contentText);
+                    fd.append('reference_voice', refFileEl.files[0]);
+
+                    var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
+
+                    fetch(ajaxUrl, {
+                        method: 'POST',
+                        body: fd
+                    })
+                    .then(function(r) { return r.json(); })
+                    .then(function(res) {
+                        btnConvert.disabled = false;
+                        btnConvert.innerHTML = origHtml;
+                        if (res.success && res.data && res.data.audio_url) {
+                            var audioUrl = res.data.audio_url;
+                            var urlInput = document.getElementById('inputChapterAudioUrl');
+                            if (urlInput) urlInput.value = audioUrl;
+
+                            // Preview audio
+                            window.muopPreviewChapterAudioUrl(audioUrl);
+
+                            if (statusBox) {
+                                statusBox.className = 'alert-box alert-success';
+                                statusBox.style.background = '#f0fdf4';
+                                statusBox.style.color = '#166534';
+                                statusBox.style.border = '1px solid #bbf7d0';
+                                var profInfo = res.data.voice_profile ? (' (Cao độ: ' + res.data.voice_profile.pitch_hz + 'Hz)') : '';
+                                statusBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> Chuyển đổi thành công! Giọng đọc đã bắt chước theo mẫu' + profInfo + '. Audio này sẽ được lưu cùng chương khi bạn bấm "Thêm Chương Mới".';
+                            }
+                        } else {
+                            if (statusBox) {
+                                statusBox.className = 'alert-box alert-error';
+                                statusBox.style.background = '#fef2f2';
+                                statusBox.style.color = '#991b1b';
+                                statusBox.style.border = '1px solid #fecaca';
+                                var msg = (res.data && res.data.message) ? res.data.message : 'Có lỗi xảy ra khi chuyển đổi giọng nói!';
+                                statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + msg;
+                            }
+                        }
+                    })
+                    .catch(function(err) {
+                        btnConvert.disabled = false;
+                        btnConvert.innerHTML = origHtml;
+                        if (statusBox) {
+                            statusBox.className = 'alert-box alert-error';
+                            statusBox.style.background = '#fef2f2';
+                            statusBox.style.color = '#991b1b';
+                            statusBox.style.border = '1px solid #fecaca';
+                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Lỗi kết nối máy chủ. Vui lòng thử lại!';
+                        }
+                    });
+                });
+            })();
             </script>
 
             <input type="hidden" name="is_draft" id="isChapterDraftInput" value="0" />

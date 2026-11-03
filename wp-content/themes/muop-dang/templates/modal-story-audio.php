@@ -8,12 +8,60 @@ if (defined('MUOP_MODAL_STORY_AUDIO_LOADED')) return;
 define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
 ?>
 
-<!-- 1. MODAL TRÌNH PHÁT AUDIO TRUYỆN (DÀNH CHO TẤT CẢ ĐỘC GIẢ) -->
+<!-- CSS Responsive Cho Modal Quản Lý Audio & Trình Phát Hình 3 -->
+<style>
+.manage-audio-form-grid {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.muop-fig3-popup-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.05);
+}
+@media (max-width: 640px) {
+    .manage-audio-form-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+    #modalManageStoryAudio .custom-modal-content,
+    #modalStoryAudioPlayer .custom-modal-content {
+        margin: 8px !important;
+        max-height: 96vh !important;
+        width: 95% !important;
+    }
+    .modal-audio-body {
+        padding: 12px 14px !important;
+    }
+    #manageAudioFileInput {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .manage-audio-table-wrap {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    .manage-audio-table {
+        min-width: 480px !important;
+    }
+    .muop-fig3-popup-card {
+        padding: 14px 12px !important;
+    }
+}
+</style>
+
+<!-- 1. MODAL TRÌNH PHÁT AUDIO TRUYỆN (DÀNH CHO TẤT CẢ ĐỘC GIẢ - HÌNH 3 MÀU XANH LÁ) -->
 <div id="modalStoryAudioPlayer" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 999998; align-items: center; justify-content: center; padding: 16px;">
-    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 580px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1.5px solid #0284c7; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 580px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1.5px solid #16a34a; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
         
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;">
+        <!-- Header màu xanh lá -->
+        <div style="background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 18px;">
                     <i class="fa-solid fa-headphones"></i>
@@ -33,59 +81,66 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
         </div>
 
         <!-- Body -->
-        <div style="padding: 20px; overflow-y: auto; flex: 1;">
-            <!-- Khung Audio Đang Phát Hiện Tại -->
-            <div style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #bae6fd; border-radius: var(--radius-md); padding: 18px; text-align: center; margin-bottom: 20px; box-shadow: inset 0 1px 3px rgba(2, 132, 199, 0.08);">
-                <div style="font-size: 11.5px; color: #0284c7; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-                    <i class="fa-solid fa-music"></i> Đang phát:
-                </div>
-                <div id="playerCurrentChapterTitle" style="font-size: 17px; font-weight: 800; color: #0369a1; margin-bottom: 12px; line-height: 1.4;">
-                    Chưa chọn chương audio
+        <div class="modal-audio-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+            <!-- Thẻ Card Figure 3 Trắng Bo Góc màu Xanh Lá -->
+            <div class="muop-fig3-popup-card">
+                <div style="font-size: 12.5px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-headphones" style="font-size: 14px;"></i>
+                    <span>AUDIO ĐANG PHÁT</span>
                 </div>
 
                 <!-- Thẻ audio HTML5 ẩn để điều khiển -->
                 <audio id="mainStoryHtmlAudio" preload="metadata" style="display: none;"></audio>
 
-                <!-- Thanh tua thời gian (Seekbar) -->
-                <div style="margin-bottom: 10px;">
-                    <input type="range" id="audioPlayerSeekBar" min="0" max="100" value="0" style="width: 100%; accent-color: #0284c7; cursor: pointer;" />
-                    <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: #0369a1; font-weight: 600; margin-top: 4px;">
-                        <span id="audioPlayerCurrentTime">00:00</span>
-                        <span id="audioPlayerDuration">--:--</span>
-                    </div>
+                <!-- Nút to màu xanh lá theo Hình 3 -->
+                <button type="button" id="btnAudioPlayerPlayPause" style="width: 100%; height: 52px; border-radius: 12px; background: #16a34a; color: #ffffff; font-size: 15.5px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3); transition: all 0.2s ease;">
+                    <i class="fa-solid fa-volume-high" id="playerMainIcon" style="font-size: 18px;"></i>
+                    <span id="playerCurrentChapterTitle">Chưa chọn chương audio</span>
+                </button>
+
+                <!-- Hàng chuyển tiếp chương (Chương trước / Chương tiếp theo) -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; gap: 8px;">
+                    <button type="button" id="btnAudioPlayerPrev" class="btn btn-outline btn-sm" style="border-radius: 8px; font-size: 12px; color: #16a34a; border-color: #86efac; font-weight: 600; padding: 4px 12px;" title="Chương audio trước">
+                        <i class="fa-solid fa-backward-step"></i> Chương trước
+                    </button>
+                    <button type="button" id="btnAudioPlayerNext" class="btn btn-outline btn-sm" style="border-radius: 8px; font-size: 12px; color: #16a34a; border-color: #86efac; font-weight: 600; padding: 4px 12px;" title="Chương audio tiếp theo">
+                        Chương tiếp theo <i class="fa-solid fa-forward-step"></i>
+                    </button>
                 </div>
 
-                <!-- Nút điều khiển phát nhạc -->
-                <div style="display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: 14px;">
-                    <!-- Nút bài trước -->
-                    <button type="button" id="btnAudioPlayerPrev" class="btn btn-outline" style="width: 36px; height: 36px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-color: #7dd3fc; color: #0284c7;" title="Chương audio trước">
-                        <i class="fa-solid fa-backward-step"></i>
-                    </button>
+                <!-- Thanh tua thời gian (Seekbar) -->
+                <div style="display: flex; align-items: center; gap: 12px; margin: 12px 0 8px 0;">
+                    <span id="audioPlayerCurrentTime" style="font-size: 13px; font-weight: 700; color: #4b5563; min-width: 42px;">00:00</span>
+                    <div style="flex: 1; position: relative; display: flex; align-items: center;">
+                        <input type="range" id="audioPlayerSeekBar" min="0" max="100" value="0" style="width: 100%; accent-color: #16a34a; cursor: pointer; height: 6px; border-radius: 3px;" />
+                    </div>
+                    <span id="audioPlayerDuration" style="font-size: 13px; font-weight: 700; color: #4b5563; min-width: 42px; text-align: right;">00:00</span>
+                </div>
 
-                    <!-- Nút Play/Pause chính -->
-                    <button type="button" id="btnAudioPlayerPlayPause" style="width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #0284c7, #0369a1); border: none; color: #fff; font-size: 20px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4); transition: transform 0.15s ease;" title="Phát / Tạm dừng">
-                        <i class="fa-solid fa-play" style="margin-left: 2px;"></i>
-                    </button>
-
-                    <!-- Nút bài tiếp -->
-                    <button type="button" id="btnAudioPlayerNext" class="btn btn-outline" style="width: 36px; height: 36px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-color: #7dd3fc; color: #0284c7;" title="Chương audio tiếp theo">
-                        <i class="fa-solid fa-forward-step"></i>
-                    </button>
-
-                    <!-- Tốc độ đọc (0.75x, 1x, 1.25x, 1.5x) -->
-                    <button type="button" id="btnAudioPlayerSpeed" class="btn btn-outline" style="height: 32px; padding: 0 10px; font-size: 11.5px; font-weight: 700; border-radius: var(--radius-full); border-color: #bae6fd; color: #0369a1;" title="Đổi tốc độ phát">
-                        1.0x
-                    </button>
+                <!-- Thanh trạng thái & Tốc độ phát -->
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; margin-top: 4px;">
+                    <span id="audioPlayerStatusText" style="font-weight: 700; color: #4b5563;">Sẵn sàng phát</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 13px; color: #4b5563; font-weight: 600;">Tốc độ</span>
+                        <select id="playerSpeedSelect" style="border: 1px solid #d1d5db; border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 700; background: #fff; color: #111827; cursor: pointer; outline: none;">
+                            <option value="0.75">0.75x</option>
+                            <option value="1.0" selected>1.0x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="1.75">1.75x</option>
+                            <option value="2.0">2.0x</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <!-- Danh Sách Phát Các Chương Có Audio -->
+            <!-- Danh Sách Phát Các Chương Có Audio (Chương 1, 2, 3, 4...) -->
             <div>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                     <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-color); margin: 0; display: flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-list-ul" style="color: #0284c7;"></i> Danh Sách Chương Có Audio:
+                        <i class="fa-solid fa-list-ul" style="color: #16a34a;"></i> Danh Sách Chương Có Audio:
                     </h4>
-                    <span id="playerAudioCountBadge" class="badge" style="background: #e0f2fe; color: #0284c7; font-size: 11.5px; padding: 3px 8px; border-radius: var(--radius-full); font-weight: 700;">
+                    <span id="playerAudioCountBadge" class="badge" style="background: #dcfce7; color: #15803d; font-size: 11.5px; padding: 3px 8px; border-radius: var(--radius-full); font-weight: 700;">
                         0 chương
                     </span>
                 </div>
@@ -93,7 +148,7 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
                 <div id="playerPlaylistContainer" style="display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; padding-right: 4px;">
                     <!-- Danh sách chương audio được nạp bằng JavaScript -->
                     <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
-                        <i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #0284c7;"></i> Đang tải danh sách audio...
+                        <i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #16a34a;"></i> Đang tải danh sách audio...
                     </div>
                 </div>
             </div>
@@ -102,7 +157,7 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
         <!-- Footer -->
         <div style="border-top: 1px solid var(--border-color); padding: 12px 20px; background: var(--bg-body); display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 12px; color: var(--text-muted);">
-                <i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Tự động chuyển chương audio tiếp theo
+                <i class="fa-solid fa-circle-check" style="color: #16a34a;"></i> Tự động chuyển chương audio tiếp theo (Chương 2, 3, 4...)
             </span>
             <button type="button" class="btn btn-secondary btn-sm" onclick="window.muopCloseAudioPlayerModal && window.muopCloseAudioPlayerModal()">
                 Đóng
@@ -111,12 +166,12 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
     </div>
 </div>
 
-<!-- 2. MODAL QUẢN LÝ & THÊM AUDIO CHO TRUYỆN (DÀNH CHO DỊCH GIẢ & ADMIN) -->
+<!-- 2. MODAL QUẢN LÝ & THÊM AUDIO CHO TRUYỆN (DÀNH CHO DỊCH GIẢ & ADMIN - TỐI ƯU MOBILE) -->
 <div id="modalManageStoryAudio" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
-    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 680px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1.5px solid #0284c7; overflow: hidden; display: flex; flex-direction: column; max-height: 92vh;">
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 680px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1.5px solid #16a34a; overflow: hidden; display: flex; flex-direction: column; max-height: 92vh;">
         
         <!-- Header -->
-        <div style="background: linear-gradient(135deg, #0284c7, #075985); color: #fff; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 18px;">
                     <i class="fa-solid fa-file-audio"></i>
@@ -136,10 +191,10 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
         </div>
 
         <!-- Body -->
-        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+        <div class="modal-audio-body" style="padding: 20px; overflow-y: auto; flex: 1;">
             <div id="manageAudioAlert" class="alert-box" style="display: none; margin-bottom: 16px;"></div>
 
-            <!-- Khung Thêm / Cập Nhật Audio Nhanh Theo Chương -->
+            <!-- Khung Thêm / Cập Nhật Audio Nhanh Theo Chương (Tự động 1 cột trên Mobile) -->
             <div style="background: var(--pastel-green, #f0fdf4); border: 1.5px solid var(--border-color, #bbf7d0); border-radius: var(--radius-md); padding: 16px 18px; margin-bottom: 20px;">
                 <h4 style="font-size: 14px; font-weight: 700; color: var(--primary-green, #166534); margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
                     <i class="fa-solid fa-cloud-arrow-up"></i> Tải Lên / Cập Nhật Audio Cho Chương:
@@ -148,17 +203,17 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
                 <form id="formQuickUploadChapterAudio" enctype="multipart/form-data">
                     <input type="hidden" id="manageAudioStoryId" value="" />
                     
-                    <div style="display: grid; grid-template-columns: 180px 1fr; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+                    <div class="manage-audio-form-grid">
                         <div>
                             <label class="form-label" for="manageAudioSelectChapter" style="font-size: 12.5px; font-weight: 700;">Chọn Chương (*):</label>
-                            <select id="manageAudioSelectChapter" class="form-input" style="height: 38px; font-size: 13px;" required>
+                            <select id="manageAudioSelectChapter" class="form-input" style="height: 38px; font-size: 13px; width: 100%; box-sizing: border-box;" required>
                                 <option value="">-- Chọn chương --</option>
                             </select>
                         </div>
 
                         <div>
                             <label class="form-label" for="manageAudioFileInput" style="font-size: 12.5px; font-weight: 700;">Chọn File Audio (.mp3, .m4a, .wav):</label>
-                            <input type="file" id="manageAudioFileInput" name="audio_file" class="form-input" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" style="padding: 6px 10px; font-size: 12.5px; height: 38px;" />
+                            <input type="file" id="manageAudioFileInput" name="audio_file" class="form-input" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" style="padding: 6px 10px; font-size: 12.5px; height: 38px; width: 100%; box-sizing: border-box;" />
                         </div>
                     </div>
 
@@ -168,22 +223,22 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; gap: 8px;">
-                        <button type="submit" id="btnSubmitSaveChapterAudio" class="btn btn-primary" style="padding: 7px 18px; font-size: 13px;">
+                        <button type="submit" id="btnSubmitSaveChapterAudio" class="btn btn-primary" style="padding: 7px 18px; font-size: 13px; background: #16a34a; border-color: #15803d;">
                             <i class="fa-solid fa-floppy-disk"></i> Lưu Audio Chương Này
                         </button>
                     </div>
                 </form>
             </div>
 
-            <!-- Bảng Danh Sách Toàn Bộ Chương & Trạng Thái Audio -->
+            <!-- Bảng Danh Sách Toàn Bộ Chương & Trạng Thái Audio (Cuộn ngang êm ái trên Mobile) -->
             <div>
                 <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-color); margin: 0 0 10px 0; display: flex; align-items: center; justify-content: space-between;">
-                    <span><i class="fa-solid fa-table-list" style="color: #0284c7;"></i> Trạng Thái Audio Từng Chương:</span>
+                    <span><i class="fa-solid fa-table-list" style="color: #16a34a;"></i> Trạng Thái Audio Từng Chương:</span>
                     <span id="manageAudioStatsSummary" style="font-size: 12px; color: var(--text-muted); font-weight: normal;">Đang nạp...</span>
                 </h4>
 
-                <div class="table-responsive" style="max-height: 280px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
-                    <table class="data-table" style="width: 100%; margin: 0; font-size: 12.5px;">
+                <div class="table-responsive manage-audio-table-wrap" style="max-height: 280px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                    <table class="data-table manage-audio-table" style="width: 100%; margin: 0; font-size: 12.5px;">
                         <thead style="position: sticky; top: 0; background: var(--bg-body); z-index: 2;">
                             <tr>
                                 <th style="width: 70px; text-align: center;">Chương</th>
@@ -196,7 +251,7 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
                         <tbody id="manageAudioTableBody">
                             <tr>
                                 <td colspan="5" style="text-align: center; padding: 25px; color: var(--text-muted);">
-                                    <i class="fa-solid fa-spinner fa-spin"></i> Đang nạp danh sách chương...
+                                    <i class="fa-solid fa-spinner fa-spin" style="color: #16a34a;"></i> Đang nạp danh sách chương...
                                 </td>
                             </tr>
                         </tbody>
@@ -256,8 +311,12 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
     }
 
     // =========================================================================
-    // 1. TRÌNH PHÁT AUDIO PLAYER
+    // 1. TRÌNH PHÁT AUDIO PLAYER (HÌNH 3 MÀU XANH LÁ)
     // =========================================================================
+    var speedSelectEl = document.getElementById('playerSpeedSelect');
+    var statusTextEl = document.getElementById('audioPlayerStatusText');
+    var mainIconEl = document.getElementById('playerMainIcon');
+
     function playTrackIndex(idx) {
         if (!currentAudioList || !currentAudioList[idx]) return;
         currentPlayingIndex = idx;
@@ -265,18 +324,35 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
 
         var titleEl = document.getElementById('playerCurrentChapterTitle');
         if (titleEl) titleEl.textContent = 'Chương ' + track.chapter_num + ': ' + track.title;
+        if (statusTextEl) statusTextEl.textContent = 'Đang phát...';
+
         if (audioElement) {
             audioElement.src = track.audio_url;
-            audioElement.playbackRate = speeds[currentSpeedIndex];
+            var curRate = speedSelectEl ? parseFloat(speedSelectEl.value) : 1.0;
+            audioElement.playbackRate = curRate || 1.0;
             audioElement.play().then(function() {
-                if (btnPlayPause) btnPlayPause.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                if (mainIconEl) mainIconEl.className = 'fa-solid fa-pause';
+                if (btnPlayPause) btnPlayPause.style.background = '#15803d';
                 logAudioListen(currentStoryId, track.id, track.chapter_num);
             }).catch(function(e) {
-                if (btnPlayPause) btnPlayPause.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 2px;"></i>';
+                if (mainIconEl) mainIconEl.className = 'fa-solid fa-volume-high';
+                if (btnPlayPause) btnPlayPause.style.background = '#16a34a';
             });
         }
 
+        updateNavButtons();
         renderPlayerPlaylist();
+    }
+
+    function updateNavButtons() {
+        if (btnPrev) {
+            btnPrev.disabled = (currentPlayingIndex <= 0);
+            btnPrev.style.opacity = (currentPlayingIndex <= 0) ? '0.5' : '1';
+        }
+        if (btnNext) {
+            btnNext.disabled = (currentPlayingIndex + 1 >= currentAudioList.length);
+            btnNext.style.opacity = (currentPlayingIndex + 1 >= currentAudioList.length) ? '0.5' : '1';
+        }
     }
 
     function renderPlayerPlaylist() {
@@ -291,10 +367,10 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
         var html = '';
         currentAudioList.forEach(function(item, idx) {
             var isCurrent = (idx === currentPlayingIndex);
-            var itemBg = isCurrent ? '#e0f2fe' : 'var(--bg-card)';
-            var itemBorder = isCurrent ? '1.5px solid #0284c7' : '1px solid var(--border-color)';
-            var titleColor = isCurrent ? '#0369a1' : 'var(--text-color)';
-            var icon = isCurrent ? '<i class="fa-solid fa-volume-high" style="color: #0284c7;"></i>' : '<i class="fa-regular fa-circle-play" style="color: var(--text-muted);"></i>';
+            var itemBg = isCurrent ? '#dcfce7' : 'var(--bg-card)';
+            var itemBorder = isCurrent ? '1.5px solid #16a34a' : '1px solid var(--border-color)';
+            var titleColor = isCurrent ? '#15803d' : 'var(--text-color)';
+            var icon = isCurrent ? '<i class="fa-solid fa-volume-high" style="color: #16a34a;"></i>' : '<i class="fa-regular fa-circle-play" style="color: var(--text-muted);"></i>';
 
             html += '<div onclick="window.muopPlayAudioIndex(' + idx + ')" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: ' + itemBg + '; border: ' + itemBorder + '; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s ease;">' +
                 '<div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">' +
@@ -305,8 +381,8 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
                     '</div>' +
                 '</div>' +
                 '<div style="display: flex; align-items: center; gap: 8px;">' +
-                    (item.audio_views > 0 ? '<span style="font-size: 11px; color: var(--text-muted); white-space: nowrap;"><i class="fa-solid fa-headphones"></i> ' + Number(item.audio_views).toLocaleString() + '</span>' : '') +
-                    (isCurrent ? '<span class="badge" style="background: #0284c7; color: #fff; font-size: 10.5px; padding: 2px 6px; border-radius: 4px;">Đang phát</span>' : '') +
+                    (item.audio_views > 0 ? '<span style="font-size: 11px; color: var(--text-muted); white-space: nowrap;"><i class="fa-solid fa-headphones" style="color: #16a34a;"></i> ' + Number(item.audio_views).toLocaleString() + '</span>' : '') +
+                    (isCurrent ? '<span class="badge" style="background: #16a34a; color: #fff; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Đang phát</span>' : '<span style="font-size: 11.5px; color: #16a34a; font-weight: 600;">Phát <i class="fa-solid fa-play" style="font-size: 10px;"></i></span>') +
                 '</div>' +
             '</div>';
         });
@@ -382,20 +458,29 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
         });
 
         audioElement.addEventListener('ended', function() {
-            // Tự chuyển chương tiếp theo
+            // Tự động chuyển tiếp sang chương kế tiếp (Chương 2, 3, 4...)
             if (currentPlayingIndex + 1 < currentAudioList.length) {
-                playTrackIndex(currentPlayingIndex + 1);
+                if (statusTextEl) statusTextEl.textContent = 'Đang chuyển tiếp sang chương kế tiếp...';
+                setTimeout(function() {
+                    playTrackIndex(currentPlayingIndex + 1);
+                }, 800);
             } else {
-                if (btnPlayPause) btnPlayPause.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 2px;"></i>';
+                if (mainIconEl) mainIconEl.className = 'fa-solid fa-rotate-right';
+                if (statusTextEl) statusTextEl.textContent = 'Đã nghe hết tất cả chương!';
+                if (btnPlayPause) btnPlayPause.style.background = '#16a34a';
             }
         });
 
         audioElement.addEventListener('play', function() {
-            if (btnPlayPause) btnPlayPause.innerHTML = '<i class="fa-solid fa-pause"></i>';
+            if (mainIconEl) mainIconEl.className = 'fa-solid fa-pause';
+            if (statusTextEl) statusTextEl.textContent = 'Đang phát...';
+            if (btnPlayPause) btnPlayPause.style.background = '#15803d';
         });
 
         audioElement.addEventListener('pause', function() {
-            if (btnPlayPause) btnPlayPause.innerHTML = '<i class="fa-solid fa-play" style="margin-left: 2px;"></i>';
+            if (mainIconEl) mainIconEl.className = 'fa-solid fa-volume-high';
+            if (statusTextEl) statusTextEl.textContent = 'Đã tạm dừng';
+            if (btnPlayPause) btnPlayPause.style.background = '#16a34a';
         });
     }
 
@@ -437,12 +522,10 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
         });
     }
 
-    if (btnSpeed && audioElement) {
-        btnSpeed.addEventListener('click', function() {
-            currentSpeedIndex = (currentSpeedIndex + 1) % speeds.length;
-            var sp = speeds[currentSpeedIndex];
+    if (speedSelectEl && audioElement) {
+        speedSelectEl.addEventListener('change', function() {
+            var sp = parseFloat(this.value) || 1.0;
             audioElement.playbackRate = sp;
-            btnSpeed.textContent = sp.toFixed(2).replace(/\.00$/, '.0') + 'x';
         });
     }
 
