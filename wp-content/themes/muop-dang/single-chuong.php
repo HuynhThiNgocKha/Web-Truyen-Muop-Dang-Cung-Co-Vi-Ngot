@@ -117,16 +117,16 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
         <?php endif; ?>
  
         <!-- Audio Player Chương Này (Hình 1 & 5) -->
-        <!-- Audio Player Chương Này (Hình 3 màu Xanh Lá) -->
-        <?php if (!empty($chapter_audio_url)) : ?>
-            <div class="muop-fig3-audio-card" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 18px 22px; margin-bottom: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.05);">
+        <!-- Audio Player Chương Này (Hình 3 màu Xanh Lá - Nhỏ Gọn & Thanh Lịch) -->
+        <?php if (!empty($chapter_audio_url) && trim($chapter_audio_url) !== '') : ?>
+            <div class="muop-fig3-audio-card" style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px 16px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.04);">
                 <!-- Header -->
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-                    <div style="font-size: 13px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
-                        <i class="fa-solid fa-headphones" style="font-size: 15px; color: #6b7280;"></i>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <div style="font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-headphones" style="font-size: 13.5px; color: #16a34a;"></i>
                         <span>AUDIO CHƯƠNG NÀY</span>
                     </div>
-                    <button type="button" onclick="window.muopOpenStoryAudioPlayer && window.muopOpenStoryAudioPlayer(<?php echo intval($story_id); ?>, '<?php echo esc_js($story_title); ?>', <?php echo intval($chapter_id); ?>)" style="background: none; border: none; font-size: 12px; color: #16a34a; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <button type="button" onclick="window.muopOpenStoryAudioPlayer && window.muopOpenStoryAudioPlayer(<?php echo intval($story_id); ?>, '<?php echo esc_js($story_title); ?>', <?php echo intval($chapter_id); ?>)" style="background: none; border: none; font-size: 11.5px; color: #16a34a; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px;">
                         <i class="fa-solid fa-list-ul"></i> Toàn bộ audio truyện
                     </button>
                 </div>
@@ -134,27 +134,27 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 <!-- Thẻ audio ẩn -->
                 <audio id="currentChapterAudioEl" src="<?php echo esc_url($chapter_audio_url); ?>" preload="metadata" style="display: none;"></audio>
 
-                <!-- Nút lớn màu xanh lá theo Hình 3 -->
-                <button type="button" id="btnPlayCurrentChapterAudio" style="width: 100%; height: 52px; border-radius: 12px; background: #16a34a; color: #ffffff; font-size: 16px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3); transition: all 0.2s ease;">
-                    <i class="fa-solid fa-volume-high" id="iconPlayChapterAudio" style="font-size: 18px;"></i>
+                <!-- Nút màu xanh lá theo Hình 3 (Kích thước nhỏ gọn 40px) -->
+                <button type="button" id="btnPlayCurrentChapterAudio" style="width: 100%; height: 40px; border-radius: 10px; background: #16a34a; color: #ffffff; font-size: 14px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 3px 10px rgba(22, 163, 74, 0.25); transition: all 0.2s ease;">
+                    <i class="fa-solid fa-volume-high" id="iconPlayChapterAudio" style="font-size: 15px;"></i>
                     <span id="textPlayChapterAudio">Nghe chương này</span>
                 </button>
 
-                <!-- Thanh tua thời gian (Seekbar) -->
-                <div style="display: flex; align-items: center; gap: 12px; margin: 14px 0 10px 0;">
-                    <span id="audioCurrentTime" style="font-size: 13px; font-weight: 700; color: #4b5563; min-width: 42px;">00:00</span>
+                <!-- Thanh tua thời gian (Seekbar mỏng gọn) -->
+                <div style="display: flex; align-items: center; gap: 10px; margin: 8px 0 6px 0;">
+                    <span id="audioCurrentTime" style="font-size: 12px; font-weight: 700; color: #4b5563; min-width: 38px;">00:00</span>
                     <div style="flex: 1; position: relative; display: flex; align-items: center;">
-                        <input type="range" id="audioSeekBar" min="0" max="100" value="0" style="width: 100%; accent-color: #16a34a; cursor: pointer; height: 6px; border-radius: 3px;" />
+                        <input type="range" id="audioSeekBar" min="0" max="100" value="0" style="width: 100%; accent-color: #16a34a; cursor: pointer; height: 4px; border-radius: 2px;" />
                     </div>
-                    <span id="audioDuration" style="font-size: 13px; font-weight: 700; color: #4b5563; min-width: 42px; text-align: right;">00:00</span>
+                    <span id="audioDuration" style="font-size: 12px; font-weight: 700; color: #4b5563; min-width: 38px; text-align: right;">00:00</span>
                 </div>
 
                 <!-- Thanh trạng thái & Tốc độ phát -->
-                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13.5px;">
-                    <span id="audioStatusText" style="font-weight: 700; color: #4b5563;">Sẵn sàng phát</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12.5px;">
+                    <span id="audioStatusText" style="font-weight: 600; color: #4b5563;">Sẵn sàng phát</span>
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 13px; color: #4b5563; font-weight: 600;">Tốc độ</span>
-                        <select id="audioSpeedSelect" style="border: 1px solid #d1d5db; border-radius: 8px; padding: 4px 10px; font-size: 13px; font-weight: 700; background: #fff; color: #111827; cursor: pointer; outline: none;">
+                        <span style="font-size: 12px; color: #6b7280; font-weight: 600;">Tốc độ</span>
+                        <select id="audioSpeedSelect" style="border: 1px solid #d1d5db; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #fff; color: #111827; cursor: pointer; outline: none;">
                             <option value="0.75">0.75x</option>
                             <option value="1.0" selected>1.0x</option>
                             <option value="1.25">1.25x</option>
@@ -167,11 +167,11 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
 
                 <!-- Chuyển tiếp sang chương tiếp theo (Chương 2, 3, 4...) -->
                 <?php if (!empty($next_chap_url)) : ?>
-                    <div class="audio-next-chapter-strip" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                        <span style="font-size: 12.5px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+                    <div class="audio-next-chapter-strip" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <span style="font-size: 11.5px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px;">
                             <i class="fa-solid fa-circle-check" style="color: #16a34a;"></i> Tự động chuyển tiếp khi nghe xong
                         </span>
-                        <a href="<?php echo esc_url($next_chap_url); ?>" id="btnNextChapterAudioLink" class="btn btn-outline btn-sm" style="border-color: #86efac; color: #16a34a; font-weight: 700; padding: 4px 14px; font-size: 12.5px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
+                        <a href="<?php echo esc_url($next_chap_url); ?>" id="btnNextChapterAudioLink" class="btn btn-outline btn-xs" style="border-color: #86efac; color: #16a34a; font-weight: 700; padding: 3px 10px; font-size: 11.5px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
                             <span>Sang Chương <?php echo ($chap_order + 1); ?> tiếp theo</span>
                             <i class="fa-solid fa-forward-step"></i>
                         </a>

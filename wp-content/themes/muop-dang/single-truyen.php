@@ -326,10 +326,12 @@ if (empty($from) && isset($_SERVER['HTTP_REFERER'])) {
                         <span class="follow-btn-label"><?php echo $is_following ? 'Đang Theo Dõi' : 'Theo Dõi'; ?></span>
                     </button>
 
-                    <!-- Nút Nghe Audio (Hình 1 - Dành cho tất cả người đọc) -->
-                    <button type="button" class="btn btn-listen-story-audio" id="btnListenStoryAudio" data-story-id="<?php echo $story_id; ?>" data-story-title="<?php echo esc_attr(get_the_title()); ?>" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; border: none; font-weight: 700; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);" title="Nghe Audio các chương của bộ truyện này">
-                        <i class="fa-solid fa-headphones"></i> Nghe Audio
-                    </button>
+                    <!-- Nút Nghe Audio (Hình 1 - Chỉ xuất hiện khi truyện có audio) -->
+                    <?php if (function_exists('muop_story_has_audio') && muop_story_has_audio($story_id)) : ?>
+                        <button type="button" class="btn btn-listen-story-audio" id="btnListenStoryAudio" data-story-id="<?php echo $story_id; ?>" data-story-title="<?php echo esc_attr(get_the_title()); ?>" style="background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; border: none; font-weight: 700; box-shadow: 0 2px 6px rgba(22, 163, 74, 0.35);" title="Nghe Audio các chương của bộ truyện này">
+                            <i class="fa-solid fa-headphones"></i> Nghe Audio
+                        </button>
+                    <?php endif; ?>
 
                     <?php if ($can_manage_story) : ?>
                         <!-- Nút Thêm Audio (Hình 1 - Dành cho Dịch giả & Admin) -->

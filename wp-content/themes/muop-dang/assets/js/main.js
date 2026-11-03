@@ -6557,6 +6557,7 @@
               }
 
               $('#formEditChapterFields').fadeIn(200);
+              loadEditModalSavedVoices();
             } else {
               const msg = (res && res.data && res.data.message) || (res && res.message) || 'Không thể tải nội dung chương!';
               $('#editChapterAlert').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).removeClass('alert-info').addClass('alert-error').show();
@@ -6566,6 +6567,86 @@
             let msg = 'Lỗi kết nối khi tải nội dung chương!';
             if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
             $('#editChapterAlert').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).removeClass('alert-info').addClass('alert-error').show();
+          }
+        });
+      });
+
+      // Nạp danh sách giọng mẫu đã lưu của dịch giả cho modal chỉnh sửa chương
+      const loadEditModalSavedVoices = () => {
+        const $select = $('#editChapterSavedVoiceSelect');
+        if (!$select.length) return;
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : getAjaxUrl();
+
+        $.ajax({
+          url: ajaxUrl,
+          type: 'GET',
+          data: { action: 'muop_get_my_saved_voices' },
+          success: (res) => {
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+            if (res && res.success && res.data && res.data.voices) {
+              const voices = res.data.voices;
+              if (voices.length === 0) {
+                $select.html('<option value="">-- Bạn chưa có giọng mẫu nào đã lưu (Hãy tải lên file mới ở dưới) --</option>');
+                return;
+              }
+              let html = '<option value="">-- Chọn 1 giọng mẫu đã lưu của bạn (' + voices.length + ' giọng) --</option>';
+              voices.forEach((v) => {
+                let profStr = '';
+                if (v.profile && v.profile.voice_label) profStr = ' • ' + v.profile.voice_label;
+                html += '<option value="' + v.id + '" data-url="' + (v.audio_url || '') + '">' + (v.name || 'Giọng Mẫu') + profStr + ' (' + (v.created_fmt || '') + ')</option>';
+              });
+              $select.html(html);
+            }
+          }
+        });
+      };
+
+      // Nghe thử giọng mẫu đã lưu trong Modal Sửa Chương
+      $(document).on('click', '#btnPreviewSavedVoiceEditModal', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const $select = $('#editChapterSavedVoiceSelect');
+        const audioEl = document.getElementById('editSavedVoiceAudioPreview');
+        const url = $select.find('option:selected').data('url');
+        if (!url) {
+          if (typeof muopAlert === 'function') muopAlert('Vui lòng chọn một giọng mẫu đã lưu từ danh sách trước khi nghe thử!', 'warning');
+          else alert('Vui lòng chọn một giọng mẫu đã lưu từ danh sách trước khi nghe thử!');
+          return;
+        }
+        if (audioEl.src === url && !audioEl.paused) {
+          audioEl.pause();
+          $btn.html('<i class="fa-solid fa-play"></i> Nghe thử');
+        } else {
+          audioEl.src = url;
+          audioEl.play();
+          $btn.html('<i class="fa-solid fa-pause"></i> Tạm dừng');
+          audioEl.onended = () => { $btn.html('<i class="fa-solid fa-play"></i> Nghe thử'); };
+        }
+      });
+
+      // Xóa giọng mẫu khỏi kho cá nhân của dịch giả trong Modal Sửa Chương
+      $(document).on('click', '#btnDeleteSavedVoiceEditModal', function(e) {
+        e.preventDefault();
+        const vid = $('#editChapterSavedVoiceSelect').val();
+        if (!vid) {
+          if (typeof muopAlert === 'function') muopAlert('Vui lòng chọn giọng mẫu bạn muốn xóa!', 'warning');
+          else alert('Vui lòng chọn giọng mẫu bạn muốn xóa!');
+          return;
+        }
+        if (!confirm('Bạn có chắc chắn muốn xóa giọng mẫu này khỏi kho cá nhân của bạn?')) return;
+
+        const ajaxUrl = (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : getAjaxUrl();
+        $.ajax({
+          url: ajaxUrl,
+          type: 'POST',
+          data: {
+            action: 'muop_delete_my_saved_voice',
+            voice_id: vid,
+            nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+          },
+          success: (res) => {
+            loadEditModalSavedVoices();
+            if (typeof muopAlert === 'function') muopAlert('Đã xóa giọng mẫu khỏi kho cá nhân của bạn!', 'success');
           }
         });
       });
@@ -6589,26 +6670,32 @@
         const refFileInput = document.getElementById('editChapterRefVoiceFile');
         const chapterId = $('#editChapterId').val() || '';
         const storyId = $('#editChapterStoryId').val() || $('#modalEditChapterContent').data('story-id') || '';
+        const savedVoiceId = $('#editChapterSavedVoiceSelect').val();
+        const hasNewFile = (refFileInput && refFileInput.files && refFileInput.files[0]);
 
         if (!textContent) {
           $alert.removeClass('alert-success alert-info').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> Vui lòng nhập nội dung chương trước khi chuyển đổi giọng nói!').show();
           return;
         }
 
-        if (!refFileInput || !refFileInput.files || !refFileInput.files[0]) {
-          $alert.removeClass('alert-success alert-info').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> Vui lòng chọn 1 file giọng mẫu (.mp3, .wav) để hệ thống bắt chước giọng đọc!').show();
+        if (!savedVoiceId && !hasNewFile) {
+          $alert.removeClass('alert-success alert-info').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> Vui lòng chọn 1 giọng mẫu đã lưu của bạn HOẶC tải lên file giọng mới (.mp3, .wav) để bắt chước!').show();
           return;
         }
 
         $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang bắt chước giọng...');
-        $alert.removeClass('alert-error alert-success').addClass('alert-info').html('<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích cao độ, âm sắc giọng mẫu và tạo file audio chương mới...').show();
+        $alert.removeClass('alert-error alert-success').addClass('alert-info').html('<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích cao độ, âm sắc giọng mẫu và tạo file audio chương mới siêu tốc...').show();
 
         const formData = new FormData();
         formData.append('action', 'muop_convert_tts_chapter_audio');
         formData.append('chapter_id', chapterId);
         formData.append('story_id', storyId);
         formData.append('chapter_text', textContent);
-        formData.append('ref_voice', refFileInput.files[0]);
+        if (savedVoiceId && !hasNewFile) {
+          formData.append('saved_voice_id', savedVoiceId);
+        } else if (hasNewFile) {
+          formData.append('ref_voice', refFileInput.files[0]);
+        }
         if (typeof muopConfig !== 'undefined' && muopConfig.nonce) {
           formData.append('nonce', muopConfig.nonce);
         }
@@ -6630,6 +6717,19 @@
               $('#editChapterDeleteAudioHidden').val('0');
               $('#editChapterAudioCurrentEl').attr('src', audioUrl);
               $('#editChapterAudioCurrentBox').css('display', 'flex');
+
+              // Hiển thị kết quả phân tích chất giọng
+              if (res.data.voice_profile) {
+                const vp = res.data.voice_profile;
+                const gText = vp.voice_label || (vp.gender === 'male' ? 'Giọng Nam' : 'Giọng Nữ');
+                $('#editChapterVoiceAnalysisText').html('<strong>Đã phân tích:</strong> ' + gText + ' (Pitch: ' + (vp.pitch_hz || '195') + 'Hz • Tỷ lệ cao độ: ' + (vp.pitch_ratio || '1.0') + ' • Âm sắc 5-band Formant EQ đã cân chỉnh)');
+                $('#editChapterVoiceAnalysisCard').css('display', 'flex');
+              }
+
+              // Cập nhật lại danh sách giọng mẫu đã lưu nếu có giọng mới
+              if (res.data.my_voices) {
+                loadEditModalSavedVoices();
+              }
 
               $alert.removeClass('alert-info alert-error').addClass('alert-success').html(
                 '<i class="fa-solid fa-circle-check"></i> ' + (res.data.message || 'Chuyển đổi thành công!') +

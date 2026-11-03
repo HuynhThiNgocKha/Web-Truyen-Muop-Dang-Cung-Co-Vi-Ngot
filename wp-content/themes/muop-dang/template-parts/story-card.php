@@ -50,14 +50,18 @@ if (!$thumb_url) {
             <img class="story-cover-img" src="<?php echo esc_url($thumb_url); ?>" alt="<?php the_title_attribute(); ?>" loading="lazy" />
         </a>
 
-        <!-- Badges: Full (Đỏ) nếu đã hoàn thành, Mới (Hồng) nếu mới đăng trong vòng 24h -->
+        <!-- Badges: Full (Đỏ), Mới (Hồng), Audio (Xanh lá) nếu có audio -->
         <?php 
         $is_full   = ($status === 'hoan_thanh');
         $story_age = current_time('timestamp') - (int) get_the_time('U', $story_id);
         $is_new    = ($story_age >= -60 && $story_age <= 86400);
+        $has_audio = function_exists('muop_story_has_audio') ? muop_story_has_audio($story_id) : false;
         ?>
-        <?php if ($is_full || $is_new) : ?>
+        <?php if ($is_full || $is_new || $has_audio) : ?>
             <div class="story-badge-top">
+                <?php if ($has_audio) : ?>
+                    <span class="badge" style="background: #16a34a; color: #ffffff;" title="Truyện có giọng đọc Audio"><i class="fa-solid fa-headphones"></i> Audio</span>
+                <?php endif; ?>
                 <?php if ($is_full) : ?>
                     <span class="badge badge-full">Full</span>
                 <?php endif; ?>

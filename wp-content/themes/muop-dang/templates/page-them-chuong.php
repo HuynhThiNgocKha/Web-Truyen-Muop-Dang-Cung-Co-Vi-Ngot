@@ -249,25 +249,51 @@ if ($selected_story_id) {
                             <span style="font-weight: 700; font-size: 13.5px; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="color: #16a34a;"></i> Chuyển Văn Bản Thành Giọng Nói (Bắt Chước Giọng Mẫu):
                             </span>
-                            <span class="badge" style="background: #16a34a; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 4px;">Voice Clone</span>
+                            <span class="badge" style="background: #16a34a; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 4px;">Voice Clone Siêu Tốc</span>
                         </div>
                         <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.5;">
-                            Tải lên 1 file âm thanh mẫu (.mp3, .wav) để hệ thống phân tích và bắt chước giọng đọc đó cho nội dung chương ở trên. File audio mới tạo sẽ trở thành audio của chương này (người dịch bấm chuyển đổi chủ động, không ép tự động).
+                            Bạn có thể chọn giọng mẫu đã lưu trong kho cá nhân của mình hoặc tải lên file giọng mới (.mp3, .wav). Mỗi dịch giả dùng kho giọng riêng biệt không dùng chung, file mới tải lên sẽ tự động lưu lại để tái sử dụng.
                         </p>
+
+                        <!-- Lựa chọn 1: Dùng lại giọng mẫu đã lưu của dịch giả -->
+                        <div id="addChapterSavedVoiceGroup" style="margin-bottom: 12px; background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px;">
+                            <label style="font-size: 12.5px; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                                <i class="fa-solid fa-bookmark" style="color: #16a34a;"></i> 1. Dùng lại giọng mẫu đã lưu của bạn:
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <select id="addChapterSavedVoiceSelect" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 12.5px; height: 38px; background: #fff;">
+                                    <option value="">-- Đang nạp danh sách giọng mẫu của bạn... --</option>
+                                </select>
+                                <button type="button" id="btnPreviewSavedVoiceAddPage" class="btn btn-outline btn-xs" style="height: 38px; padding: 0 12px; font-size: 12px; border-color: #86efac; color: #16a34a; white-space: nowrap;" title="Nghe thử giọng mẫu này">
+                                    <i class="fa-solid fa-play"></i> Nghe thử
+                                </button>
+                                <button type="button" id="btnDeleteSavedVoiceAddPage" class="btn btn-outline btn-xs" style="height: 38px; padding: 0 10px; font-size: 12px; border-color: #fecaca; color: #dc2626;" title="Xóa giọng mẫu này khỏi kho của bạn">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                            <audio id="addSavedVoiceAudioPreview" style="display: none;"></audio>
+                        </div>
                         
+                        <!-- Lựa chọn 2: Tải lên file giọng mới -->
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; align-items: flex-end;">
                             <div>
                                 <label class="form-label" for="inputTtsReferenceVoice" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
-                                    Chọn file giọng đọc mẫu (.mp3, .wav):
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Hoặc tải lên file giọng mẫu mới (.mp3, .wav):
                                 </label>
                                 <input type="file" id="inputTtsReferenceVoice" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 6px 10px; font-size: 12.5px; height: 38px;" />
                             </div>
 
                             <div>
-                                <button type="button" id="btnTriggerTtsConvert" class="btn btn-primary" style="height: 38px; width: 100%; font-size: 13px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <button type="button" id="btnTriggerTtsConvert" class="btn btn-primary" style="height: 38px; width: 100%; font-size: 13px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Sang Giọng Nói
                                 </button>
                             </div>
+                        </div>
+
+                        <!-- Thẻ kết quả phân tích chất giọng -->
+                        <div id="addChapterVoiceAnalysisCard" style="display: none; margin-top: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #065f46; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-microphone-lines" style="color: #10b981; font-size: 14px;"></i>
+                            <span id="addChapterVoiceAnalysisText">Đang phân tích giọng...</span>
                         </div>
 
                         <div id="ttsConvertStatusBox" class="alert-box" style="display: none; margin-top: 10px; font-size: 12.5px; padding: 8px 12px;"></div>
@@ -345,14 +371,108 @@ if ($selected_story_id) {
                         return;
                     }
 
-                    if (!refFileEl || !refFileEl.files || !refFileEl.files[0]) {
+                    var savedVoiceSelect = document.getElementById('addChapterSavedVoiceSelect');
+                    var btnPreviewSaved = document.getElementById('btnPreviewSavedVoiceAddPage');
+                    var btnDeleteSaved = document.getElementById('btnDeleteSavedVoiceAddPage');
+                    var savedAudioPreview = document.getElementById('addSavedVoiceAudioPreview');
+                    var analysisCard = document.getElementById('addChapterVoiceAnalysisCard');
+                    var analysisText = document.getElementById('addChapterVoiceAnalysisText');
+
+                    // Nạp danh sách giọng mẫu đã lưu của dịch giả
+                    var currentSavedVoices = [];
+                    function renderSavedVoices(voices) {
+                        currentSavedVoices = voices || [];
+                        if (!savedVoiceSelect) return;
+                        if (!currentSavedVoices || currentSavedVoices.length === 0) {
+                            savedVoiceSelect.innerHTML = '<option value="">-- Bạn chưa có giọng mẫu nào đã lưu (Hãy tải lên file mới ở dưới) --</option>';
+                            return;
+                        }
+                        var html = '<option value="">-- Chọn 1 giọng mẫu đã lưu của bạn (' + currentSavedVoices.length + ' giọng) --</option>';
+                        currentSavedVoices.forEach(function(v) {
+                            var profStr = '';
+                            if (v.profile && v.profile.voice_label) profStr = ' • ' + v.profile.voice_label;
+                            html += '<option value="' + v.id + '" data-url="' + (v.audio_url || '') + '">' + (v.name || 'Giọng Mẫu') + profStr + ' (' + (v.created_fmt || '') + ')</option>';
+                        });
+                        savedVoiceSelect.innerHTML = html;
+                    }
+
+                    function fetchSavedVoices() {
+                        var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
+                        fetch(ajaxUrl + '?action=muop_get_my_saved_voices')
+                        .then(function(r) { return r.json(); })
+                        .then(function(res) {
+                            if (res && res.success && res.data) {
+                                renderSavedVoices(res.data.voices);
+                            }
+                        })
+                        .catch(function() {});
+                    }
+                    fetchSavedVoices();
+
+                    // Nghe thử giọng mẫu đã lưu
+                    if (btnPreviewSaved && savedVoiceSelect && savedAudioPreview) {
+                        btnPreviewSaved.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            var opt = savedVoiceSelect.options[savedVoiceSelect.selectedIndex];
+                            var url = opt ? opt.getAttribute('data-url') : '';
+                            if (!url) {
+                                alert('Vui lòng chọn một giọng mẫu đã lưu từ danh sách trước khi nghe thử!');
+                                return;
+                            }
+                            if (savedAudioPreview.src === url && !savedAudioPreview.paused) {
+                                savedAudioPreview.pause();
+                                btnPreviewSaved.innerHTML = '<i class="fa-solid fa-play"></i> Nghe thử';
+                            } else {
+                                savedAudioPreview.src = url;
+                                savedAudioPreview.play();
+                                btnPreviewSaved.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+                                savedAudioPreview.onended = function() {
+                                    btnPreviewSaved.innerHTML = '<i class="fa-solid fa-play"></i> Nghe thử';
+                                };
+                            }
+                        });
+                    }
+
+                    // Xóa giọng mẫu khỏi kho của dịch giả
+                    if (btnDeleteSaved && savedVoiceSelect) {
+                        btnDeleteSaved.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            var vid = savedVoiceSelect.value;
+                            if (!vid) {
+                                alert('Vui lòng chọn giọng mẫu bạn muốn xóa!');
+                                return;
+                            }
+                            if (!confirm('Bạn có chắc chắn muốn xóa giọng mẫu này khỏi kho cá nhân của bạn?')) return;
+
+                            var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
+                            var delFd = new FormData();
+                            delFd.append('action', 'muop_delete_my_saved_voice');
+                            delFd.append('voice_id', vid);
+                            delFd.append('nonce', (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '');
+
+                            fetch(ajaxUrl, { method: 'POST', body: delFd })
+                            .then(function(r) { return r.json(); })
+                            .then(function(res) {
+                                if (res.success) {
+                                    fetchSavedVoices();
+                                } else {
+                                    alert(res.data ? res.data.message : 'Không thể xóa giọng mẫu!');
+                                }
+                            });
+                        });
+                    }
+
+                    var selectedSavedVoiceId = savedVoiceSelect ? savedVoiceSelect.value : '';
+                    var hasNewFile = (refFileEl && refFileEl.files && refFileEl.files[0]);
+
+                    if (!selectedSavedVoiceId && !hasNewFile) {
                         if (statusBox) {
                             statusBox.style.display = 'block';
                             statusBox.className = 'alert-box alert-error';
                             statusBox.style.background = '#fef2f2';
                             statusBox.style.color = '#991b1b';
                             statusBox.style.border = '1px solid #fecaca';
-                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Vui lòng chọn 1 file âm thanh mẫu giọng đọc (.mp3, .wav) để hệ thống bắt chước!';
+                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Vui lòng chọn 1 giọng mẫu đã lưu của bạn HOẶC tải lên file âm thanh mới (.mp3, .wav) để bắt chước!';
                         }
                         return;
                     }
@@ -361,7 +481,7 @@ if ($selected_story_id) {
 
                     var origHtml = btnConvert.innerHTML;
                     btnConvert.disabled = true;
-                    btnConvert.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích giọng & chuyển đổi...';
+                    btnConvert.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang bắt chước giọng...';
 
                     if (statusBox) {
                         statusBox.style.display = 'block';
@@ -369,7 +489,7 @@ if ($selected_story_id) {
                         statusBox.style.background = '#eff6ff';
                         statusBox.style.color = '#1e40af';
                         statusBox.style.border = '1px solid #bfdbfe';
-                        statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Hệ thống đang trích xuất cao độ, âm sắc giọng mẫu và tổng hợp audio chương... Quá trình này có thể mất 5 - 15 giây tùy độ dài văn bản.';
+                        statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích cao độ, âm sắc giọng mẫu và tạo file audio chương mới siêu tốc...';
                     }
 
                     var fd = new FormData();
@@ -378,7 +498,12 @@ if ($selected_story_id) {
                     fd.append('story_id', storyId || 0);
                     fd.append('chapter_id', 0);
                     fd.append('content', contentText);
-                    fd.append('reference_voice', refFileEl.files[0]);
+
+                    if (selectedSavedVoiceId && !hasNewFile) {
+                        fd.append('saved_voice_id', selectedSavedVoiceId);
+                    } else if (hasNewFile) {
+                        fd.append('reference_voice', refFileEl.files[0]);
+                    }
 
                     var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
 
@@ -398,13 +523,25 @@ if ($selected_story_id) {
                             // Preview audio
                             window.muopPreviewChapterAudioUrl(audioUrl);
 
+                            // Hiển thị kết quả phân tích chất giọng
+                            if (res.data.voice_profile && analysisCard && analysisText) {
+                                var vp = res.data.voice_profile;
+                                var gText = vp.voice_label || (vp.gender === 'male' ? 'Giọng Nam' : 'Giọng Nữ');
+                                analysisText.innerHTML = '<strong>Đã phân tích:</strong> ' + gText + ' (Pitch: ' + (vp.pitch_hz || '195') + 'Hz • Tỷ lệ cao độ: ' + (vp.pitch_ratio || '1.0') + ' • Âm sắc 5-band Formant EQ đã cân chỉnh)';
+                                analysisCard.style.display = 'flex';
+                            }
+
+                            // Cập nhật lại kho giọng mẫu nếu có giọng mới
+                            if (res.data.my_voices) {
+                                renderSavedVoices(res.data.my_voices);
+                            }
+
                             if (statusBox) {
                                 statusBox.className = 'alert-box alert-success';
                                 statusBox.style.background = '#f0fdf4';
                                 statusBox.style.color = '#166534';
                                 statusBox.style.border = '1px solid #bbf7d0';
-                                var profInfo = res.data.voice_profile ? (' (Cao độ: ' + res.data.voice_profile.pitch_hz + 'Hz)') : '';
-                                statusBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> Chuyển đổi thành công! Giọng đọc đã bắt chước theo mẫu' + profInfo + '. Audio này sẽ được lưu cùng chương khi bạn bấm "Thêm Chương Mới".';
+                                statusBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + (res.data.message || 'Chuyển đổi thành công!') + ' Audio này sẽ được lưu cùng chương khi bạn bấm "Thêm Chương Mới".';
                             }
                         } else {
                             if (statusBox) {

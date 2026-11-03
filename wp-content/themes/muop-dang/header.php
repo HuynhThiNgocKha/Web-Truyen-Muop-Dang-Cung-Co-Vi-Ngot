@@ -580,6 +580,11 @@ if ($genres === false) {
                         <i class="fa-solid fa-circle-check"></i> Truyện Full
                     </a>
                 </li>
+                <li class="<?php echo is_page('truyen-audio') ? 'active' : ''; ?>">
+                    <a href="<?php echo esc_url(home_url('/truyen-audio/')); ?>">
+                        <i class="fa-solid fa-headphones"></i> Truyện Audio
+                    </a>
+                </li>
                 <?php if ($is_logged_in) : ?>
                     <li class="<?php echo (is_page('team-dich') || is_tax('team_dich')) ? 'active' : ''; ?>">
                         <a href="<?php echo esc_url(home_url('/team-dich/')); ?>">
@@ -695,6 +700,11 @@ if ($genres === false) {
                 <li class="<?php echo is_page('truyen-full') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/truyen-full/')); ?>" class="drawer-nav-link">
                         <span>Truyện Full</span>
+                    </a>
+                </li>
+                <li class="<?php echo is_page('truyen-audio') ? 'active' : ''; ?>">
+                    <a href="<?php echo esc_url(home_url('/truyen-audio/')); ?>" class="drawer-nav-link">
+                        <i class="fa-solid fa-headphones" style="font-size: 13px; color: #16a34a; margin-right: 6px;"></i> <span>Truyện Audio</span>
                     </a>
                 </li>
                 <li class="<?php echo is_page('truyen-hot') ? 'active' : ''; ?>">

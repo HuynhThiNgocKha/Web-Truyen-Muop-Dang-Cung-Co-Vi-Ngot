@@ -715,6 +715,10 @@ function muop_create_required_pages() {
             'title'    => 'Truyện Full',
             'template' => 'page-truyen-full.php'
         ),
+        'truyen-audio' => array(
+            'title'    => 'Truyện Audio',
+            'template' => 'page-truyen-audio.php'
+        ),
         'the-loai' => array(
             'title'    => 'Thể Loại Truyện',
             'template' => 'page-the-loai.php'
@@ -8036,34 +8040,76 @@ function muop_ajax_convert_tts_chapter_audio_handler() {
         wp_send_json_error(array('message' => 'Bạn không có quyền quản lý audio cho bộ truyện này!'));
     }
 
-    // Xử lý file giọng đọc mẫu (Bắt buộc phải có giọng mẫu đưa lên để bắt chước)
+    // Xử lý file giọng đọc mẫu (Chọn giọng đã lưu trước đó HOẶC Tải file mới lên)
     $ref_audio_path = '';
-    $temp_ref_file = false;
+    $cached_profile_json = '';
+    $is_new_upload = false;
+    $new_voice_saved_path = '';
+    $new_voice_saved_url = '';
+    $original_voice_name = 'Giọng Mẫu';
 
-    $ref_file = null;
-    if (!empty($_FILES['reference_voice']) && !empty($_FILES['reference_voice']['name'])) {
-        $ref_file = $_FILES['reference_voice'];
-    } elseif (!empty($_FILES['ref_voice']) && !empty($_FILES['ref_voice']['name'])) {
-        $ref_file = $_FILES['ref_voice'];
+    // Trường hợp 1: Dịch giả chọn từ Kho Giọng Mẫu Đã Lưu của chính mình
+    if (!empty($_POST['saved_voice_id'])) {
+        $saved_vid = sanitize_text_field($_POST['saved_voice_id']);
+        $my_voices = muop_get_translator_voices($current_uid);
+        foreach ($my_voices as $v) {
+            if ($v['id'] === $saved_vid) {
+                if (!empty($v['file_path']) && file_exists($v['file_path'])) {
+                    $ref_audio_path = $v['file_path'];
+                }
+                if (!empty($v['profile']) && is_array($v['profile'])) {
+                    $cached_profile_json = json_encode($v['profile']);
+                }
+                $original_voice_name = $v['name'];
+                break;
+            }
+        }
     }
 
-    if ($ref_file) {
-        $ext = strtolower(pathinfo($ref_file['name'], PATHINFO_EXTENSION));
-        $allowed = array('mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac');
-        if (!in_array($ext, $allowed)) {
-            wp_send_json_error(array('message' => 'Định dạng file giọng mẫu không hợp lệ! Vui lòng tải lên file âm thanh .mp3, .wav, .m4a.'));
+    // Trường hợp 2: Dịch giả tải file giọng mẫu mới lên từ máy tính
+    if (empty($ref_audio_path)) {
+        $ref_file = null;
+        if (!empty($_FILES['reference_voice']) && !empty($_FILES['reference_voice']['name'])) {
+            $ref_file = $_FILES['reference_voice'];
+        } elseif (!empty($_FILES['ref_voice']) && !empty($_FILES['ref_voice']['name'])) {
+            $ref_file = $_FILES['ref_voice'];
         }
-        $ref_audio_path = $ref_file['tmp_name'];
-    } elseif (!empty($_POST['sample_voice_url'])) {
-        $sample_url = esc_url_raw($_POST['sample_voice_url']);
-        $upload_dir = wp_upload_dir();
-        if (strpos($sample_url, $upload_dir['baseurl']) === 0) {
-            $ref_audio_path = $upload_dir['basedir'] . substr($sample_url, strlen($upload_dir['baseurl']));
+
+        if ($ref_file) {
+            $ext = strtolower(pathinfo($ref_file['name'], PATHINFO_EXTENSION));
+            $allowed = array('mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac');
+            if (!in_array($ext, $allowed)) {
+                wp_send_json_error(array('message' => 'Định dạng file giọng mẫu không hợp lệ! Vui lòng tải lên file âm thanh .mp3, .wav, .m4a.'));
+            }
+
+            // Lưu file giọng mẫu vào thư mục wp-content/uploads/voices/ cho dịch giả
+            $upload_dir = wp_upload_dir();
+            $voices_dir = $upload_dir['basedir'] . '/voices';
+            if (!file_exists($voices_dir)) {
+                wp_mkdir_p($voices_dir);
+            }
+
+            $safe_base_name = sanitize_file_name(pathinfo($ref_file['name'], PATHINFO_FILENAME));
+            $voice_filename = 'voice_u' . $current_uid . '_' . time() . '_' . wp_generate_password(4, false, false) . '.' . $ext;
+            $new_voice_saved_path = $voices_dir . '/' . $voice_filename;
+            $new_voice_saved_url  = $upload_dir['baseurl'] . '/voices/' . $voice_filename;
+
+            if (move_uploaded_file($ref_file['tmp_name'], $new_voice_saved_path)) {
+                $ref_audio_path = $new_voice_saved_path;
+                $is_new_upload = true;
+                $original_voice_name = !empty($safe_base_name) ? $safe_base_name : 'Giọng Mẫu Mới';
+            }
+        } elseif (!empty($_POST['sample_voice_url'])) {
+            $sample_url = esc_url_raw($_POST['sample_voice_url']);
+            $upload_dir = wp_upload_dir();
+            if (strpos($sample_url, $upload_dir['baseurl']) === 0) {
+                $ref_audio_path = $upload_dir['basedir'] . substr($sample_url, strlen($upload_dir['baseurl']));
+            }
         }
     }
 
     if (empty($ref_audio_path) || !file_exists($ref_audio_path)) {
-        wp_send_json_error(array('message' => 'Vui lòng tải lên file âm thanh mẫu giọng đọc (.mp3, .wav) để hệ thống bắt chước giọng!'));
+        wp_send_json_error(array('message' => 'Vui lòng chọn 1 giọng mẫu đã lưu hoặc tải lên file âm thanh (.mp3, .wav) để bắt chước!'));
     }
 
     // Tạo thư mục lưu trữ wp-content/uploads/audio/
@@ -8094,12 +8140,16 @@ function muop_ajax_convert_tts_chapter_audio_handler() {
         wp_send_json_error(array('message' => 'Không tìm thấy công cụ Voice Clone TTS trên máy chủ!'));
     }
 
-    // Thực thi lệnh Python
+    // Thực thi lệnh Python (truyền thêm --cached-profile nếu dùng giọng cũ để xử lý siêu tốc)
     $cmd = 'python ' . escapeshellarg($python_script)
          . ' --text-file ' . escapeshellarg($temp_text_file)
          . ' --ref-audio ' . escapeshellarg($ref_audio_path)
          . ' --output ' . escapeshellarg($output_file_path)
          . ' --speed ' . escapeshellarg(strval($speed));
+
+    if (!empty($cached_profile_json)) {
+        $cmd .= ' --cached-profile ' . escapeshellarg($cached_profile_json);
+    }
 
     $output_str = shell_exec($cmd . ' 2>&1');
     @unlink($temp_text_file);
@@ -8109,6 +8159,21 @@ function muop_ajax_convert_tts_chapter_audio_handler() {
     if (!$json_res || empty($json_res['success']) || !file_exists($output_file_path)) {
         $err = ($json_res && !empty($json_res['error'])) ? $json_res['error'] : $output_str;
         wp_send_json_error(array('message' => 'Lỗi chuyển đổi giọng nói: ' . $err));
+    }
+
+    $voice_profile = isset($json_res['voice_profile']) ? $json_res['voice_profile'] : array();
+
+    // Nếu tải file mới lên: Tự động lưu vào Kho Giọng Mẫu cá nhân của dịch giả này để tái sử dụng
+    $saved_voice_item = null;
+    if ($is_new_upload && !empty($new_voice_saved_path)) {
+        $label = !empty($voice_profile['voice_label']) ? $voice_profile['voice_label'] : ($original_voice_name);
+        $saved_voice_item = muop_save_translator_voice(
+            $current_uid,
+            $label,
+            $new_voice_saved_url,
+            $new_voice_saved_path,
+            $voice_profile
+        );
     }
 
     // QUY TẮC: Chèn lên file cũ VÀ xóa file cũ hoàn toàn khỏi đĩa nếu đã có chapter_id
@@ -8122,7 +8187,9 @@ function muop_ajax_convert_tts_chapter_audio_handler() {
         'audio_url'     => $output_file_url,
         'chapter_id'    => $chapter_id,
         'duration'      => isset($json_res['duration']) ? $json_res['duration'] : 0,
-        'voice_profile' => isset($json_res['voice_profile']) ? $json_res['voice_profile'] : null
+        'voice_profile' => $voice_profile,
+        'saved_voice'   => $saved_voice_item,
+        'my_voices'     => muop_get_translator_voices($current_uid)
     ));
 }
 
@@ -8566,3 +8633,156 @@ function muop_ajax_get_realtime_online_visitors_handler() {
         'server_time'   => current_time('H:i:s d/m/Y')
     ));
 }
+
+/**
+ * ============================================================================
+ * 23. HỆ THỐNG TRUYỆN AUDIO & KHO GIỌNG MẪU DỊCH GIẢ (TRANSLATOR VOICE BANK)
+ * ============================================================================
+ */
+
+/**
+ * 23.1 Kiểm tra nhanh một bộ truyện có bất kỳ chương nào chứa file audio hay không
+ */
+function muop_story_has_audio($story_id) {
+    if (!$story_id) return false;
+    global $wpdb;
+    $has = $wpdb->get_var($wpdb->prepare("
+        SELECT pm_audio.meta_value 
+        FROM {$wpdb->postmeta} pm_audio
+        INNER JOIN {$wpdb->postmeta} pm_sid 
+            ON pm_audio.post_id = pm_sid.post_id AND pm_sid.meta_key = '_chuong_truyen_id'
+        INNER JOIN {$wpdb->posts} p_ch 
+            ON pm_audio.post_id = p_ch.ID AND p_ch.post_status = 'publish'
+        WHERE pm_sid.meta_value = %d
+          AND pm_audio.meta_key = '_chuong_audio_url' 
+          AND pm_audio.meta_value != ''
+        LIMIT 1
+    ", $story_id));
+    return !empty($has);
+}
+
+/**
+ * 23.2 Lấy danh sách ID các truyện có ít nhất 1 chương có audio (Dùng cho Trang Chủ & Trang /truyen-audio/)
+ */
+function muop_get_story_ids_with_audio() {
+    $cached = wp_cache_get('muop_story_ids_with_audio', 'muop_cache');
+    if ($cached !== false) return $cached;
+
+    global $wpdb;
+    $sql = "
+        SELECT DISTINCT CAST(pm_sid.meta_value AS UNSIGNED) AS story_id
+        FROM {$wpdb->postmeta} pm_audio
+        INNER JOIN {$wpdb->postmeta} pm_sid 
+            ON pm_audio.post_id = pm_sid.post_id AND pm_sid.meta_key = '_chuong_truyen_id'
+        INNER JOIN {$wpdb->posts} p_ch 
+            ON pm_audio.post_id = p_ch.ID AND p_ch.post_status = 'publish'
+        INNER JOIN {$wpdb->posts} p_st 
+            ON pm_sid.meta_value = p_st.ID AND p_st.post_status = 'publish'
+        WHERE pm_audio.meta_key = '_chuong_audio_url' 
+          AND pm_audio.meta_value != ''
+    ";
+    $ids = $wpdb->get_col($sql);
+    $result = (!empty($ids)) ? array_map('intval', $ids) : array(0);
+    wp_cache_set('muop_story_ids_with_audio', $result, 'muop_cache', 300);
+    return $result;
+}
+
+/**
+ * 23.3 Lưu giọng mẫu vào kho cá nhân của dịch giả (Cách ly theo user_id)
+ */
+function muop_save_translator_voice($user_id, $voice_name, $audio_url, $audio_path, $profile = array()) {
+    if (!$user_id || empty($audio_url)) return false;
+    $voices = get_user_meta($user_id, '_muop_translator_voice_bank', true);
+    if (!is_array($voices)) $voices = array();
+
+    $voice_id = 'v_' . time() . '_' . wp_generate_password(5, false, false);
+    $new_voice = array(
+        'id'          => $voice_id,
+        'name'        => sanitize_text_field($voice_name),
+        'audio_url'   => esc_url_raw($audio_url),
+        'file_path'   => sanitize_text_field($audio_path),
+        'profile'     => !empty($profile) ? $profile : array(),
+        'created_at'  => current_time('mysql'),
+        'created_fmt' => current_time('d/m/Y H:i')
+    );
+
+    // Lưu tối đa 20 giọng mẫu của dịch giả
+    array_unshift($voices, $new_voice);
+    if (count($voices) > 20) {
+        $voices = array_slice($voices, 0, 20);
+    }
+
+    update_user_meta($user_id, '_muop_translator_voice_bank', $voices);
+    return $new_voice;
+}
+
+/**
+ * 23.4 Lấy danh sách giọng mẫu đã lưu của dịch giả hiện tại
+ */
+function muop_get_translator_voices($user_id) {
+    if (!$user_id) return array();
+    $voices = get_user_meta($user_id, '_muop_translator_voice_bank', true);
+    return is_array($voices) ? $voices : array();
+}
+
+/**
+ * 23.5 Xóa một giọng mẫu khỏi kho cá nhân của dịch giả
+ */
+function muop_delete_translator_voice($user_id, $voice_id) {
+    if (!$user_id || empty($voice_id)) return false;
+    $voices = get_user_meta($user_id, '_muop_translator_voice_bank', true);
+    if (!is_array($voices)) return false;
+
+    $updated = array();
+    foreach ($voices as $v) {
+        if ($v['id'] === $voice_id) {
+            if (!empty($v['file_path']) && file_exists($v['file_path'])) {
+                @unlink($v['file_path']);
+            }
+            continue;
+        }
+        $updated[] = $v;
+    }
+    update_user_meta($user_id, '_muop_translator_voice_bank', $updated);
+    return true;
+}
+
+/**
+ * 23.6 AJAX: Lấy danh sách giọng mẫu đã lưu của dịch giả hiện tại
+ */
+add_action('wp_ajax_muop_get_my_saved_voices', 'muop_ajax_get_my_saved_voices_handler');
+function muop_ajax_get_my_saved_voices_handler() {
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để xem danh sách giọng mẫu!'));
+    }
+    $uid = get_current_user_id();
+    $voices = muop_get_translator_voices($uid);
+    wp_send_json_success(array('voices' => $voices));
+}
+
+/**
+ * 23.7 AJAX: Xóa giọng mẫu khỏi kho của dịch giả
+ */
+add_action('wp_ajax_muop_delete_my_saved_voice', 'muop_ajax_delete_my_saved_voice_handler');
+function muop_ajax_delete_my_saved_voice_handler() {
+    $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : '';
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc hết hạn!'));
+    }
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'Vui lòng đăng nhập!'));
+    }
+    $uid = get_current_user_id();
+    $voice_id = isset($_POST['voice_id']) ? sanitize_text_field($_POST['voice_id']) : '';
+    if (empty($voice_id)) {
+        wp_send_json_error(array('message' => 'Không tìm thấy ID giọng mẫu cần xóa!'));
+    }
+
+    $deleted = muop_delete_translator_voice($uid, $voice_id);
+    if ($deleted) {
+        wp_send_json_success(array('message' => 'Đã xóa giọng mẫu khỏi kho cá nhân của bạn!'));
+    } else {
+        wp_send_json_error(array('message' => 'Không thể xóa giọng mẫu này!'));
+    }
+}
+

@@ -390,22 +390,50 @@ if (is_wp_error($all_genres)) $all_genres = array();
                             <span style="font-weight: 700; font-size: 13px; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
                                 <i class="fa-solid fa-wand-magic-sparkles" style="color: #16a34a;"></i> Chuyển đổi văn bản thành audio mới (Bắt chước giọng mẫu):
                             </span>
-                            <span class="badge" style="background: #16a34a; color: #fff; font-size: 10.5px; padding: 2px 6px; border-radius: 4px;">Tự chuyển đổi</span>
+                            <span class="badge" style="background: #16a34a; color: #fff; font-size: 10.5px; padding: 2px 6px; border-radius: 4px;">Voice Clone Siêu Tốc</span>
                         </div>
                         <p style="font-size: 11.5px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.5;">
-                            Khi chỉnh sửa văn bản, bạn có thể tải lên file giọng mẫu để chuyển đổi thành audio mới (audio mới sẽ chèn lên audio cũ và audio cũ trên máy chủ sẽ bị xóa hoàn toàn).
+                            Bạn có thể chọn giọng mẫu đã lưu trong kho cá nhân của bạn hoặc tải lên giọng mới (mỗi dịch giả dùng kho giọng riêng biệt của mình, file mới tải lên sẽ tự động lưu để dùng lại).
                         </p>
 
+                        <!-- Lựa chọn 1: Chọn từ Kho Giọng Mẫu Đã Lưu Của Dịch Giả -->
+                        <div id="editChapterSavedVoiceGroup" style="margin-bottom: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px;">
+                            <label style="font-size: 12px; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                                <i class="fa-solid fa-bookmark" style="color: #16a34a;"></i> 1. Dùng lại giọng mẫu đã lưu của bạn:
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <select id="editChapterSavedVoiceSelect" class="form-input" style="flex: 1; padding: 5px 8px; font-size: 12px; height: 34px; background: #fff;">
+                                    <option value="">-- Đang nạp danh sách giọng mẫu của bạn... --</option>
+                                </select>
+                                <button type="button" id="btnPreviewSavedVoiceEditModal" class="btn btn-outline btn-xs" style="height: 34px; padding: 0 10px; font-size: 11.5px; border-color: #86efac; color: #16a34a; white-space: nowrap;" title="Nghe thử giọng mẫu này">
+                                    <i class="fa-solid fa-play"></i> Nghe thử
+                                </button>
+                                <button type="button" id="btnDeleteSavedVoiceEditModal" class="btn btn-outline btn-xs" style="height: 34px; padding: 0 8px; font-size: 11.5px; border-color: #fecaca; color: #dc2626;" title="Xóa giọng mẫu này khỏi kho của bạn">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                            <audio id="editSavedVoiceAudioPreview" style="display: none;"></audio>
+                        </div>
+
+                        <!-- Lựa chọn 2: Tải lên file giọng mẫu mới -->
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; align-items: flex-end;">
                             <div>
-                                <label class="form-label" for="editChapterRefVoiceFile" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Chọn file giọng mẫu (.mp3, .wav):</label>
+                                <label class="form-label" for="editChapterRefVoiceFile" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Hoặc tải lên giọng mẫu mới (.mp3, .wav):
+                                </label>
                                 <input type="file" id="editChapterRefVoiceFile" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 5px 8px; font-size: 12px; height: 36px;" />
                             </div>
                             <div>
-                                <button type="button" id="btnConvertTtsInEditChapter" class="btn btn-primary" style="height: 36px; width: 100%; font-size: 12.5px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <button type="button" id="btnConvertTtsInEditChapter" class="btn btn-primary" style="height: 36px; width: 100%; font-size: 12.5px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Đổi Audio Mới
                                 </button>
                             </div>
+                        </div>
+
+                        <!-- Thẻ kết quả phân tích chất giọng -->
+                        <div id="editChapterVoiceAnalysisCard" style="display: none; margin-top: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #065f46; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-microphone-lines" style="color: #10b981; font-size: 14px;"></i>
+                            <span id="editChapterVoiceAnalysisText">Đang phân tích giọng...</span>
                         </div>
 
                         <div id="editChapterTtsAlert" class="alert-box" style="display: none; margin-top: 10px; font-size: 12px; padding: 8px 12px;"></div>
