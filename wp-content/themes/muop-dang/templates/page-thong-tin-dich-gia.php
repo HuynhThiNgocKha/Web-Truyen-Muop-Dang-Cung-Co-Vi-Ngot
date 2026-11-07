@@ -545,7 +545,6 @@ if (!empty($story_ids)) {
         <!-- MODAL POPUP MASTER CHỈNH SỬA TRUYỆN & CHƯƠNG -->
         <?php get_template_part('templates/modal-edit-story-master'); ?>
         <?php get_template_part('templates/modal-schedule-story'); ?>
-        </div>
 
         <!-- PHẦN 2: BÌNH LUẬN TỪ ĐỘC GIẢ (ĐƯA XUỐNG PHÍA DƯỚI) -->
         <div class="translator-section-block" style="margin-top: 36px;">

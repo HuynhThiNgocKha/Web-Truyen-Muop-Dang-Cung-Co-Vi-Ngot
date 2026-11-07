@@ -60,7 +60,7 @@ if (!$thumb_url) {
         <?php if ($is_full || $is_new || $has_audio) : ?>
             <div class="story-badge-top">
                 <?php if ($has_audio) : ?>
-                    <span class="badge" style="background: #16a34a; color: #ffffff;" title="Truyện có giọng đọc Audio"><i class="fa-solid fa-headphones"></i> Audio</span>
+                    <span class="badge badge-audio-icon" title="Truyện có giọng đọc Audio"><i class="fa-solid fa-headphones"></i></span>
                 <?php endif; ?>
                 <?php if ($is_full) : ?>
                     <span class="badge badge-full">Full</span>

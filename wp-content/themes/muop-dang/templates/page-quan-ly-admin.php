@@ -450,6 +450,13 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     <i class="fa-solid fa-shield-halved"></i> Quản Trị Viên
                                 </div>
                             </div>
+                            <div class="admin-user-menu-item" onclick="$('#btnOpenRealtimeOnlineModal').click();" style="cursor: pointer; background: #f0fdf4; border: 1px solid #dcfce7; border-radius: 6px; margin: 4px 8px; padding: 7px 10px; display: flex; align-items: center; justify-content: space-between;">
+                                <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #166534;">
+                                    <span class="live-pulse-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #22c55e; display: inline-block;"></span>
+                                    <span>Đang online:</span>
+                                </div>
+                                <span class="badge" style="background: #16a34a; color: #fff; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 10px;"><strong id="userDropdownLiveOnlineCount">0</strong></span>
+                            </div>
                             <a href="<?php echo esc_url(home_url('/')); ?>" class="admin-user-menu-item">
                                 <i class="fa-solid fa-house" style="color: var(--primary-green);"></i>
                                 <span>Trang chủ web</span>
@@ -1049,7 +1056,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                         </div>
 
                         <!-- 2. PHÂN TÍCH TỔNG QUAN TĂNG TRƯỞNG & LƯỢT ĐỌC TOÀN TRANG -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                        <div class="adm-stat-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
                             <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1.5px solid #86efac; border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm); cursor: pointer;" onclick="$('#btnOpenRealtimeOnlineModal').click();" title="Bấm xem danh sách khách online">
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <div style="font-size: 12px; color: #166534; font-weight: 700; display: flex; align-items: center; gap: 6px;">
@@ -1240,7 +1247,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                         </div>
 
                         <!-- 2. Thẻ thống kê tổng quan trong ngày đã chọn -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="adm-stat-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
                             <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Số Người Đọc (IP)</span>
@@ -1395,7 +1402,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                         </div>
 
                         <!-- 2. Thẻ thống kê tổng quan -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="adm-stat-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
                             <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Tổng Lượt Nghe</span>
@@ -2491,7 +2498,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                             </div>
 
                             <!-- 4 Thẻ KPI của truyện này -->
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                            <div class="adm-stat-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
                                 <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px;">
                                     <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Tổng Click Truyện Này</div>
                                     <div style="font-size: 22px; font-weight: 800; color: #ea580c; margin-top: 4px;" id="statAffStoryTotal">0</div>
@@ -3210,7 +3217,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                             </div>
                             
                             <!-- 4 Stats Boxes -->
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+                            <div class="adm-stat-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
                                 <div style="background: #fff; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px;">
                                     <span style="font-size: 11.5px; color: #64748b; font-weight: 600; display: block;">Ảnh Đã Tự Động Tối Ưu</span>
                                     <span id="optStatFiles" style="font-size: 18px; font-weight: 800; color: #065f46;"><?php echo number_format($opt_stats['total_files']); ?> ảnh</span>
@@ -4291,7 +4298,7 @@ jQuery(document).ready(function($) {
     });
   }
 
-  // Tải và đồng bộ lịch sử tách chương từ cơ sở dữ liệu (hỗ trợ điện thoại và máy tính)
+  // Tải và đồng bộ lịch sử tách chương từ cơ sở dữ liệu (Database là nguồn chuẩn duy nhất, truyện đã xóa sẽ mất vĩnh viễn trên mọi thiết bị)
   function syncSplitterHistoryFromDB() {
     $.ajax({
       url: muopConfig.ajaxUrl,
@@ -4301,60 +4308,10 @@ jQuery(document).ready(function($) {
         nonce: muopConfig.nonce
       },
       success: function(res) {
-        var localList = getSplitterHistory();
         if (res && res.success && res.data && Array.isArray(res.data.list)) {
-          var serverList = res.data.list;
-          if (serverList.length > 0) {
-            // Kiểm tra các bản ghi local chưa có trên server để đẩy lên
-            var serverKeys = {};
-            serverList.forEach(function(it) { if (it && it.id) serverKeys[it.id] = true; });
-            localList.forEach(function(localItem) {
-              if (localItem && localItem.id && !serverKeys[localItem.id]) {
-                $.ajax({
-                  url: muopConfig.ajaxUrl,
-                  type: 'POST',
-                  data: {
-                    action: 'muop_save_splitter_history',
-                    session_key: localItem.id,
-                    title: localItem.title,
-                    total_chapters: localItem.total_chapters,
-                    total_words: localItem.total_words,
-                    avg_words: localItem.avg_words,
-                    target_words: localItem.target_words,
-                    chapters: JSON.stringify(localItem.chapters || []),
-                    nonce: muopConfig.nonce
-                  }
-                });
-                serverList.push(localItem);
-              }
-            });
-            saveSplitterHistoryList(serverList);
-            renderSplitterHistoryTable();
-          } else if (localList.length > 0) {
-            // Máy chủ chưa có bản ghi nhưng máy khách có -> tự động đẩy tất cả lên máy chủ
-            localList.forEach(function(localItem) {
-              if (localItem && localItem.id) {
-                $.ajax({
-                  url: muopConfig.ajaxUrl,
-                  type: 'POST',
-                  data: {
-                    action: 'muop_save_splitter_history',
-                    session_key: localItem.id,
-                    title: localItem.title,
-                    total_chapters: localItem.total_chapters,
-                    total_words: localItem.total_words,
-                    avg_words: localItem.avg_words,
-                    target_words: localItem.target_words,
-                    chapters: JSON.stringify(localItem.chapters || []),
-                    nonce: muopConfig.nonce
-                  }
-                });
-              }
-            });
-            renderSplitterHistoryTable();
-          } else {
-            renderSplitterHistoryTable();
-          }
+          // Luôn đồng bộ dữ liệu từ server về local để đảm bảo truyện đã xóa trên máy khác/điện thoại sẽ mất vĩnh viễn
+          saveSplitterHistoryList(res.data.list);
+          renderSplitterHistoryTable();
         }
       }
     });
@@ -5332,7 +5289,7 @@ jQuery(document).ready(function($) {
           const members = Number(d.member_online || 0);
 
           // Cập nhật Topbar
-          $('#topbarLiveOnlineCount').text(total.toLocaleString());
+          $('#topbarLiveOnlineCount, #sidebarLiveOnlineCount, #sidebarNavLiveOnlineCount, #userDropdownLiveOnlineCount').text(total.toLocaleString());
 
           // Cập nhật Tab Thống kê & Phân tích
           $('#statAnalyticsLiveOnlineChip').text(total.toLocaleString());

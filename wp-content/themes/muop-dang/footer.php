@@ -327,6 +327,12 @@ $schedule_modal_file = get_template_directory() . '/templates/modal-schedule-sto
 if (file_exists($schedule_modal_file)) {
     include $schedule_modal_file;
 }
+
+// Include Modal Donate Ủng Hộ Team Dịch (Hình 5)
+$donate_modal_file = get_template_directory() . '/templates/modal-donate-team.php';
+if (file_exists($donate_modal_file)) {
+    include $donate_modal_file;
+}
 ?>
 
 <?php wp_footer(); ?>

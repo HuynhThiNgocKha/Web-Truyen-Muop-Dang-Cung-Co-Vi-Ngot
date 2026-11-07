@@ -148,45 +148,6 @@ get_header();
         </div>
     </section>
 
-    <!-- 4. MỤC TRUYỆN AUDIO (12 TRUYỆN CÓ AUDIO - BẤM VÀO CHUYỂN SANG /truyen-audio/) -->
-    <?php
-    $audio_story_ids = function_exists('muop_get_story_ids_with_audio') ? muop_get_story_ids_with_audio() : array(0);
-    if (!empty($audio_story_ids) && $audio_story_ids !== array(0)) :
-        $query_audio = new WP_Query(array(
-            'post_type'      => 'truyen',
-            'posts_per_page' => 12,
-            'post_status'    => 'publish',
-            'post__in'       => $audio_story_ids,
-            'orderby'        => 'modified',
-            'order'          => 'DESC'
-        ));
-
-        if ($query_audio->have_posts()) :
-    ?>
-    <section class="section-block">
-        <div class="section-header">
-            <h2 class="section-title">
-                <i class="fa-solid fa-headphones" style="color: #16a34a;"></i> Truyện Audio
-            </h2>
-            <a href="<?php echo esc_url(home_url('/truyen-audio/')); ?>" class="section-view-all" title="Xem tất cả truyện có audio">
-                Xem thêm <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
-            </a>
-        </div>
-
-        <div class="story-grid">
-            <?php
-            while ($query_audio->have_posts()) : $query_audio->the_post();
-                get_template_part('template-parts/story-card');
-            endwhile;
-            wp_reset_postdata();
-            ?>
-        </div>
-    </section>
-    <?php 
-        endif;
-    endif;
-    ?>
-
     <!-- 5. MỤC TRUYỆN FULL (12 TRUYỆN HOÀN THÀNH) -->
     <section class="section-block">
         <div class="section-header">

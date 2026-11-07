@@ -1,14 +1,30 @@
 -- ========================================================
--- MƯỚP ĐẮNG CŨNG CÓ VỊ NGỌT - BẢN CẬP NHẬT DATABASE HOSTING
--- Ngày cập nhật: 2026-11-02
--- Áp dụng cho: Tính năng Audio, Quản lý khách đọc, Thống kê Affiliate & Lịch sử tách chương
--- Hướng dẫn: Mở cPanel -> phpMyAdmin -> Chọn database hosting -> Tab SQL (hoặc Import) -> Dán & Chạy
+-- MƯỚP ĐẮNG CŨNG CÓ VỊ NGỌT - BẢN CẬP NHẬT DATABASE TOÀN DIỆN CHO HOSTING
+-- Cập nhật từ trước đến nay: Online Realtime, Audio TTS, VietQR Donate, Affiliate, Tách Chương, Khách đọc
+-- Hướng dẫn: Mở cPanel / DirectAdmin -> phpMyAdmin -> Chọn database -> Tab SQL -> Dán toàn bộ nội dung & Bấm Thực Hiện (Go)
 -- ========================================================
 
 SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
 SET time_zone = '+07:00';
 
--- 1. Tạo bảng ghi nhận nhật ký lượt nghe Audio (Mới)
+-- 1. Bảng theo dõi người dùng đang truy cập trực tiếp theo thời gian thực (Online Real-time)
+CREATE TABLE IF NOT EXISTS `wp_muop_online_visitors` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `session_key` varchar(64) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `user_id` bigint(20) unsigned DEFAULT 0,
+  `user_name` varchar(100) DEFAULT 'Khách vãng lai',
+  `page_url` varchar(255) NOT NULL DEFAULT '',
+  `page_title` varchar(255) NOT NULL DEFAULT '',
+  `device_type` varchar(50) DEFAULT 'Máy tính',
+  `last_active` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_session` (`session_key`),
+  KEY `idx_last_active` (`last_active`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- 2. Bảng ghi nhận nhật ký lượt nghe Audio
 CREATE TABLE IF NOT EXISTS `wp_muop_audio_logs` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `story_id` bigint(20) unsigned NOT NULL,
@@ -30,7 +46,7 @@ CREATE TABLE IF NOT EXISTS `wp_muop_audio_logs` (
   KEY `idx_time` (`listen_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
--- 2. Tạo bảng ghi nhận nhật ký khách đọc truyện theo ngày (Mới)
+-- 3. Bảng ghi nhận nhật ký khách đọc truyện theo ngày
 CREATE TABLE IF NOT EXISTS `wp_muop_visitor_read_logs` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `ip_address` varchar(45) NOT NULL,
@@ -51,7 +67,7 @@ CREATE TABLE IF NOT EXISTS `wp_muop_visitor_read_logs` (
   KEY `idx_chapter` (`chapter_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
--- 3. Tạo bảng lưu lịch sử tách chương đồng bộ đa thiết bị
+-- 4. Bảng lưu lịch sử tách chương đồng bộ đa thiết bị
 CREATE TABLE IF NOT EXISTS `wp_muop_splitter_history` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `session_key` varchar(64) NOT NULL,
@@ -68,23 +84,94 @@ CREATE TABLE IF NOT EXISTS `wp_muop_splitter_history` (
   KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
--- 4. Bảng ghi nhận lượt click Affiliate Shopee & TikTok
+-- 5. Bảng ghi nhận lượt click Affiliate Shopee & TikTok
 CREATE TABLE IF NOT EXISTS `wp_affiliate_clicks` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `link_type` varchar(20) NOT NULL,
+  `link_type` varchar(20) NOT NULL DEFAULT 'shopee',
   `url` text NOT NULL,
-  `story_id` bigint(20) unsigned DEFAULT 0,
-  `chapter_num` int(11) DEFAULT 0,
   `ip` varchar(45) DEFAULT '',
   `user_agent` text,
-  `created_at` datetime NOT NULL,
+  `user_id` bigint(20) unsigned DEFAULT 0,
+  `story_id` bigint(20) unsigned DEFAULT 0,
+  `chapter_num` int(11) DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_story` (`story_id`),
   KEY `idx_created` (`created_at`),
   KEY `idx_link_type` (`link_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
--- 5. Cập nhật thiết lập 24 truyện/trang
+-- 6. Bảng lịch sử đọc truyện của người dùng
+CREATE TABLE IF NOT EXISTS `wp_reading_history` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `story_id` bigint(20) unsigned NOT NULL,
+  `chapter_id` bigint(20) unsigned NOT NULL,
+  `chapter_num` int(11) DEFAULT 1,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_story` (`user_id`, `story_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- 7. Bảng Tủ Truyện (Bookmarks)
+CREATE TABLE IF NOT EXISTS `wp_reading_bookmarks` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `story_id` bigint(20) unsigned NOT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_story` (`user_id`, `story_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- 8. Bảng thông báo người dùng (Notifications)
+CREATE TABLE IF NOT EXISTS `wp_muop_notifications` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL DEFAULT 0,
+  `sender_id` bigint(20) unsigned DEFAULT 0,
+  `type` varchar(50) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `message` text NOT NULL,
+  `link` varchar(500) DEFAULT '',
+  `image` varchar(500) DEFAULT '',
+  `is_read` tinyint(1) DEFAULT 0,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_read` (`user_id`, `is_read`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- 9. Bảng nạp tiền / giao dịch (Payments)
+CREATE TABLE IF NOT EXISTS `wp_muop_payments` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `method` varchar(50) NOT NULL,
+  `status` varchar(20) DEFAULT 'pending',
+  `transaction_code` varchar(100) DEFAULT '',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- 10. Bảng báo cáo lỗi (Reports)
+CREATE TABLE IF NOT EXISTS `wp_muop_reports` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `story_id` bigint(20) unsigned NOT NULL,
+  `chapter_id` bigint(20) unsigned DEFAULT 0,
+  `user_id` bigint(20) unsigned DEFAULT 0,
+  `reason` varchar(255) NOT NULL,
+  `details` text DEFAULT '',
+  `status` varchar(20) DEFAULT 'pending',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_story` (`story_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- 11. Cập nhật thiết lập 24 truyện/trang
 UPDATE `wp_options` SET `option_value` = '24' WHERE `option_name` = 'posts_per_page';
 INSERT INTO `wp_options` (`option_name`, `option_value`, `autoload`)
 SELECT 'posts_per_page', '24', 'yes'

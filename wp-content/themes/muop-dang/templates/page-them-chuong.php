@@ -212,107 +212,119 @@ if ($selected_story_id) {
                     </div>
                 </div>
 
-                <!-- Mục Tải Lên Audio Cho Chương (Hình 5) -->
+                <!-- Mục Tải Lên & Tạo Audio Cho Chương (Thu Nhỏ - Nhấn Vào Mới Sổ Ra) -->
                 <div class="form-group" style="margin-top: 18px; padding-top: 18px; border-top: 1px dashed var(--border-color); margin-bottom: 0;">
-                    <label class="form-label" style="font-weight: 700; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--primary-green); margin-bottom: 6px;">
-                        <i class="fa-solid fa-headphones" style="font-size: 16px;"></i>
-                        <span>Tải Lên Audio Cho Chương (Tùy chọn)</span>
-                        <span class="badge" style="background: #e0f2fe; color: #0284c7; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: normal;">Nghe đọc audio</span>
-                    </label>
-                    <p style="font-size: 12.5px; color: var(--text-muted); margin: 0 0 12px 0; line-height: 1.5;">
-                        Bạn có thể tải lên file âm thanh (.mp3, .m4a, .wav, .ogg, .aac) hoặc dán link audio. File âm thanh này sẽ hiển thị trong mục <strong>Nghe Audio</strong> tại trang đọc truyện và trang thông tin truyện.
-                    </p>
-
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; background: var(--bg-card); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                        <!-- Upload File -->
-                        <div>
-                            <label class="form-label" for="inputChapterAudioFile" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">
-                                <i class="fa-solid fa-cloud-arrow-up"></i> Chọn file Audio từ thiết bị:
-                            </label>
-                            <input type="file" id="inputChapterAudioFile" name="chapter_audio" class="form-input" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" style="padding: 6px 10px; font-size: 13px;" onchange="window.muopPreviewChapterAudio && window.muopPreviewChapterAudio(this)" />
-                            <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">Hỗ trợ: MP3, M4A, WAV, AAC, OGG.</small>
+                    <!-- Thanh Tiêu Đề Thu Nhỏ (Accordion Toggle Header) -->
+                    <div id="btnToggleChapterAudioSection" role="button" tabindex="0" onclick="window.muopToggleAddChapterAudio && window.muopToggleAddChapterAudio()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.muopToggleAddChapterAudio&&window.muopToggleAddChapterAudio();}" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #ffffff; border: 1.5px solid #86efac; border-radius: var(--radius-sm); cursor: pointer; user-select: none; transition: all 0.25s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <span style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: #dcfce7; color: #16a34a; border-radius: 50%;">
+                                <i class="fa-solid fa-headphones" style="font-size: 16px;"></i>
+                            </span>
+                            <div>
+                                <span style="font-weight: 700; font-size: 14.5px; color: var(--primary-green);">Tạo Audio Cho Chương</span>
+                                <span class="badge" style="background: #e0f2fe; color: #0284c7; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; margin-left: 6px;">Nghe đọc audio</span>
+                            </div>
                         </div>
-
-                        <!-- Hoặc nhập link -->
-                        <div>
-                            <label class="form-label" for="inputChapterAudioUrl" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">
-                                <i class="fa-solid fa-link"></i> Hoặc dán đường dẫn link Audio:
-                            </label>
-                            <input type="url" id="inputChapterAudioUrl" name="chapter_audio_url" class="form-input" placeholder="https://.../audio.mp3" style="padding: 8px 12px; font-size: 13px;" oninput="window.muopPreviewChapterAudioUrl && window.muopPreviewChapterAudioUrl(this.value)" />
-                            <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">Link file âm thanh lưu trữ trực tuyến (nếu có).</small>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span id="chapterAudioToggleStatusText" style="font-size: 12.5px; color: var(--text-muted); font-weight: 500;">Bấm để mở</span>
+                            <span id="chapterAudioToggleIcon" style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #f0fdf4; color: var(--primary-green); transition: transform 0.3s ease;">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </span>
                         </div>
                     </div>
 
-                    <!-- Chuyển đổi Văn Bản Sang Giọng Nói (Bắt chước giọng mẫu) -->
-                    <div style="margin-top: 14px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: var(--radius-sm); padding: 14px 16px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
-                            <span style="font-weight: 700; font-size: 13.5px; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
-                                <i class="fa-solid fa-wand-magic-sparkles" style="color: #16a34a;"></i> Chuyển Văn Bản Thành Giọng Nói (Bắt Chước Giọng Mẫu):
-                            </span>
-                            <span class="badge" style="background: #16a34a; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 4px;">Voice Clone Siêu Tốc</span>
-                        </div>
-                        <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.5;">
-                            Bạn có thể chọn giọng mẫu đã lưu trong kho cá nhân của mình hoặc tải lên file giọng mới (.mp3, .wav). Mỗi dịch giả dùng kho giọng riêng biệt không dùng chung, file mới tải lên sẽ tự động lưu lại để tái sử dụng.
+                    <!-- Khối Nội Dung Sổ Ra Khi Bấm (Mặc Định Thu Gọn) -->
+                    <div id="chapterAudioCollapsibleBody" style="display: none; margin-top: 14px;">
+                        <p style="font-size: 12.5px; color: var(--text-muted); margin: 0 0 12px 0; line-height: 1.5;">
+                            Bạn có thể tải lên file âm thanh (.mp3, .m4a, .wav, .ogg, .aac) từ thiết bị hoặc sử dụng công cụ <strong>Tạo Audio</strong> bên dưới để tự động chuyển văn bản thành giọng đọc truyền cảm cho chương truyện.
                         </p>
 
-                        <!-- Lựa chọn 1: Dùng lại giọng mẫu đã lưu của dịch giả -->
-                        <div id="addChapterSavedVoiceGroup" style="margin-bottom: 12px; background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px;">
-                            <label style="font-size: 12.5px; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-                                <i class="fa-solid fa-bookmark" style="color: #16a34a;"></i> 1. Dùng lại giọng mẫu đã lưu của bạn:
-                            </label>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <select id="addChapterSavedVoiceSelect" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 12.5px; height: 38px; background: #fff;">
-                                    <option value="">-- Đang nạp danh sách giọng mẫu của bạn... --</option>
-                                </select>
-                                <button type="button" id="btnPreviewSavedVoiceAddPage" class="btn btn-outline btn-xs" style="height: 38px; padding: 0 12px; font-size: 12px; border-color: #86efac; color: #16a34a; white-space: nowrap;" title="Nghe thử giọng mẫu này">
-                                    <i class="fa-solid fa-play"></i> Nghe thử
-                                </button>
-                                <button type="button" id="btnDeleteSavedVoiceAddPage" class="btn btn-outline btn-xs" style="height: 38px; padding: 0 10px; font-size: 12px; border-color: #fecaca; color: #dc2626;" title="Xóa giọng mẫu này khỏi kho của bạn">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </div>
-                            <audio id="addSavedVoiceAudioPreview" style="display: none;"></audio>
-                        </div>
-                        
-                        <!-- Lựa chọn 2: Tải lên file giọng mới -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; align-items: flex-end;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; background: var(--bg-card); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                            <!-- Upload File Từ Máy Tính -->
                             <div>
-                                <label class="form-label" for="inputTtsReferenceVoice" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
-                                    <i class="fa-solid fa-cloud-arrow-up"></i> Hoặc tải lên file giọng mẫu mới (.mp3, .wav):
+                                <label class="form-label" for="inputChapterAudioFile" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Chọn file Audio từ thiết bị:
                                 </label>
-                                <input type="file" id="inputTtsReferenceVoice" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 6px 10px; font-size: 12.5px; height: 38px;" />
+                                <input type="file" id="inputChapterAudioFile" name="chapter_audio" class="form-input" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac,.flac" style="padding: 6px 10px; font-size: 13px;" onchange="window.muopPreviewChapterAudio && window.muopPreviewChapterAudio(this)" />
+                                <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">Hỗ trợ: MP3, M4A, WAV, AAC, OGG, FLAC.</small>
                             </div>
 
+                            <!-- Hoặc Nhập Link Audio -->
                             <div>
-                                <button type="button" id="btnTriggerTtsConvert" class="btn btn-primary" style="height: 38px; width: 100%; font-size: 13px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Sang Giọng Nói
+                                <label class="form-label" for="inputChapterAudioUrl" style="font-size: 12.5px; font-weight: 600; margin-bottom: 6px;">
+                                    <i class="fa-solid fa-link"></i> Hoặc dán đường dẫn link Audio:
+                                </label>
+                                <input type="url" id="inputChapterAudioUrl" name="chapter_audio_url" class="form-input" placeholder="https://.../audio.mp3" style="padding: 8px 12px; font-size: 13px;" oninput="window.muopPreviewChapterAudioUrl && window.muopPreviewChapterAudioUrl(this.value)" />
+                                <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">Link file âm thanh lưu trữ trực tuyến (nếu có).</small>
+                            </div>
+                        </div>
+
+                        <!-- Chuyển Đổi Văn Bản Sang Giọng Nói (Tạo Audio) -->
+                        <div style="margin-top: 14px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: var(--radius-sm); padding: 14px 16px;">
+                            <!-- Lựa chọn 1: Dùng lại giọng mẫu đã lưu của dịch giả hoặc Giọng Gốc Chuẩn -->
+                            <div id="addChapterSavedVoiceGroup" style="margin-bottom: 12px; background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px;">
+                                <label style="font-size: 12.5px; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                                    <i class="fa-solid fa-bookmark" style="color: #16a34a;"></i> 1. Dùng giọng mẫu có sẵn hoặc đã lưu của bạn:
+                                </label>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <select id="addChapterSavedVoiceSelect" class="form-input" style="flex: 1; padding: 6px 10px; font-size: 12.5px; height: 38px; background: #fff;">
+                                        <option value="">-- Đang nạp danh sách giọng mẫu... --</option>
+                                    </select>
+                                    <button type="button" id="btnPreviewSavedVoiceAddPage" class="btn btn-outline btn-xs" style="height: 38px; padding: 0 12px; font-size: 12px; border-color: #86efac; color: #16a34a; white-space: nowrap;" title="Nghe thử giọng mẫu này">
+                                        <i class="fa-solid fa-play"></i> Nghe thử
+                                    </button>
+                                    <button type="button" id="btnDeleteSavedVoiceAddPage" class="btn btn-outline btn-xs" style="height: 38px; padding: 0 10px; font-size: 12px; border-color: #fecaca; color: #dc2626;" title="Xóa giọng mẫu này khỏi kho cá nhân">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                                <audio id="addSavedVoiceAudioPreview" style="display: none;"></audio>
+                            </div>
+                            
+                            <!-- Lựa chọn 2: Tải lên file giọng mới kèm Nút Phân Tích Giọng -->
+                            <div style="margin-bottom: 10px;">
+                                <label class="form-label" for="inputTtsReferenceVoice" style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> 2. Hoặc tải lên file giọng mẫu mới (.mp3, .wav):
+                                </label>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="file" id="inputTtsReferenceVoice" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 6px 10px; font-size: 12.5px; height: 38px; flex: 1; box-sizing: border-box;" />
+                                    <button type="button" id="btnAnalyzeVoiceChapter" class="btn btn-outline" style="height: 38px; padding: 0 14px; font-size: 12.5px; border-color: #86efac; color: #166534; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;" title="Phân tích chất giọng mẫu này trước khi tạo audio">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích Giọng
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Thẻ kết quả phân tích chất giọng -->
+                            <div id="addChapterVoiceAnalysisCard" style="display: none; margin-top: 10px; background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 8px; padding: 10px 14px; font-size: 12.5px; color: #065f46; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-microphone-lines" style="color: #10b981; font-size: 16px;"></i>
+                                <span id="addChapterVoiceAnalysisText">Đang phân tích giọng...</span>
+                            </div>
+
+                            <!-- Nút Tạo Audio -->
+                            <div style="margin-top: 12px;">
+                                <button type="button" id="btnTriggerTtsConvert" class="btn btn-primary" style="height: 42px; width: 100%; font-size: 14px; font-weight: 700; background: #16a34a; border-color: #15803d; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 3px 10px rgba(22, 163, 74, 0.25);">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Tạo Audio
                                 </button>
                             </div>
+
+                            <div id="ttsConvertStatusBox" class="alert-box" style="display: none; margin-top: 10px; font-size: 12.5px; padding: 8px 12px;"></div>
                         </div>
 
-                        <!-- Thẻ kết quả phân tích chất giọng -->
-                        <div id="addChapterVoiceAnalysisCard" style="display: none; margin-top: 10px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #065f46; align-items: center; gap: 8px;">
-                            <i class="fa-solid fa-microphone-lines" style="color: #10b981; font-size: 14px;"></i>
-                            <span id="addChapterVoiceAnalysisText">Đang phân tích giọng...</span>
+                        <!-- Audio Preview Player -->
+                        <div id="chapterAudioPreviewWrap" style="display: none; margin-top: 14px; padding: 12px 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); align-items: center; gap: 14px; flex-wrap: wrap;">
+                            <span style="font-size: 13px; font-weight: 700; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-circle-play" style="color: var(--primary-green);"></i> Nghe thử Audio:
+                            </span>
+                            <audio id="chapterAudioPreviewPlayer" controls style="height: 36px; max-width: 320px;"></audio>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="window.muopClearChapterAudio && window.muopClearChapterAudio()" style="color: #dc2626; border-color: #fecaca; padding: 5px 12px; font-size: 12px;">
+                                <i class="fa-solid fa-trash-can"></i> Hủy audio đã chọn
+                            </button>
                         </div>
-
-                        <div id="ttsConvertStatusBox" class="alert-box" style="display: none; margin-top: 10px; font-size: 12.5px; padding: 8px 12px;"></div>
-                    </div>
-
-                    <!-- Audio Preview Player -->
-                    <div id="chapterAudioPreviewWrap" style="display: none; margin-top: 12px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); align-items: center; gap: 12px; flex-wrap: wrap;">
-                        <span style="font-size: 13px; font-weight: 600; color: #166534; display: inline-flex; align-items: center; gap: 6px;">
-                            <i class="fa-solid fa-circle-play" style="color: var(--primary-green);"></i> Nghe thử Audio:
-                        </span>
-                        <audio id="chapterAudioPreviewPlayer" controls style="height: 36px; max-width: 320px;"></audio>
-                        <button type="button" class="btn btn-outline btn-xs" onclick="window.muopClearChapterAudio && window.muopClearChapterAudio()" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11.5px;">
-                            <i class="fa-solid fa-trash-can"></i> Hủy audio đã chọn
-                        </button>
                     </div>
                 </div>
             </div>
 
             <script>
+            // Các hàm preview audio toàn cục
             window.muopPreviewChapterAudio = function(input) {
                 var wrap = document.getElementById('chapterAudioPreviewWrap');
                 var player = document.getElementById('chapterAudioPreviewPlayer');
@@ -346,226 +358,331 @@ if ($selected_story_id) {
                 if (wrap) wrap.style.display = 'none';
             };
 
-            // Bắt sự kiện bấm chuyển đổi Voice Clone TTS
+            // Quản lý Accordion Thu Nhỏ / Sổ Ra & Tính Năng Tạo Audio
             (function() {
+                // 1. Accordion Toggle
+                var toggleBtn = document.getElementById('btnToggleChapterAudioSection');
+                var collBody = document.getElementById('chapterAudioCollapsibleBody');
+                var toggleIcon = document.getElementById('chapterAudioToggleIcon');
+                var toggleText = document.getElementById('chapterAudioToggleStatusText');
+
+                if (toggleBtn && collBody) {
+                    function doToggleAudio() {
+                        var isHidden = (collBody.style.display === 'none' || !collBody.style.display || window.getComputedStyle(collBody).display === 'none');
+                        if (isHidden) {
+                            collBody.style.display = 'block';
+                            if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
+                            if (toggleText) toggleText.textContent = 'Thu nhỏ lại';
+                            toggleBtn.style.background = '#f0fdf4';
+                            setTimeout(function() {
+                                try {
+                                    if (toggleBtn && typeof toggleBtn.scrollIntoView === 'function') {
+                                        toggleBtn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }
+                                } catch(err) {}
+                            }, 120);
+                        } else {
+                            collBody.style.display = 'none';
+                            if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
+                            if (toggleText) toggleText.textContent = 'Bấm để mở';
+                            toggleBtn.style.background = '#ffffff';
+                        }
+                    }
+                    window.muopToggleAddChapterAudio = doToggleAudio;
+                    toggleBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        doToggleAudio();
+                    });
+                    toggleBtn.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            doToggleAudio();
+                        }
+                    });
+                }
+
+                // 2. Logic Nạp Giọng Mẫu & Tạo Audio
                 var btnConvert = document.getElementById('btnTriggerTtsConvert');
-                if (!btnConvert) return;
+                var savedVoiceSelect = document.getElementById('addChapterSavedVoiceSelect');
+                var btnPreviewSaved = document.getElementById('btnPreviewSavedVoiceAddPage');
+                var btnDeleteSaved = document.getElementById('btnDeleteSavedVoiceAddPage');
+                var savedAudioPreview = document.getElementById('addSavedVoiceAudioPreview');
+                var analysisCard = document.getElementById('addChapterVoiceAnalysisCard');
+                var analysisText = document.getElementById('addChapterVoiceAnalysisText');
+                var refFileEl = document.getElementById('inputTtsReferenceVoice');
+                var statusBox = document.getElementById('ttsConvertStatusBox');
 
-                btnConvert.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    var contentEl = document.getElementById('chapterContent');
-                    var refFileEl = document.getElementById('inputTtsReferenceVoice');
-                    var statusBox = document.getElementById('ttsConvertStatusBox');
-                    var storySelect = document.getElementById('selectStory');
+                var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
+                var currentSavedVoices = [];
 
-                    var contentText = contentEl ? contentEl.value.trim() : '';
-                    if (!contentText || contentText.length < 5) {
-                        if (statusBox) {
-                            statusBox.style.display = 'block';
-                            statusBox.className = 'alert-box alert-error';
-                            statusBox.style.background = '#fef2f2';
-                            statusBox.style.color = '#991b1b';
-                            statusBox.style.border = '1px solid #fecaca';
-                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Vui lòng nhập nội dung văn bản chương truyện ở trên trước khi chuyển đổi!';
-                        }
+                function renderSavedVoices(voices, selectId) {
+                    currentSavedVoices = voices || [];
+                    if (!savedVoiceSelect) return;
+                    if (!currentSavedVoices || currentSavedVoices.length === 0) {
+                        savedVoiceSelect.innerHTML = '<option value="system_default_voice" data-url="/wp-content/uploads/audio/giong_goc_chuan_he_thong.mp3">Giọng Gốc (Chuẩn Mặc Định - Dùng Chung)</option>';
                         return;
                     }
-
-                    var savedVoiceSelect = document.getElementById('addChapterSavedVoiceSelect');
-                    var btnPreviewSaved = document.getElementById('btnPreviewSavedVoiceAddPage');
-                    var btnDeleteSaved = document.getElementById('btnDeleteSavedVoiceAddPage');
-                    var savedAudioPreview = document.getElementById('addSavedVoiceAudioPreview');
-                    var analysisCard = document.getElementById('addChapterVoiceAnalysisCard');
-                    var analysisText = document.getElementById('addChapterVoiceAnalysisText');
-
-                    // Nạp danh sách giọng mẫu đã lưu của dịch giả
-                    var currentSavedVoices = [];
-                    function renderSavedVoices(voices) {
-                        currentSavedVoices = voices || [];
-                        if (!savedVoiceSelect) return;
-                        if (!currentSavedVoices || currentSavedVoices.length === 0) {
-                            savedVoiceSelect.innerHTML = '<option value="">-- Bạn chưa có giọng mẫu nào đã lưu (Hãy tải lên file mới ở dưới) --</option>';
-                            return;
+                    var html = '';
+                    currentSavedVoices.forEach(function(v) {
+                        var profStr = '';
+                        if (v.profile && v.profile.voice_label) profStr = ' • ' + v.profile.voice_label;
+                        var isSel = (selectId && selectId === v.id) ? ' selected' : (v.id === 'system_default_voice' ? ' selected' : '');
+                        var aUrl = v.audio_url || '';
+                        if (v.id === 'system_default_voice' && !aUrl) {
+                            aUrl = '/wp-content/uploads/audio/giong_goc_chuan_he_thong.mp3';
                         }
-                        var html = '<option value="">-- Chọn 1 giọng mẫu đã lưu của bạn (' + currentSavedVoices.length + ' giọng) --</option>';
-                        currentSavedVoices.forEach(function(v) {
-                            var profStr = '';
-                            if (v.profile && v.profile.voice_label) profStr = ' • ' + v.profile.voice_label;
-                            html += '<option value="' + v.id + '" data-url="' + (v.audio_url || '') + '">' + (v.name || 'Giọng Mẫu') + profStr + ' (' + (v.created_fmt || '') + ')</option>';
-                        });
-                        savedVoiceSelect.innerHTML = html;
-                    }
+                        html += '<option value="' + v.id + '" data-url="' + aUrl + '"' + isSel + '>' + (v.name || 'Giọng Mẫu') + profStr + '</option>';
+                    });
+                    savedVoiceSelect.innerHTML = html;
+                }
 
-                    function fetchSavedVoices() {
-                        var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
-                        fetch(ajaxUrl + '?action=muop_get_my_saved_voices')
-                        .then(function(r) { return r.json(); })
-                        .then(function(res) {
-                            if (res && res.success && res.data) {
-                                renderSavedVoices(res.data.voices);
-                            }
-                        })
-                        .catch(function() {});
-                    }
-                    fetchSavedVoices();
-
-                    // Nghe thử giọng mẫu đã lưu
-                    if (btnPreviewSaved && savedVoiceSelect && savedAudioPreview) {
-                        btnPreviewSaved.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            var opt = savedVoiceSelect.options[savedVoiceSelect.selectedIndex];
-                            var url = opt ? opt.getAttribute('data-url') : '';
-                            if (!url) {
-                                alert('Vui lòng chọn một giọng mẫu đã lưu từ danh sách trước khi nghe thử!');
-                                return;
-                            }
-                            if (savedAudioPreview.src === url && !savedAudioPreview.paused) {
-                                savedAudioPreview.pause();
-                                btnPreviewSaved.innerHTML = '<i class="fa-solid fa-play"></i> Nghe thử';
-                            } else {
-                                savedAudioPreview.src = url;
-                                savedAudioPreview.play();
-                                btnPreviewSaved.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
-                                savedAudioPreview.onended = function() {
-                                    btnPreviewSaved.innerHTML = '<i class="fa-solid fa-play"></i> Nghe thử';
-                                };
-                            }
-                        });
-                    }
-
-                    // Xóa giọng mẫu khỏi kho của dịch giả
-                    if (btnDeleteSaved && savedVoiceSelect) {
-                        btnDeleteSaved.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            var vid = savedVoiceSelect.value;
-                            if (!vid) {
-                                alert('Vui lòng chọn giọng mẫu bạn muốn xóa!');
-                                return;
-                            }
-                            if (!confirm('Bạn có chắc chắn muốn xóa giọng mẫu này khỏi kho cá nhân của bạn?')) return;
-
-                            var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
-                            var delFd = new FormData();
-                            delFd.append('action', 'muop_delete_my_saved_voice');
-                            delFd.append('voice_id', vid);
-                            delFd.append('nonce', (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '');
-
-                            fetch(ajaxUrl, { method: 'POST', body: delFd })
-                            .then(function(r) { return r.json(); })
-                            .then(function(res) {
-                                if (res.success) {
-                                    fetchSavedVoices();
-                                } else {
-                                    alert(res.data ? res.data.message : 'Không thể xóa giọng mẫu!');
-                                }
-                            });
-                        });
-                    }
-
-                    var selectedSavedVoiceId = savedVoiceSelect ? savedVoiceSelect.value : '';
-                    var hasNewFile = (refFileEl && refFileEl.files && refFileEl.files[0]);
-
-                    if (!selectedSavedVoiceId && !hasNewFile) {
-                        if (statusBox) {
-                            statusBox.style.display = 'block';
-                            statusBox.className = 'alert-box alert-error';
-                            statusBox.style.background = '#fef2f2';
-                            statusBox.style.color = '#991b1b';
-                            statusBox.style.border = '1px solid #fecaca';
-                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Vui lòng chọn 1 giọng mẫu đã lưu của bạn HOẶC tải lên file âm thanh mới (.mp3, .wav) để bắt chước!';
-                        }
-                        return;
-                    }
-
-                    var storyId = storySelect ? storySelect.value : '<?php echo esc_js($story_id_param); ?>';
-
-                    var origHtml = btnConvert.innerHTML;
-                    btnConvert.disabled = true;
-                    btnConvert.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang bắt chước giọng...';
-
-                    if (statusBox) {
-                        statusBox.style.display = 'block';
-                        statusBox.className = 'alert-box alert-info';
-                        statusBox.style.background = '#eff6ff';
-                        statusBox.style.color = '#1e40af';
-                        statusBox.style.border = '1px solid #bfdbfe';
-                        statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích cao độ, âm sắc giọng mẫu và tạo file audio chương mới siêu tốc...';
-                    }
-
-                    var fd = new FormData();
-                    fd.append('action', 'muop_convert_tts_chapter_audio');
-                    fd.append('nonce', (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '');
-                    fd.append('story_id', storyId || 0);
-                    fd.append('chapter_id', 0);
-                    fd.append('content', contentText);
-
-                    if (selectedSavedVoiceId && !hasNewFile) {
-                        fd.append('saved_voice_id', selectedSavedVoiceId);
-                    } else if (hasNewFile) {
-                        fd.append('reference_voice', refFileEl.files[0]);
-                    }
-
-                    var ajaxUrl = (window.muopConfig && window.muopConfig.ajaxUrl) ? window.muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php';
-
-                    fetch(ajaxUrl, {
-                        method: 'POST',
-                        body: fd
-                    })
+                function fetchSavedVoices(selectId) {
+                    fetch(ajaxUrl + '?action=muop_get_my_saved_voices')
                     .then(function(r) { return r.json(); })
                     .then(function(res) {
-                        btnConvert.disabled = false;
-                        btnConvert.innerHTML = origHtml;
-                        if (res.success && res.data && res.data.audio_url) {
-                            var audioUrl = res.data.audio_url;
-                            var urlInput = document.getElementById('inputChapterAudioUrl');
-                            if (urlInput) urlInput.value = audioUrl;
-
-                            // Preview audio
-                            window.muopPreviewChapterAudioUrl(audioUrl);
-
-                            // Hiển thị kết quả phân tích chất giọng
-                            if (res.data.voice_profile && analysisCard && analysisText) {
-                                var vp = res.data.voice_profile;
-                                var gText = vp.voice_label || (vp.gender === 'male' ? 'Giọng Nam' : 'Giọng Nữ');
-                                analysisText.innerHTML = '<strong>Đã phân tích:</strong> ' + gText + ' (Pitch: ' + (vp.pitch_hz || '195') + 'Hz • Tỷ lệ cao độ: ' + (vp.pitch_ratio || '1.0') + ' • Âm sắc 5-band Formant EQ đã cân chỉnh)';
-                                analysisCard.style.display = 'flex';
-                            }
-
-                            // Cập nhật lại kho giọng mẫu nếu có giọng mới
-                            if (res.data.my_voices) {
-                                renderSavedVoices(res.data.my_voices);
-                            }
-
-                            if (statusBox) {
-                                statusBox.className = 'alert-box alert-success';
-                                statusBox.style.background = '#f0fdf4';
-                                statusBox.style.color = '#166534';
-                                statusBox.style.border = '1px solid #bbf7d0';
-                                statusBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + (res.data.message || 'Chuyển đổi thành công!') + ' Audio này sẽ được lưu cùng chương khi bạn bấm "Thêm Chương Mới".';
-                            }
+                        if (res && res.success && res.data) {
+                            renderSavedVoices(res.data.voices, selectId);
                         } else {
+                            renderSavedVoices([], selectId);
+                        }
+                    })
+                    .catch(function() {
+                        renderSavedVoices([], selectId);
+                    });
+                }
+                fetchSavedVoices();
+
+                // Nghe thử giọng mẫu
+                if (btnPreviewSaved && savedVoiceSelect && savedAudioPreview) {
+                    btnPreviewSaved.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var opt = savedVoiceSelect.options[savedVoiceSelect.selectedIndex];
+                        var url = opt ? opt.getAttribute('data-url') : '';
+                        if (!url && opt && opt.value === 'system_default_voice') {
+                            url = '/wp-content/uploads/audio/giong_goc_chuan_he_thong.mp3';
+                        }
+                        if (!url) {
+                            alert('Vui lòng chọn một giọng mẫu từ danh sách trước khi nghe thử!');
+                            return;
+                        }
+                        if (savedAudioPreview.src && savedAudioPreview.src.indexOf(url) !== -1 && !savedAudioPreview.paused) {
+                            savedAudioPreview.pause();
+                            btnPreviewSaved.innerHTML = '<i class="fa-solid fa-play"></i> Nghe thử';
+                        } else {
+                            savedAudioPreview.src = url;
+                            savedAudioPreview.play().catch(function() {});
+                            btnPreviewSaved.innerHTML = '<i class="fa-solid fa-pause"></i> Tạm dừng';
+                            savedAudioPreview.onended = function() {
+                                btnPreviewSaved.innerHTML = '<i class="fa-solid fa-play"></i> Nghe thử';
+                            };
+                        }
+                    });
+                }
+
+                // Xóa giọng mẫu khỏi kho của dịch giả
+                if (btnDeleteSaved && savedVoiceSelect) {
+                    btnDeleteSaved.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var vid = savedVoiceSelect.value;
+                        if (!vid) {
+                            alert('Vui lòng chọn giọng mẫu bạn muốn xóa!');
+                            return;
+                        }
+                        if (vid === 'system_default_voice') {
+                            alert('Đây là giọng gốc chuẩn mặc định của hệ thống dùng chung, không thể xóa!');
+                            return;
+                        }
+                        if (!confirm('Bạn có chắc chắn muốn xóa giọng mẫu này khỏi kho cá nhân của bạn?')) return;
+
+                        var delFd = new FormData();
+                        delFd.append('action', 'muop_delete_my_saved_voice');
+                        delFd.append('voice_id', vid);
+                        delFd.append('nonce', (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '');
+
+                        fetch(ajaxUrl, { method: 'POST', body: delFd })
+                        .then(function(r) { return r.json(); })
+                        .then(function(res) {
+                            if (res.success) {
+                                fetchSavedVoices();
+                            } else {
+                                alert(res.data ? res.data.message : 'Không thể xóa giọng mẫu!');
+                            }
+                        });
+                    });
+                }
+
+                // Phân Tích Giọng
+                var btnAnalyze = document.getElementById('btnAnalyzeVoiceChapter');
+                if (btnAnalyze) {
+                    btnAnalyze.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var file = refFileEl && refFileEl.files && refFileEl.files[0];
+                        var savedVid = savedVoiceSelect ? savedVoiceSelect.value : '';
+
+                        if (!file && !savedVid) {
+                            alert('Vui lòng chọn 1 giọng mẫu đã lưu hoặc chọn file âm thanh (.mp3, .wav) để phân tích!');
+                            return;
+                        }
+
+                        if (savedVid === 'system_default_voice' && !file) {
+                            if (analysisCard) analysisCard.style.display = 'flex';
+                            if (analysisText) {
+                                analysisText.innerHTML = '✅ <strong style="color: #15803d;">Đã phân tích xong!</strong> Nhận diện: Giọng Nữ (Hoài My - Chuẩn Ngọt Ngào, Dễ Nghe) — 210Hz. Bấm <strong>"Tạo Audio"</strong> để tạo audio.';
+                            }
+                            return;
+                        }
+
+                        btnAnalyze.disabled = true;
+                        btnAnalyze.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích...';
+
+                        if (analysisCard) analysisCard.style.display = 'flex';
+                        if (analysisText) analysisText.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích âm điệu, màu giọng và cao độ...';
+
+                        var fd = new FormData();
+                        fd.append('action', 'muop_analyze_voice_sample');
+                        if (savedVid && !file) {
+                            fd.append('saved_voice_id', savedVid);
+                        } else if (file) {
+                            fd.append('reference_voice', file);
+                        }
+                        fd.append('nonce', (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '');
+
+                        fetch(ajaxUrl, { method: 'POST', body: fd })
+                        .then(function(r) { return r.json(); })
+                        .then(function(res) {
+                            btnAnalyze.disabled = false;
+                            btnAnalyze.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích Giọng';
+
+                            if (res && res.success && res.data) {
+                                var vp = res.data.voice_profile || {};
+                                var label = res.data.voice_name || vp.voice_label || 'Giọng Mẫu';
+                                if (analysisText) {
+                                    analysisText.innerHTML = '✅ <strong style="color: #15803d;">Đã phân tích xong!</strong> Nhận diện: ' + label + ' (Tần số: ' + (vp.pitch_hz || '210') + 'Hz). Bấm <strong>"Tạo Audio"</strong> để tạo audio.';
+                                }
+                                if (res.data.is_new_saved && res.data.voice_id) {
+                                    fetchSavedVoices(res.data.voice_id);
+                                }
+                            } else {
+                                if (analysisText) {
+                                    analysisText.innerHTML = '<span style="color: #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> ' + ((res && res.data && res.data.message) || 'Lỗi khi phân tích giọng') + '</span>';
+                                }
+                            }
+                        })
+                        .catch(function() {
+                            btnAnalyze.disabled = false;
+                            btnAnalyze.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích Giọng';
+                            if (analysisText) {
+                                analysisText.innerHTML = '<span style="color: #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> Không thể kết nối máy chủ phân tích giọng.</span>';
+                            }
+                        });
+                    });
+                }
+
+                // Khi bấm nút "Tạo Audio"
+                if (btnConvert) {
+                    btnConvert.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var contentEl = document.getElementById('chapContent');
+                        var contentText = contentEl ? contentEl.value.trim() : '';
+                        if (!contentText || contentText.length < 5) {
                             if (statusBox) {
+                                statusBox.style.display = 'block';
                                 statusBox.className = 'alert-box alert-error';
                                 statusBox.style.background = '#fef2f2';
                                 statusBox.style.color = '#991b1b';
                                 statusBox.style.border = '1px solid #fecaca';
-                                var msg = (res.data && res.data.message) ? res.data.message : 'Có lỗi xảy ra khi chuyển đổi giọng nói!';
-                                statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + msg;
+                                statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Vui lòng nhập hoặc dán nội dung văn bản chương truyện ở trên trước khi tạo audio!';
                             }
+                            return;
                         }
-                    })
-                    .catch(function(err) {
-                        btnConvert.disabled = false;
-                        btnConvert.innerHTML = origHtml;
+
+                        var selectedSavedVoiceId = savedVoiceSelect ? savedVoiceSelect.value : 'system_default_voice';
+                        var hasNewFile = (refFileEl && refFileEl.files && refFileEl.files[0]);
+
+                        var storySelect = document.getElementById('selectStory');
+                        var storyId = storySelect ? storySelect.value : '<?php echo esc_js($selected_story_id); ?>';
+
+                        var origBtnHtml = btnConvert.innerHTML;
+                        btnConvert.disabled = true;
+                        btnConvert.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tạo audio chương...';
+
                         if (statusBox) {
-                            statusBox.className = 'alert-box alert-error';
-                            statusBox.style.background = '#fef2f2';
-                            statusBox.style.color = '#991b1b';
-                            statusBox.style.border = '1px solid #fecaca';
-                            statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Lỗi kết nối máy chủ. Vui lòng thử lại!';
+                            statusBox.style.display = 'block';
+                            statusBox.className = 'alert-box alert-info';
+                            statusBox.style.background = '#eff6ff';
+                            statusBox.style.color = '#1e40af';
+                            statusBox.style.border = '1px solid #bfdbfe';
+                            statusBox.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tổng hợp giọng nói Hoài My/Nam Minh truyền cảm, mượt mà... Vui lòng đợi trong giây lát!';
                         }
+
+                        var fd = new FormData();
+                        fd.append('action', 'muop_convert_tts_chapter_audio');
+                        fd.append('nonce', (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : '');
+                        fd.append('story_id', storyId || 0);
+                        fd.append('chapter_id', 0);
+                        fd.append('content', contentText);
+                        if (selectedSavedVoiceId && !hasNewFile) {
+                            fd.append('saved_voice_id', selectedSavedVoiceId);
+                        } else if (hasNewFile) {
+                            fd.append('reference_voice', refFileEl.files[0]);
+                        }
+
+                        fetch(ajaxUrl, { method: 'POST', body: fd })
+                        .then(function(r) { return r.json(); })
+                        .then(function(res) {
+                            btnConvert.disabled = false;
+                            btnConvert.innerHTML = origBtnHtml;
+
+                            if (res && res.success && res.data && res.data.audio_url) {
+                                var audioUrl = res.data.audio_url;
+                                var urlInput = document.getElementById('inputChapterAudioUrl');
+                                if (urlInput) urlInput.value = audioUrl;
+
+                                var previewWrap = document.getElementById('chapterAudioPreviewWrap');
+                                var previewPlayer = document.getElementById('chapterAudioPreviewPlayer');
+                                if (previewWrap && previewPlayer) {
+                                    previewPlayer.src = audioUrl;
+                                    previewWrap.style.display = 'flex';
+                                }
+
+                                if (res.data.saved_voice && res.data.saved_voice.id) {
+                                    fetchSavedVoices(res.data.saved_voice.id);
+                                }
+
+                                if (statusBox) {
+                                    statusBox.style.display = 'block';
+                                    statusBox.className = 'alert-box alert-success';
+                                    statusBox.style.background = '#f0fdf4';
+                                    statusBox.style.color = '#166534';
+                                    statusBox.style.border = '1px solid #bbf7d0';
+                                    statusBox.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + (res.data.message || 'Tạo audio chương thành công!') + ' Đường dẫn audio đã được gắn tự động.';
+                                }
+                            } else {
+                                var err = (res && res.data && res.data.message) || (res && res.message) || 'Lỗi khi tạo audio!';
+                                if (statusBox) {
+                                    statusBox.style.display = 'block';
+                                    statusBox.className = 'alert-box alert-error';
+                                    statusBox.style.background = '#fef2f2';
+                                    statusBox.style.color = '#991b1b';
+                                    statusBox.style.border = '1px solid #fecaca';
+                                    statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ' + err;
+                                }
+                            }
+                        })
+                        .catch(function(err) {
+                            btnConvert.disabled = false;
+                            btnConvert.innerHTML = origBtnHtml;
+                            if (statusBox) {
+                                statusBox.style.display = 'block';
+                                statusBox.className = 'alert-box alert-error';
+                                statusBox.style.background = '#fef2f2';
+                                statusBox.style.color = '#991b1b';
+                                statusBox.style.border = '1px solid #fecaca';
+                                statusBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Không thể kết nối đến máy chủ!';
+                            }
+                        });
                     });
-                });
+                }
             })();
             </script>
 

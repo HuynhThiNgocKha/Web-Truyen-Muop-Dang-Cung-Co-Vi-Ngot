@@ -56,39 +56,81 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
                     <i class="fa-solid fa-clock"></i> Chọn ngày & giờ hẹn mới (Chuẩn 24 Giờ Việt Nam):
                 </label>
 
-                <!-- Bộ chọn ngày và 24 giờ Việt Nam (Không AM/PM) -->
-                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px;">
-                    <!-- Ngày -->
-                    <div style="flex: 1.2; min-width: 140px;">
-                        <input type="date" id="popupSchedDate" class="form-input" min="<?php echo date('Y-m-d'); ?>" value="<?php echo date('Y-m-d'); ?>" onchange="window.muopSyncPopupScheduleTime && window.muopSyncPopupScheduleTime()" style="height: 38px; font-size: 13.5px; font-weight: 600;" />
+                <!-- Bộ chọn ngày và 24 giờ Việt Nam ĐẸP MẮT (Chuẩn Hình 1 & 2) -->
+                <div class="custom-sched-picker-row">
+                    <!-- 1. Custom Date Picker (Hình 1) -->
+                    <div class="custom-sched-picker-col">
+                        <input type="hidden" id="popupSchedDate" value="<?php echo date('Y-m-d'); ?>" />
+                        <button type="button" class="custom-sched-btn-trigger" id="btnTriggerCustomDate" title="Bấm để chọn ngày phát hành">
+                            <span style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-calendar-days" style="color: #8b5cf6;"></i>
+                                <span id="displayCustomDateText"><?php echo date('d/m/Y'); ?></span>
+                            </span>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 11px; opacity: 0.5;"></i>
+                        </button>
+
+                        <!-- Popup Lịch Mini Tuyệt Đẹp (Hình 1) -->
+                        <div class="custom-sched-dropdown-card" id="cardCustomDatePicker">
+                            <div class="custom-cal-header">
+                                <button type="button" class="custom-cal-nav-btn" id="btnCalPrevMonth"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span class="custom-cal-title" id="calMonthYearTitle">Tháng ...</span>
+                                <button type="button" class="custom-cal-nav-btn" id="btnCalNextMonth"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                            <div class="custom-cal-weekdays">
+                                <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span>
+                            </div>
+                            <div class="custom-cal-grid" id="calDaysGrid"></div>
+                            <div class="custom-cal-footer">
+                                <button type="button" class="custom-cal-quick-btn" id="btnCalSelectToday">Hôm nay</button>
+                                <button type="button" class="custom-cal-quick-btn" id="btnCalSelectTomorrow">Ngày mai</button>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Giờ (24 giờ chuẩn: 00 đến 23) -->
-                    <div style="flex: 1; min-width: 110px;">
-                        <select id="popupSchedHour" class="form-input" onchange="window.muopSyncPopupScheduleTime && window.muopSyncPopupScheduleTime()" style="height: 38px; font-size: 13.5px; font-weight: 600;">
+                    <!-- 2. Custom Time Picker (Hình 2: Giờ & Phút) -->
+                    <div class="custom-sched-picker-col">
+                        <select id="popupSchedHour" style="display: none;">
                             <?php for ($h = 0; $h < 24; $h++): 
                                 $h_str = str_pad($h, 2, '0', STR_PAD_LEFT);
-                                $suffix = '';
-                                if ($h >= 0 && $h < 6) $suffix = ' (đêm)';
-                                elseif ($h >= 6 && $h < 11) $suffix = ' (sáng)';
-                                elseif ($h >= 11 && $h < 13) $suffix = ' (trưa)';
-                                elseif ($h >= 13 && $h < 18) $suffix = ' (chiều)';
-                                else $suffix = ' (tối)';
+                                $suffix = ($h < 6 ? ' (đêm)' : ($h < 11 ? ' (sáng)' : ($h < 13 ? ' (trưa)' : ($h < 18 ? ' (chiều)' : ' (tối)'))));
                             ?>
                                 <option value="<?php echo $h_str; ?>"><?php echo $h_str . ' giờ' . $suffix; ?></option>
                             <?php endfor; ?>
                         </select>
-                    </div>
-
-                    <!-- Phút (00 đến 55, bước nhảy 5 phút) -->
-                    <div style="flex: 0.9; min-width: 95px;">
-                        <select id="popupSchedMinute" class="form-input" onchange="window.muopSyncPopupScheduleTime && window.muopSyncPopupScheduleTime()" style="height: 38px; font-size: 13.5px; font-weight: 600;">
+                        <select id="popupSchedMinute" style="display: none;">
                             <?php for ($m = 0; $m < 60; $m += 5): 
                                 $m_str = str_pad($m, 2, '0', STR_PAD_LEFT);
                             ?>
                                 <option value="<?php echo $m_str; ?>"><?php echo $m_str . ' phút'; ?></option>
                             <?php endfor; ?>
                         </select>
+
+                        <button type="button" class="custom-sched-btn-trigger" id="btnTriggerCustomTime" title="Bấm để chọn giờ hẹn">
+                            <span style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-clock" style="color: #8b5cf6;"></i>
+                                <span id="displayCustomTimeText">12:00 (trưa)</span>
+                            </span>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 11px; opacity: 0.5;"></i>
+                        </button>
+
+                        <!-- Popup Menu Giờ & Phút Sang Trọng (Hình 2) -->
+                        <div class="custom-sched-dropdown-card" id="cardCustomTimePicker" style="width: 310px; right: 0; left: auto;">
+                            <div class="custom-time-title">
+                                <i class="fa-solid fa-sun" style="color: #f59e0b;"></i> Chọn Giờ (24 Giờ Việt Nam)
+                            </div>
+                            <div class="custom-time-hours-grid" id="timeHoursGrid"></div>
+
+                            <div class="custom-time-title" style="margin-top: 8px;">
+                                <i class="fa-solid fa-stopwatch" style="color: #06b6d4;"></i> Chọn Phút
+                            </div>
+                            <div class="custom-time-mins-grid" id="timeMinsGrid"></div>
+
+                            <div style="display: flex; justify-content: flex-end; padding-top: 6px; border-top: 1px solid #ede9fe;">
+                                <button type="button" class="custom-cal-quick-btn" id="btnCloseTimePicker" style="background: #7c3aed; color: #fff; border-color: #6d28d9; padding: 4px 14px;">
+                                    Xong
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -168,7 +210,19 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
         if (dParts.length === 3 && prevEl) {
             var dateFmt = dParts[2] + '/' + dParts[1] + '/' + dParts[0];
             prevEl.innerHTML = '<i class="fa-solid fa-clock"></i> <span>Thời gian chọn: <strong>' + hVal + ':' + mVal + ' ngày ' + dateFmt + '</strong> (Giờ Việt Nam)</span>';
+            
+            // Cập nhật text hiển thị trên 2 nút trigger đẹp mắt (Hình 1 & 2)
+            var dispDate = document.getElementById('displayCustomDateText');
+            if (dispDate) dispDate.textContent = dateFmt;
+            
+            var dispTime = document.getElementById('displayCustomTimeText');
+            if (dispTime) {
+                var hInt = parseInt(hVal, 10);
+                var suf = (hInt < 6 ? ' (đêm)' : (hInt < 11 ? ' (sáng)' : (hInt < 13 ? ' (trưa)' : (hInt < 18 ? ' (chiều)' : ' (tối)'))));
+                dispTime.textContent = hVal + ':' + mVal + suf;
+            }
         }
+        if (window.muopUpdateCustomPickerUI) window.muopUpdateCustomPickerUI();
     };
 
     // Chọn nhanh thời gian (+1h, +3h, Tối nay 20h, Sáng mai 8h)
@@ -352,13 +406,13 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
             }
         }
 
-        modal.style.display = 'flex';
+        modal.style.setProperty('display', 'flex', 'important');
     };
 
     // Hàm đóng Popup
     window.muopCloseScheduleModal = function() {
         var modal = document.getElementById('modalScheduleStoryDetail');
-        if (modal) modal.style.display = 'none';
+        if (modal) modal.style.setProperty('display', 'none', 'important');
         if (timerId) {
             clearInterval(timerId);
             timerId = null;
@@ -570,6 +624,210 @@ define('MUOP_MODAL_SCHEDULE_STORY_LOADED', true);
             window.muopOpenScheduleModal(sId, sTitle, '', '');
             return;
         }
+    });
+
+    // =========================================================================
+    // CUSTOM DATE & TIME PICKER CONTROLLERS (HÌNH 1 & HÌNH 2)
+    // =========================================================================
+    var curViewDate = new Date();
+
+    function getSelectedDateObj() {
+        var dateEl = document.getElementById('popupSchedDate');
+        if (dateEl && dateEl.value) {
+            var parts = dateEl.value.split('-');
+            if (parts.length === 3) {
+                return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            }
+        }
+        return new Date();
+    }
+
+    function renderCustomCalendar(viewYear, viewMonth) {
+        var grid = document.getElementById('calDaysGrid');
+        var title = document.getElementById('calMonthYearTitle');
+        if (!grid || !title) return;
+
+        title.textContent = 'Tháng ' + (viewMonth + 1) + ' / ' + viewYear;
+
+        var firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay(); // 0 is Sun, 1 is Mon
+        var startOffset = (firstDayOfWeek === 0) ? 6 : (firstDayOfWeek - 1); // Mon is 0
+
+        var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+        var selectedDate = getSelectedDateObj();
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        var html = '';
+        for (var i = 0; i < startOffset; i++) {
+            html += '<div class="custom-cal-day is-disabled"></div>';
+        }
+
+        for (var d = 1; d <= daysInMonth; d++) {
+            var thisDate = new Date(viewYear, viewMonth, d);
+            thisDate.setHours(0, 0, 0, 0);
+            var isPast = (thisDate.getTime() < today.getTime());
+            var isToday = (thisDate.getTime() === today.getTime());
+            var isSel = (thisDate.getFullYear() === selectedDate.getFullYear() &&
+                         thisDate.getMonth() === selectedDate.getMonth() &&
+                         thisDate.getDate() === selectedDate.getDate());
+
+            var cls = 'custom-cal-day';
+            if (isPast) cls += ' is-disabled';
+            if (isToday) cls += ' is-today';
+            if (isSel) cls += ' is-selected';
+
+            html += '<div class="' + cls + '" data-year="' + viewYear + '" data-month="' + (viewMonth + 1) + '" data-day="' + d + '" ' + (isPast ? '' : 'onclick="window.muopPickCustomCalDate(' + viewYear + ',' + (viewMonth + 1) + ',' + d + ')"') + '>' + d + '</div>';
+        }
+
+        grid.innerHTML = html;
+    }
+
+    window.muopPickCustomCalDate = function(y, m, d) {
+        var dateEl = document.getElementById('popupSchedDate');
+        if (dateEl) {
+            dateEl.value = y + '-' + pad2(m) + '-' + pad2(d);
+            window.muopSyncPopupScheduleTime();
+        }
+        var card = document.getElementById('cardCustomDatePicker');
+        if (card) card.classList.remove('show');
+    };
+
+    function renderCustomTimeGrids() {
+        var hGrid = document.getElementById('timeHoursGrid');
+        var mGrid = document.getElementById('timeMinsGrid');
+        var hourEl = document.getElementById('popupSchedHour');
+        var minEl = document.getElementById('popupSchedMinute');
+        if (!hGrid || !mGrid || !hourEl || !minEl) return;
+
+        var curH = hourEl.value;
+        var curM = minEl.value;
+
+        var hHtml = '';
+        for (var h = 0; h < 24; h++) {
+            var hStr = pad2(h);
+            var isSelH = (hStr === curH);
+            hHtml += '<div class="custom-time-hour-pill ' + (isSelH ? 'is-selected' : '') + '" onclick="window.muopPickCustomHour(\'' + hStr + '\')">' + hStr + 'h</div>';
+        }
+        hGrid.innerHTML = hHtml;
+
+        var mHtml = '';
+        for (var m = 0; m < 60; m += 5) {
+            var mStr = pad2(m);
+            var isSelM = (mStr === curM);
+            mHtml += '<div class="custom-time-min-pill ' + (isSelM ? 'is-selected' : '') + '" onclick="window.muopPickCustomMinute(\'' + mStr + '\')">' + mStr + 'p</div>';
+        }
+        mGrid.innerHTML = mHtml;
+    }
+
+    window.muopPickCustomHour = function(hStr) {
+        var hourEl = document.getElementById('popupSchedHour');
+        if (hourEl) {
+            hourEl.value = hStr;
+            window.muopSyncPopupScheduleTime();
+            renderCustomTimeGrids();
+        }
+    };
+
+    window.muopPickCustomMinute = function(mStr) {
+        var minEl = document.getElementById('popupSchedMinute');
+        if (minEl) {
+            minEl.value = mStr;
+            window.muopSyncPopupScheduleTime();
+            renderCustomTimeGrids();
+        }
+    };
+
+    window.muopUpdateCustomPickerUI = function() {
+        var selDate = getSelectedDateObj();
+        curViewDate = new Date(selDate.getTime());
+        renderCustomCalendar(curViewDate.getFullYear(), curViewDate.getMonth());
+        renderCustomTimeGrids();
+    };
+
+    // Khởi tạo các sự kiện click cho bộ chọn Custom Date & Time
+    document.addEventListener('DOMContentLoaded', function() {
+        var btnDate = document.getElementById('btnTriggerCustomDate');
+        var cardDate = document.getElementById('cardCustomDatePicker');
+        var btnTime = document.getElementById('btnTriggerCustomTime');
+        var cardTime = document.getElementById('cardCustomTimePicker');
+
+        if (btnDate && cardDate) {
+            btnDate.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (cardTime) cardTime.classList.remove('show');
+                cardDate.classList.toggle('show');
+                if (cardDate.classList.contains('show')) {
+                    window.muopUpdateCustomPickerUI();
+                }
+            });
+        }
+
+        if (btnTime && cardTime) {
+            btnTime.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (cardDate) cardDate.classList.remove('show');
+                cardTime.classList.toggle('show');
+                if (cardTime.classList.contains('show')) {
+                    window.muopUpdateCustomPickerUI();
+                }
+            });
+        }
+
+        var btnPrev = document.getElementById('btnCalPrevMonth');
+        var btnNext = document.getElementById('btnCalNextMonth');
+        if (btnPrev) {
+            btnPrev.addEventListener('click', function(e) {
+                e.stopPropagation();
+                curViewDate.setMonth(curViewDate.getMonth() - 1);
+                renderCustomCalendar(curViewDate.getFullYear(), curViewDate.getMonth());
+            });
+        }
+        if (btnNext) {
+            btnNext.addEventListener('click', function(e) {
+                e.stopPropagation();
+                curViewDate.setMonth(curViewDate.getMonth() + 1);
+                renderCustomCalendar(curViewDate.getFullYear(), curViewDate.getMonth());
+            });
+        }
+
+        var btnToday = document.getElementById('btnCalSelectToday');
+        var btnTomorrow = document.getElementById('btnCalSelectTomorrow');
+        if (btnToday) {
+            btnToday.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var now = new Date();
+                window.muopPickCustomCalDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
+            });
+        }
+        if (btnTomorrow) {
+            btnTomorrow.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var tom = new Date();
+                tom.setDate(tom.getDate() + 1);
+                window.muopPickCustomCalDate(tom.getFullYear(), tom.getMonth() + 1, tom.getDate());
+            });
+        }
+
+        var btnCloseTime = document.getElementById('btnCloseTimePicker');
+        if (btnCloseTime) {
+            btnCloseTime.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (cardTime) cardTime.classList.remove('show');
+            });
+        }
+
+        // Đóng khi click ngoài
+        document.addEventListener('click', function(e) {
+            if (cardDate && !cardDate.contains(e.target) && (!btnDate || !btnDate.contains(e.target))) {
+                cardDate.classList.remove('show');
+            }
+            if (cardTime && !cardTime.contains(e.target) && (!btnTime || !btnTime.contains(e.target))) {
+                cardTime.classList.remove('show');
+            }
+        });
+
+        // Khởi tạo lần đầu
+        window.muopUpdateCustomPickerUI();
     });
 })();
 </script>

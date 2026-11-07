@@ -139,7 +139,8 @@ if (!function_exists('muop_format_story_summary')) {
 }
 if (!function_exists('muop_format_team_bio')) {
     function muop_format_team_bio($bio) {
-        return wp_kses_post(nl2br($bio));
+        $clean = str_replace(array("\r\n", "\r"), "\n", $bio);
+        return str_replace("\n", "<br>", esc_html(trim($clean)));
     }
 }
 if (!function_exists('muop_get_chapter_views')) {
@@ -704,7 +705,7 @@ if ($genres === false) {
                 </li>
                 <li class="<?php echo is_page('truyen-audio') ? 'active' : ''; ?>">
                     <a href="<?php echo esc_url(home_url('/truyen-audio/')); ?>" class="drawer-nav-link">
-                        <i class="fa-solid fa-headphones" style="font-size: 13px; color: #16a34a; margin-right: 6px;"></i> <span>Truyện Audio</span>
+                        <span>Truyện Audio</span>
                     </a>
                 </li>
                 <li class="<?php echo is_page('truyen-hot') ? 'active' : ''; ?>">

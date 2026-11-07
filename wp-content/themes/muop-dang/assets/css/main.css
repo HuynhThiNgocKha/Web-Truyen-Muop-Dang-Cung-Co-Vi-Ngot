@@ -5982,29 +5982,35 @@ html[data-theme="dark"] .auth-brand-static .auth-brand-logo {
 }
 
 .team-hero-action {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  width: 100% !important;
+  max-width: 440px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 10px !important;
+  margin-top: 12px;
 }
 
 .team-hero-action .btn,
 .btn-edit-team-all,
+.btn-donate-team,
 .btn-favorite-team,
 .btn-follow-team {
-  height: 40px !important;
-  padding: 0 18px !important;
-  font-size: 13.5px !important;
+  height: 38px !important;
+  padding: 0 10px !important;
+  font-size: 13px !important;
   font-weight: 600 !important;
   border-radius: var(--radius-full) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 7px !important;
+  gap: 6px !important;
   white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
   box-sizing: border-box !important;
   transition: all 0.2s ease !important;
+  width: 100% !important;
+  min-width: 0 !important;
 }
 
 /* Team Stats KPI Grid */
@@ -6384,23 +6390,27 @@ html[data-theme="dark"] .auth-brand-static .auth-brand-logo {
     font-size: 20px;
   }
   .team-hero-action {
-    width: 100%;
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
     justify-content: center;
-    gap: 8px;
   }
   .team-hero-action .btn,
   .btn-favorite-team,
   .btn-follow-team,
-  .btn-edit-team-all {
-    flex: 1 1 auto;
-    min-width: 130px;
-    justify-content: center;
+  .btn-edit-team-all,
+  .btn-donate-team {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 8px !important;
+    font-size: 12px !important;
+    justify-content: center !important;
   }
   .team-hero-bio-row {
-    justify-content: center;
+    justify-content: flex-start !important;
+    text-align: left !important;
   }
   .team-stats-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -6771,13 +6781,13 @@ html[data-theme="dark"] .auth-brand-static .auth-brand-logo {
 
 @media (max-width: 992px) {
   .adm-genres-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 768px) {
   .adm-genres-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 }
 
@@ -9803,16 +9813,128 @@ body.page-template-page-quan-ly-admin {
   }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 768px) {
+  .btn-top-live-online {
+    display: none !important;
+  }
+
+  /* 1. Grid 3 ô 1 hàng ngang cho Thể loại & Từ nhạy cảm */
   .adm-genres-grid {
-    grid-template-columns: 1fr !important;
-    gap: 10px !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
   }
 
-  .adm-genre-card {
-    padding: 12px 14px !important;
+  .adm-genres-grid .adm-genre-card {
+    padding: 7px 6px !important;
+    border-radius: 8px !important;
+    gap: 4px !important;
+    min-height: auto !important;
   }
 
+  .adm-genres-grid .adm-genre-card > div:first-child {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+  }
+
+  .adm-genres-grid .adm-genre-title,
+  .adm-genres-grid .adm-word-title {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    word-break: break-word !important;
+  }
+
+  .adm-genres-grid .adm-genre-card .badge {
+    font-size: 8.5px !important;
+    padding: 1px 4px !important;
+    border-radius: 4px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+  }
+
+  .adm-genres-grid .adm-genre-card > div:last-child {
+    padding-top: 3px !important;
+    margin-top: 2px !important;
+    border-top: 1px dashed var(--border-light) !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+  }
+
+  .adm-genres-grid .btn-genre-dropdown-trigger {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 10px !important;
+    padding: 0 !important;
+    border-radius: 4px !important;
+  }
+
+  /* 2. Grid 3 ô 1 hàng ngang cho Thẻ Thống Kê (Audio, Khách Đọc, Doanh Thu, Analytics) */
+  .adm-stat-cards-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .adm-stat-cards-grid > div {
+    padding: 8px 6px !important;
+    border-radius: 8px !important;
+    min-width: 0 !important;
+    box-shadow: var(--shadow-sm) !important;
+  }
+
+  /* Tiêu đề & Icon thẻ */
+  .adm-stat-cards-grid > div > div:first-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 2px !important;
+  }
+
+  .adm-stat-cards-grid > div span:first-child,
+  .adm-stat-cards-grid > div div:first-child span {
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+    word-break: break-word !important;
+  }
+
+  .adm-stat-cards-grid > div span[style*="width: 32px"],
+  .adm-stat-cards-grid > div span[style*="width:32px"],
+  .adm-stat-cards-grid > div span[style*="height: 32px"],
+  .adm-stat-cards-grid > div span[style*="height:32px"] {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 10px !important;
+    border-radius: 5px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Số to trong thẻ */
+  .adm-stat-cards-grid > div > div[style*="font-size: 26px"],
+  .adm-stat-cards-grid > div > div[style*="font-size:26px"],
+  .adm-stat-cards-grid > div > div[style*="font-size: 24px"],
+  .adm-stat-cards-grid > div > div[style*="font-size:24px"],
+  .adm-stat-cards-grid > div > div[style*="font-size: 22px"],
+  .adm-stat-cards-grid > div > div[style*="font-size:22px"] {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    line-height: 1.2 !important;
+    margin-top: 4px !important;
+  }
+
+  /* Dòng chú thích bên dưới */
+  .adm-stat-cards-grid > div > div:last-child {
+    font-size: 8.5px !important;
+    line-height: 1.2 !important;
+    margin-top: 3px !important;
+    word-break: break-word !important;
+  }
+}
+
+@media (max-width: 576px) {
   .admin-db-content {
     padding: 10px 8px !important;
   }
@@ -11971,3 +12093,972 @@ html[data-theme="dark"] .story-carousel-dot.is-active {
 
 
 
+
+/* ==========================================================================
+   STORY BADGE AUDIO TƯƠNG ĐƯƠNG BADGE FULL (HÌNH 2)
+   ========================================================================== */
+.story-badge-top {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.story-badge-top .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  box-sizing: border-box;
+  line-height: 1;
+}
+
+.story-badge-top .badge.badge-audio-icon {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  padding: 0 8px !important;
+  min-width: 28px !important;
+  box-shadow: 0 1px 3px rgba(22, 163, 74, 0.35) !important;
+}
+
+.story-badge-top .badge.badge-audio-icon i {
+  font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .story-badge-top .badge {
+    height: 19px;
+    padding: 0 6px;
+    font-size: 10px;
+    border-radius: 5px;
+  }
+  .story-badge-top .badge.badge-audio-icon {
+    padding: 0 6px !important;
+    min-width: 24px !important;
+  }
+  .story-badge-top .badge.badge-audio-icon i {
+    font-size: 10px;
+  }
+}
+
+/* ==========================================================================
+   CUSTOM SPEED POPUP (HÌNH 1 ĐẸP MẮT)
+   ========================================================================== */
+.custom-speed-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-custom-speed-toggle {
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-custom-speed-toggle:hover {
+  border-color: #16a34a;
+  color: #16a34a;
+  background: #f0fdf4;
+}
+
+.custom-speed-menu {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0 !important;
+  right: auto !important;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 14px 32px -4px rgba(0,0,0,0.22), 0 6px 14px -2px rgba(0,0,0,0.1);
+  padding: 10px;
+  z-index: 10000;
+  width: 175px;
+  box-sizing: border-box;
+  animation: fadeInSpeed 0.15s ease-out;
+}
+
+.custom-speed-menu.show {
+  display: block !important;
+}
+
+@keyframes fadeInSpeed {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.speed-menu-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.speed-grid-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.speed-opt-btn {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #374151;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.speed-opt-btn:hover {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #16a34a;
+}
+
+.speed-opt-btn.is-active {
+  background: #16a34a !important;
+  border-color: #15803d !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.35);
+}
+
+/* ==========================================================================
+   POPUP NGHE NHẠC ĐĨA THAN VINYL XOAY TRÒN (HÌNH 3)
+   ========================================================================== */
+.music-player-vinyl-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0 12px;
+  perspective: 1000px;
+}
+
+.music-player-vinyl-disc {
+  width: 206px;
+  height: 206px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #2a2a2a 0%, #151515 45%, #0f0f0f 70%, #1a1a1a 85%, #0a0a0a 100%);
+  border: 4px solid #333333;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), inset 0 0 0 2px #444, inset 0 0 0 6px #1a1a1a, inset 0 0 0 10px #222, inset 0 0 0 14px #1a1a1a, inset 0 0 0 18px #262626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.3s ease;
+  animation: spinVinyl 14s linear infinite;
+  animation-play-state: paused;
+}
+
+.music-player-vinyl-disc.is-playing {
+  animation-play-state: running !important;
+}
+
+@keyframes spinVinyl {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.music-player-vinyl-center {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 0 0 3px #ffffff, 0 4px 10px rgba(0,0,0,0.5);
+  background: #1e293b;
+}
+
+.music-player-vinyl-center img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.music-player-center-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: inset 0 0 4px rgba(0,0,0,0.6);
+  z-index: 3;
+}
+
+@media (max-width: 640px) {
+  .music-player-vinyl-disc {
+    width: 172px;
+    height: 172px;
+  }
+  .music-player-vinyl-center {
+    width: 92px;
+    height: 92px;
+  }
+}
+
+/* ==========================================================================
+   TINH CHỈNH TEAM DỊCH THEO YÊU CẦU (HÌNH 1, 2, 3, 4)
+   ========================================================================== */
+/* HÌNH 1: Giới thiệu hiển thị tự nhiên, không ép căn giữa, không khoảng cách thừa */
+.team-hero-bio-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  gap: 6px !important;
+  margin-top: 6px !important;
+  width: 100% !important;
+}
+
+.team-hero-bio {
+  flex: 1 !important;
+  font-size: 13.5px !important;
+  color: var(--text-color) !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  text-align: left !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+.team-hero-bio p {
+  margin: 0 !important;
+  line-height: 1.5 !important;
+  text-align: left !important;
+}
+
+/* HÌNH 2: Huy hiệu spotlight chữ nhỏ, nằm trên 1 hàng, không che mất */
+.team-spotlight-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  background: linear-gradient(135deg, #FFF8E1, #FFECB3) !important;
+  color: #B45309 !important;
+  border: 1px solid #FDE68A !important;
+  padding: 3px 10px !important;
+  border-radius: var(--radius-full) !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+/* HÌNH 3: 4 Ô Thống Kê nằm cùng trên 1 hàng, không xuống dòng */
+.team-stat-label {
+  font-size: 11.5px !important;
+  color: var(--text-muted) !important;
+  font-weight: 600 !important;
+  margin-top: 1px !important;
+  white-space: nowrap !important;
+}
+
+/* HÌNH 4: Team dịch badge chữ nhỏ để tên nằm trên cùng 1 hàng */
+.team-badge-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  background: var(--soft-green) !important;
+  color: var(--primary-green) !important;
+  border: 1px solid var(--border-color) !important;
+  padding: 2px 10px !important;
+  border-radius: var(--radius-full) !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+@media (max-width: 768px) {
+  .team-hero-bio-row {
+    justify-content: flex-start !important;
+    text-align: left !important;
+  }
+  .team-hero-bio {
+    text-align: left !important;
+    font-size: 13px !important;
+  }
+  .team-spotlight-badge {
+    font-size: 10.5px !important;
+    padding: 2.5px 8px !important;
+    gap: 4px !important;
+  }
+  .team-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  .team-stat-item {
+    padding: 8px 8px !important;
+    gap: 8px !important;
+  }
+  .team-stat-icon {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 13px !important;
+    flex-shrink: 0 !important;
+  }
+  .team-stat-num {
+    font-size: 14.5px !important;
+    font-weight: 800 !important;
+  }
+  .team-stat-label {
+    font-size: 10px !important;
+    white-space: nowrap !important;
+  }
+  .team-badge-btn {
+    font-size: 11px !important;
+    padding: 2px 8px !important;
+    white-space: nowrap !important;
+  }
+}
+
+
+/* ==========================================================================
+   DONATE TEAM STYLES (Đồng bộ màu sắc với các nút khác & Bỏ icon)
+   ========================================================================== */
+.btn-donate-team,
+.btn-donate-story {
+  background-color: var(--soft-green, #e8f5e9) !important;
+  color: var(--primary-green, #2e7d32) !important;
+  border: 1px solid var(--border-color, #d5e7cf) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-donate-team:hover,
+.btn-donate-story:hover {
+  background-color: var(--border-color, #c8e6c9) !important;
+  color: var(--primary-hover, #1b5e20) !important;
+  border-color: var(--primary-green, #2e7d32) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.15) !important;
+}
+
+.btn-donate-team-inline {
+  display: none !important;
+}
+
+
+/* ==========================================================================
+   CUSTOM DATE & TIME PICKER (HÌNH 1 & HÌNH 2)
+   ========================================================================== */
+.custom-sched-picker-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.custom-sched-picker-col {
+  flex: 1;
+  min-width: 140px;
+  position: relative;
+}
+.custom-sched-btn-trigger {
+  width: 100%;
+  height: 40px;
+  background: #ffffff;
+  border: 1.5px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #4c1d95;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(124, 58, 237, 0.08);
+  box-sizing: border-box;
+}
+.custom-sched-btn-trigger:hover,
+.custom-sched-btn-trigger.is-active {
+  border-color: #8b5cf6;
+  background: #f5f3ff;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+.custom-sched-dropdown-card {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: #ffffff;
+  border: 1.5px solid #c4b5fd;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px -6px rgba(124, 58, 237, 0.25), 0 8px 16px -4px rgba(0,0,0,0.08);
+  padding: 14px;
+  z-index: 9999999;
+  width: 290px;
+  box-sizing: border-box;
+  animation: fadeInSched 0.18s ease-out;
+}
+.custom-sched-dropdown-card.show {
+  display: block !important;
+}
+@keyframes fadeInSched {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Calendar Styles (Hình 1) */
+.custom-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ede9fe;
+}
+.custom-cal-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #5b21b6;
+}
+.custom-cal-nav-btn {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  color: #6d28d9;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+.custom-cal-nav-btn:hover {
+  background: #7c3aed;
+  color: #ffffff;
+  border-color: #7c3aed;
+}
+.custom-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8b5cf6;
+  margin-bottom: 6px;
+}
+.custom-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.custom-cal-day {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.custom-cal-day:hover:not(.is-disabled) {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.custom-cal-day.is-selected {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.35);
+}
+.custom-cal-day.is-today {
+  border: 1.5px solid #a78bfa;
+}
+.custom-cal-day.is-disabled {
+  color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+  opacity: 0.5;
+}
+.custom-cal-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #ede9fe;
+}
+.custom-cal-quick-btn {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  color: #6d28d9;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.custom-cal-quick-btn:hover {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+/* Time Picker Styles (Hình 2) */
+.custom-time-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6d28d9;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.custom-time-hours-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.custom-time-hour-pill {
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.custom-time-hour-pill:hover {
+  background: #ede9fe;
+  color: #6d28d9;
+  border-color: #c4b5fd;
+}
+.custom-time-hour-pill.is-selected {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  color: #ffffff !important;
+  border-color: #6d28d9 !important;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.35);
+}
+.custom-time-mins-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.custom-time-min-pill {
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.custom-time-min-pill:hover {
+  background: #ede9fe;
+  color: #6d28d9;
+  border-color: #c4b5fd;
+}
+.custom-time-min-pill.is-selected {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  color: #ffffff !important;
+  border-color: #6d28d9 !important;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.35);
+}
+
+@media (max-width: 576px) {
+  .custom-sched-dropdown-card {
+    width: 290px !important;
+    max-width: calc(100vw - 32px) !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+  }
+}
+
+
+/* ==========================================================================
+   TEAM HERO DESKTOP & MOBILE LAYOUT FIX (HÌNH 1 - CÁC NÚT XUỐNG DƯỚI)
+   ========================================================================== */
+.team-hero-top {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 16px !important;
+  padding-bottom: 22px !important;
+  border-bottom: 1px solid var(--border-light) !important;
+  margin-bottom: 20px !important;
+}
+
+.team-hero-main-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 20px !important;
+  width: 100% !important;
+}
+
+.team-hero-info {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.team-hero-action {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  margin-top: 6px !important;
+}
+
+.team-hero-action .btn,
+.team-hero-action .btn-edit-team-all,
+.team-hero-action .btn-donate-team,
+.team-hero-action .btn-favorite-team,
+.team-hero-action .btn-follow-team {
+  height: 38px !important;
+  padding: 0 20px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-full) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+  width: auto !important;
+  min-width: 130px !important;
+}
+
+  /* ==========================================================================
+   TEAM HERO & RESPONSIVE UNIFIED STYLES (OPERA, CHROME, MOBILE)
+   ========================================================================== */
+.team-hero-top {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 16px !important;
+  padding-bottom: 22px !important;
+  border-bottom: 1px solid var(--border-light) !important;
+  margin-bottom: 20px !important;
+  width: 100% !important;
+}
+
+.team-hero-main-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 22px !important;
+  width: 100% !important;
+}
+
+.team-avatar-wrap {
+  flex-shrink: 0 !important;
+}
+
+.team-avatar-circle {
+  width: 104px !important;
+  height: 104px !important;
+}
+
+.team-hero-info {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.team-hero-title-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 6px !important;
+}
+
+.team-hero-bio-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+  margin-top: 4px !important;
+}
+
+/* Các nút hành động nằm ngay phía dưới phần thông tin team */
+.team-hero-action {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  margin-top: 14px !important;
+  padding-top: 14px !important;
+  border-top: 1px dashed var(--border-light) !important;
+}
+
+.team-hero-action .btn,
+.team-hero-action .btn-edit-team-all,
+.team-hero-action .btn-donate-team,
+.team-hero-action .btn-favorite-team,
+.team-hero-action .btn-follow-team {
+  height: 40px !important;
+  padding: 0 22px !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-full) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+  width: auto !important;
+  min-width: 130px !important;
+}
+
+/* GIAO DIỆN TRÊN ĐIỆN THOẠI (MOBILE < 768px): Căn avatar ở giữa, các nút nằm phía dưới đều đặn */
+@media (max-width: 768px) {
+  .team-hero-card {
+    padding: 18px 14px !important;
+  }
+  .team-hero-top {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 14px !important;
+    padding-bottom: 18px !important;
+    width: 100% !important;
+  }
+  .team-hero-main-row {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+  /* Hình đại diện (Avatar) nằm chính giữa */
+  .team-avatar-wrap {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 0 auto 6px auto !important;
+    text-align: center !important;
+  }
+  .team-avatar-circle {
+    margin: 0 auto !important;
+    width: 96px !important;
+    height: 96px !important;
+    font-size: 38px !important;
+  }
+  .team-hero-info {
+    width: 100% !important;
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+  .team-hero-title-row {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 8px !important;
+    margin-bottom: 6px !important;
+  }
+  .team-hero-name {
+    text-align: center !important;
+    font-size: 20px !important;
+  }
+  .team-hero-bio-row {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    margin-top: 4px !important;
+    padding: 0 !important;
+  }
+  .team-hero-bio {
+    flex: 1 !important;
+    width: 100% !important;
+    text-align: center !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    font-size: 13.5px !important;
+    line-height: 1.6 !important;
+    color: var(--text-color) !important;
+    margin: 0 !important;
+  }
+  .team-hero-bio * {
+    text-align: center !important;
+  }
+  .team-hero-bio p {
+    text-align: center !important;
+    margin: 0 0 6px 0 !important;
+  }
+  /* Các nút nằm phía dưới, chia 2 cột đối xứng hài hòa */
+  .team-hero-action {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    margin-top: 14px !important;
+    padding-top: 14px !important;
+    border-top: 1px dashed var(--border-light) !important;
+    justify-content: center !important;
+  }
+  .team-hero-action .btn,
+  .team-hero-action .btn-edit-team-all,
+  .team-hero-action .btn-donate-team,
+  .team-hero-action .btn-favorite-team,
+  .team-hero-action .btn-follow-team {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 8px !important;
+    font-size: 12.5px !important;
+    height: 38px !important;
+  }
+}
+
+/* ĐỒNG BỘ KÍCH THƯỚC NÚT DONATE TRÊN TRANG CHI TIẾT TRUYỆN (HÌNH 1) */
+.story-actions-bar .btn-donate-story,
+.story-actions-bar #btnDonateStoryDetail {
+  width: auto !important;
+  max-width: fit-content !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px 18px !important;
+  font-size: 13.5px !important;
+  border-radius: var(--radius-full, 9999px) !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+
+/* ==========================================================================
+   TỐI ƯU POPUP CHỈNH SỬA CHƯƠNG & ACCORDION TẠO AUDIO TRÊN MOBILE (HÌNH 1, 2, 3)
+   ========================================================================== */
+#modalEditChapterContent {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+#modalEditChapterContent .custom-modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 92vh !important;
+  overflow: hidden !important;
+}
+
+#modalEditChapterContent .modal-edit-chapter-body {
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+}
+
+#btnToggleEditChapterAudioSection {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+@media (max-width: 768px) {
+  #modalEditChapterContent {
+    padding: 6px !important;
+    align-items: flex-start !important;
+  }
+
+  #modalEditChapterContent .custom-modal-content {
+    max-width: 100% !important;
+    max-height: 96vh !important;
+    height: 96vh !important;
+    margin: 6px auto !important;
+    border-radius: var(--radius-sm, 12px) !important;
+  }
+
+  #modalEditChapterContent .modal-header-top-box {
+    padding: 10px 14px !important;
+    flex-shrink: 0 !important;
+  }
+
+  #modalEditChapterContent .modal-edit-chapter-body {
+    padding: 12px 14px 30px 14px !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  #modalEditChapterContent .form-textarea-chapter {
+    min-height: 180px !important;
+    height: 200px !important;
+    font-size: 13.5px !important;
+    line-height: 1.55 !important;
+  }
+
+  #modalEditChapterContent #editChapterAudioCollapsibleBody {
+    margin-top: 10px !important;
+    padding-bottom: 16px !important;
+  }
+}

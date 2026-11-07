@@ -4195,6 +4195,7 @@
         
         // Open edit chapter content modal
         $('#modalEditChapterContent').fadeIn(200);
+        $('body').css('overflow', 'hidden'); /* modalEditChapterContentLockBody */
         $('#modalChapterStoryTitleText').text($('#storyDetailTitle').text());
 
         // Load chapter data directly
@@ -5803,6 +5804,10 @@
 
             if (res && res.success) {
               $alert.removeClass('alert-error').addClass('alert-success').text(res.data.message || 'Cập nhật thành công!').fadeIn();
+              $modal.find('.custom-modal-content, [style*="overflow-y"]').animate({ scrollTop: 0 }, 200);
+              if (typeof window.muopShowToast === 'function') {
+                window.muopShowToast(res.data.message || 'Cập nhật thông tin team dịch thành công!', 'success');
+              }
 
               // Cập nhật tên team
               if (res.data.team_name) {
@@ -5838,6 +5843,13 @@
                 $('#teamModalAvatarPreviewChar').hide();
               }
 
+              // Cập nhật Donate QR Preview (Hình 5)
+              if (res.data.donate_qr_url) {
+                $('#teamQrPreviewImg').attr('src', res.data.donate_qr_url);
+                $('#teamQrPreviewWrap').css('display', 'flex');
+                $('#btnDeleteTeamQrCode').css('display', 'inline-flex');
+              }
+
               // Nếu có redirect url (do đổi slug)
               if (res.data.redirect_url && window.location.href !== res.data.redirect_url) {
                 setTimeout(() => {
@@ -5847,7 +5859,7 @@
                 setTimeout(() => {
                   $modal.fadeOut(200);
                   $alert.hide();
-                }, 900);
+                }, 1600);
               }
             } else {
               $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Không thể cập nhật thông tin!')).fadeIn();
@@ -5895,7 +5907,93 @@
         }
         handleTeamFormSubmit($(this), $('#btnSubmitTeamInfo'), $('#editTeamAlert'), $('#modalEditTeamInfo'), '<i class="fa-solid fa-check"></i> Lưu Thay Đổi');
       });
+
+      // 5. Xóa mã QR Donate của Team
+      $(document).on('click', '#btnDeleteTeamQrCode', function(e) {
+        e.preventDefault();
+        if (!confirm('Bạn có chắc chắn muốn xóa mã QR Donate của team không?')) return;
+        const $btn = $(this);
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang xóa...');
+        const teamId = $('#formEditTeamInfo input[name="team_id"]').val();
+        $.ajax({
+          url: getAjaxUrl(),
+          type: 'POST',
+          data: {
+            action: 'muop_save_team_donate_info',
+            team_id: teamId,
+            delete_qr: '1',
+            nonce: (window.muopConfig && window.muopConfig.nonce) ? window.muopConfig.nonce : ''
+          },
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa mã QR');
+            if (res && res.success) {
+              $('#teamQrPreviewWrap').hide();
+              $btn.hide();
+              $('#inputDonateBank').val('');
+              $('#inputDonateAccNum').val('');
+              $('#inputDonateAccName').val('');
+              $('#inputDonateQrFile').val('');
+              if (typeof window.muopShowToast === 'function') {
+                window.muopShowToast('Đã xóa mã QR Donate thành công!', 'success');
+              } else {
+                alert('Đã xóa mã QR Donate thành công!');
+              }
+            } else {
+              alert(getAjaxMsg(res, 'Không thể xóa mã QR!'));
+            }
+          },
+          error: () => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa mã QR');
+            alert('Lỗi kết nối máy chủ!');
+          }
+        });
+      });
+
+      // 6. SỰ KIỆN CLICK MỞ MODAL DONATE TEAM DỊCH / TÁC PHẨM (HÌNH 3 & HÌNH 5)
+      $(document).on('click', '.btn-donate-team, #btnOpenDonateTeamModal, .btn-donate-story, #btnDonateStoryDetail, [data-action="open-donate-modal"]', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const $btn = $(this);
+        let teamId = parseInt($btn.data('team-id') || $btn.attr('data-team-id')) || 0;
+        let teamName = $btn.data('team-name') || $btn.attr('data-team-name') || '';
+        let authorId = parseInt($btn.data('author-id') || $btn.attr('data-author-id')) || 0;
+        let storyId = parseInt($btn.data('story-id') || $btn.attr('data-story-id')) || 0;
+
+        if (!teamName && $('#teamHeroNameDisplay').length) {
+          teamName = $('#teamHeroNameDisplay').text().trim();
+        }
+        if (!teamId && $('#formEditTeamInfo input[name="team_id"]').length) {
+          teamId = parseInt($('#formEditTeamInfo input[name="team_id"]').val()) || 0;
+        }
+
+        if (typeof window.muopOpenDonateModal === 'function') {
+          window.muopOpenDonateModal(teamId, teamName, authorId, storyId);
+        } else {
+          const $m = $('#modalDonateTeam');
+          if ($m.length) {
+            $m.css('display', 'flex').show();
+          }
+        }
+      });
     }
+  };
+
+  // TOAST THÔNG BÁO NỔI TOÀN HỆ THỐNG
+  window.muopShowToast = function(message, type) {
+    type = type || 'success';
+    $('.muop-floating-toast').remove();
+    const bg = type === 'success' ? '#166534' : (type === 'error' ? '#991b1b' : '#1e293b');
+    const border = type === 'success' ? '#86efac' : (type === 'error' ? '#fca5a5' : '#475569');
+    const icon = type === 'success' ? 'fa-solid fa-circle-check' : (type === 'error' ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-info');
+    const $toast = $(
+      '<div class="muop-floating-toast" style="position: fixed; top: 24px; left: 50%; transform: translateX(-50%); background: ' + bg + '; border: 1.5px solid ' + border + '; color: #ffffff; padding: 12px 24px; border-radius: 30px; font-weight: 700; font-size: 14px; z-index: 99999999; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; pointer-events: none;">' +
+      '<i class="' + icon + '" style="font-size: 18px;"></i> <span>' + message + '</span></div>'
+    );
+    $('body').append($toast);
+    setTimeout(function() {
+      $toast.fadeOut(300, function() { $(this).remove(); });
+    }, 3200);
   };
 
   // 16. STORY SUMMARY TOGGLE (XEM THÊM / THU GỌN GIỚI THIỆU TRUYỆN)
@@ -6428,6 +6526,7 @@
               setTimeout(() => {
                 $alert.fadeOut(300);
                 $('#modalEditChapterContent').fadeOut(250);
+                $('body').css('overflow', '');
               }, 1200);
             } else {
               $alert.removeClass('alert-success').addClass('alert-error').text(getAjaxMsg(res, 'Lỗi cập nhật chương!')).fadeIn();
@@ -6749,6 +6848,34 @@
         });
       });
 
+      // 11.c.1. Toggle Accordion Tạo / Quản lý Audio trong Modal Chỉnh Sửa Chương
+      $(document).on('click', '#btnToggleEditChapterAudioSection', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof window.muopToggleEditChapterAudio === 'function') {
+          window.muopToggleEditChapterAudio(e);
+        } else {
+          const $body = $('#editChapterAudioCollapsibleBody');
+          const isHidden = ($body.css('display') === 'none');
+          if (isHidden) {
+            $body.slideDown(200, function() {
+              const el = document.getElementById('btnToggleEditChapterAudioSection');
+              if (el && typeof el.scrollIntoView === 'function') {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            });
+            $('#editChapterAudioToggleIcon').css('transform', 'rotate(180deg)');
+            $('#editChapterAudioToggleText').text('Thu nhỏ lại');
+            $('#btnToggleEditChapterAudioSection').css({ 'background': '#f0fdf4', 'border-color': '#22c55e' });
+          } else {
+            $body.slideUp(200);
+            $('#editChapterAudioToggleIcon').css('transform', 'rotate(0deg)');
+            $('#editChapterAudioToggleText').text('Bấm để mở');
+            $('#btnToggleEditChapterAudioSection').css({ 'background': '#ffffff', 'border-color': '#86efac' });
+          }
+        }
+      });
+
       // 11.c. Khi nhấn "Xóa chương" từ menu 3 chấm: Mở popup xác nhận xóa chương
       $(document).on('click', '.btn-trigger-delete-chapter', function(e) {
         e.preventDefault();
@@ -6856,6 +6983,7 @@
       $('#btnCloseChapterContentModal, .btn-close-modal-chapter').on('click', function(e) {
         e.preventDefault();
         $('#modalEditChapterContent').hide();
+        $('body').css('overflow', '');
       });
 
       $('#modalEditChapterContent').on('click', function(e) {

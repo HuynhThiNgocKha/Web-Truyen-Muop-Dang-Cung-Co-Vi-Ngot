@@ -126,9 +126,7 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                         <i class="fa-solid fa-headphones" style="font-size: 13.5px; color: #16a34a;"></i>
                         <span>AUDIO CHƯƠNG NÀY</span>
                     </div>
-                    <button type="button" onclick="window.muopOpenStoryAudioPlayer && window.muopOpenStoryAudioPlayer(<?php echo intval($story_id); ?>, '<?php echo esc_js($story_title); ?>', <?php echo intval($chapter_id); ?>)" style="background: none; border: none; font-size: 11.5px; color: #16a34a; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px;">
-                        <i class="fa-solid fa-list-ul"></i> Toàn bộ audio truyện
-                    </button>
+                    
                 </div>
 
                 <!-- Thẻ audio ẩn -->
@@ -149,35 +147,52 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                     <span id="audioDuration" style="font-size: 12px; font-weight: 700; color: #4b5563; min-width: 38px; text-align: right;">00:00</span>
                 </div>
 
-                <!-- Thanh trạng thái & Tốc độ phát -->
-                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12.5px;">
-                    <span id="audioStatusText" style="font-weight: 600; color: #4b5563;">Sẵn sàng phát</span>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 12px; color: #6b7280; font-weight: 600;">Tốc độ</span>
-                        <select id="audioSpeedSelect" style="border: 1px solid #d1d5db; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #fff; color: #111827; cursor: pointer; outline: none;">
+                <!-- Thanh trạng thái & Tốc độ phát (Hình 1 đẹp mắt) -->
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; position: relative;">
+                    <span id="audioStatusText" style="display: none;"></span>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-left: auto;">
+                        <span style="font-size: 12px; color: #6b7280; font-weight: 600;">Tốc độ:</span>
+                        
+                        <!-- Custom Speed Dropdown Popup Đẹp Mắt -->
+                        <div class="custom-speed-dropdown" id="dropdownChapterSpeed">
+                            <button type="button" class="btn-custom-speed-toggle" id="btnChapterSpeedToggle" title="Chọn tốc độ phát audio">
+                                <span class="current-speed-text" id="chapterCurrentSpeedText">1.0x</span>
+                                <i class="fa-solid fa-chevron-up" style="font-size: 9px; opacity: 0.6;"></i>
+                            </button>
+                            <div class="custom-speed-menu" id="menuChapterSpeed">
+                                <div class="speed-menu-header">
+                                    <i class="fa-solid fa-gauge-high" style="color: #16a34a;"></i> Tốc độ phát
+                                </div>
+                                <div class="speed-grid-options">
+                                    <button type="button" class="speed-opt-btn" data-speed="0.75">0.75x</button>
+                                    <button type="button" class="speed-opt-btn is-active" data-speed="1.0">1.0x <i class="fa-solid fa-check"></i></button>
+                                    <button type="button" class="speed-opt-btn" data-speed="1.25">1.25x</button>
+                                    <button type="button" class="speed-opt-btn" data-speed="1.5">1.5x</button>
+                                    <button type="button" class="speed-opt-btn" data-speed="1.75">1.75x</button>
+                                    <button type="button" class="speed-opt-btn" data-speed="2.0">2.0x</button>
+                                    <button type="button" class="speed-opt-btn" data-speed="2.25">2.25x</button>
+                                    <button type="button" class="speed-opt-btn" data-speed="2.5">2.5x</button>
+                                    <button type="button" class="speed-opt-btn" data-speed="3.0" style="grid-column: span 2;">3.0x</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Giữ select ẩn để đồng bộ code cũ -->
+                        <select id="audioSpeedSelect" style="display: none;">
                             <option value="0.75">0.75x</option>
                             <option value="1.0" selected>1.0x</option>
                             <option value="1.25">1.25x</option>
                             <option value="1.5">1.5x</option>
                             <option value="1.75">1.75x</option>
                             <option value="2.0">2.0x</option>
+                            <option value="2.25">2.25x</option>
+                            <option value="2.5">2.5x</option>
+                            <option value="3.0">3x</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- Chuyển tiếp sang chương tiếp theo (Chương 2, 3, 4...) -->
-                <?php if (!empty($next_chap_url)) : ?>
-                    <div class="audio-next-chapter-strip" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                        <span style="font-size: 11.5px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px;">
-                            <i class="fa-solid fa-circle-check" style="color: #16a34a;"></i> Tự động chuyển tiếp khi nghe xong
-                        </span>
-                        <a href="<?php echo esc_url($next_chap_url); ?>" id="btnNextChapterAudioLink" class="btn btn-outline btn-xs" style="border-color: #86efac; color: #16a34a; font-weight: 700; padding: 3px 10px; font-size: 11.5px; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
-                            <span>Sang Chương <?php echo ($chap_order + 1); ?> tiếp theo</span>
-                            <i class="fa-solid fa-forward-step"></i>
-                        </a>
-                    </div>
-                <?php endif; ?>
-            </div>
+                </div>
 
             <script>
             (function() {
@@ -192,6 +207,18 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 var speedSelect = document.getElementById('audioSpeedSelect');
                 var nextLink = document.getElementById('btnNextChapterAudioLink');
                 if (!audio || !btn) return;
+                var floatBtnInit = document.getElementById('btnFloatingAudioToggle');
+                if (floatBtnInit) {
+                    floatBtnInit.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        if (audio.paused) {
+                            audio.play();
+                        } else {
+                            audio.pause();
+                        }
+                    });
+                }
+
 
                 var hasLogged = false;
                 var isSeeking = false;
@@ -211,7 +238,15 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                     }
                 });
 
-                audio.addEventListener('play', function() {
+                                audio.addEventListener('play', function() {
+                    var floatBtn = document.getElementById('btnFloatingAudioToggle');
+                    var floatIcon = document.getElementById('iconFloatingAudio');
+                    if (floatIcon) floatIcon.className = 'fa-solid fa-pause';
+                    if (floatBtn) {
+                        floatBtn.style.background = '#dcfce7';
+                        floatBtn.style.color = '#15803d';
+                        floatBtn.style.borderColor = '#16a34a';
+                    }
                     if (icon) icon.className = 'fa-solid fa-pause';
                     if (text) text.textContent = 'Tạm dừng';
                     if (statusText) statusText.textContent = 'Đang phát...';
@@ -229,7 +264,15 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                     }
                 });
 
-                audio.addEventListener('pause', function() {
+                                audio.addEventListener('pause', function() {
+                    var floatBtn = document.getElementById('btnFloatingAudioToggle');
+                    var floatIcon = document.getElementById('iconFloatingAudio');
+                    if (floatIcon) floatIcon.className = 'fa-solid fa-headphones';
+                    if (floatBtn) {
+                        floatBtn.style.background = '';
+                        floatBtn.style.color = '';
+                        floatBtn.style.borderColor = '';
+                    }
                     if (icon) icon.className = 'fa-solid fa-volume-high';
                     if (text) text.textContent = 'Tiếp tục nghe';
                     if (statusText) statusText.textContent = 'Đã tạm dừng';
@@ -272,6 +315,43 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
                 if (speedSelect) {
                     speedSelect.addEventListener('change', function() {
                         audio.playbackRate = parseFloat(this.value) || 1.0;
+                    });
+                }
+
+                // Xử lý Custom Speed Popup (Hình 1)
+                var speedToggle = document.getElementById('btnChapterSpeedToggle');
+                var speedMenu = document.getElementById('menuChapterSpeed');
+                var speedLabel = document.getElementById('chapterCurrentSpeedText');
+                var speedButtons = speedMenu ? speedMenu.querySelectorAll('.speed-opt-btn') : [];
+
+                if (speedToggle && speedMenu) {
+                    speedToggle.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        speedMenu.classList.toggle('show');
+                    });
+
+                    document.addEventListener('click', function(e) {
+                        if (!speedToggle.contains(e.target) && !speedMenu.contains(e.target)) {
+                            speedMenu.classList.remove('show');
+                        }
+                    });
+
+                    speedButtons.forEach(function(b) {
+                        b.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            var val = parseFloat(this.getAttribute('data-speed')) || 1.0;
+                            if (audio) audio.playbackRate = val;
+                            if (speedLabel) speedLabel.textContent = val + (val === 3 ? '.0x' : 'x');
+                            if (speedSelect) speedSelect.value = (val === 3 ? '3.0' : String(val));
+                            speedButtons.forEach(function(x) {
+                                x.classList.remove('is-active');
+                                var existingCheck = x.querySelector('.fa-check');
+                                if (existingCheck) existingCheck.remove();
+                            });
+                            this.classList.add('is-active');
+                            this.innerHTML = (val === 3 ? '3.0x' : val + 'x') + ' <i class="fa-solid fa-check"></i>';
+                            speedMenu.classList.remove('show');
+                        });
                     });
                 }
 
@@ -547,6 +627,11 @@ $shopee_url     = get_option('muop_shopee_url', 'https://s.shopee.vn/4qG9lQO2rp'
     <button type="button" class="floating-reading-btn btn-floating-scroll-top" id="btnFloatingScrollTop" title="Lên đầu trang">
         <i class="fa-solid fa-chevron-up"></i>
     </button>
+    <?php if (!empty($chapter_audio_url) && trim($chapter_audio_url) !== '') : ?>
+    <button type="button" class="floating-reading-btn btn-floating-audio-play" id="btnFloatingAudioToggle" title="Nghe / Tạm dừng Audio chương">
+        <i class="fa-solid fa-headphones" id="iconFloatingAudio"></i>
+    </button>
+    <?php endif; ?>
     <button type="button" class="floating-reading-btn btn-reading-settings-trigger" id="btnFloatingReadingSettings" title="Tùy chỉnh đọc truyện (Font, Màu, Cỡ chữ)">
         <i class="fa-solid fa-sliders"></i>
     </button>
