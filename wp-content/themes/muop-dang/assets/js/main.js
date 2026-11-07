@@ -4069,6 +4069,11 @@
             $('#storyDetailGenres').text(data.genres || 'Chưa phân loại');
             $('#storyDetailViewsAll').text(data.views_all.toLocaleString('vi-VN'));
             $('#storyDetailViewsMonth').text(data.views_month.toLocaleString('vi-VN'));
+            if (data.grand_total_formatted) {
+              $('#storyDetailStorage').text(`${data.grand_total_formatted} (Bìa: ${data.cover_formatted} | Chữ: ${data.total_text_formatted} | Audio: ${data.total_audio_formatted})`);
+            } else {
+              $('#storyDetailStorage').text('--');
+            }
             $('#storyDetailDesc').html(data.description || 'Chưa có mô tả.');
 
             // Badges
@@ -4112,18 +4117,23 @@
             $tbody.empty();
 
             if (!data.chapters || data.chapters.length === 0) {
-              $tbody.html('<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Truyện này hiện chưa có chương nào. Nhấn "+ Thêm Chương Mới" để đăng chương đầu tiên.</td></tr>');
+              $tbody.html('<tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Truyện này hiện chưa có chương nào. Nhấn "+ Thêm Chương Mới" để đăng chương đầu tiên.</td></tr>');
             } else {
               data.chapters.forEach((ch) => {
                 const statusBadge = ch.status === 'publish' 
                   ? '<span class="badge badge-approved"><i class="fa-solid fa-check"></i> Xuất bản</span>' 
                   : '<span class="badge badge-hot"><i class="fa-solid fa-clock"></i> Bản nháp</span>';
 
+                const storageBadge = ch.total_formatted
+                  ? `<span class="badge" style="background:#e0f2fe; color:#0284c7; font-weight:700; font-family:monospace; font-size:11.5px;" title="Chữ: ${ch.text_formatted || '--'} | Audio: ${ch.audio_formatted || 'Chưa có'}">${ch.total_formatted}</span>`
+                  : `<span style="color:var(--text-muted);font-size:11px;">--</span>`;
+
                 const rowHtml = `
                   <tr class="adm-chapter-subrow" data-chap-num="${ch.number}" data-chap-title="${(ch.title || '').toLowerCase()}">
                     <td style="text-align: center;"><strong>Chương ${ch.number}</strong></td>
                     <td><span style="font-weight: 600; color: var(--text-main);">${ch.title}</span></td>
                     <td><span class="badge badge-green" style="font-size: 11.5px;">${ch.words.toLocaleString('vi-VN')} từ</span></td>
+                    <td style="text-align: center;">${storageBadge}</td>
                     <td>${statusBadge}</td>
                     <td style="font-size: 12px; color: var(--text-muted);">${ch.date}</td>
                     <td><i class="fa-solid fa-eye"></i> ${ch.views.toLocaleString('vi-VN')}</td>
@@ -4820,7 +4830,9 @@
             'admTabGenres': 'Thể loại truyện',
             'admTabComments': 'Bình luận & Đánh giá',
             'admTabReports': 'Báo lỗi chương',
-            'admTabBroadcast': 'Thông báo hệ thống'
+            'admTabBroadcast': 'Thông báo hệ thống',
+            'admTabStorage': 'Quản lý dung lượng',
+            'admTabTrash': 'Thùng rác hệ thống (Lưu 15 ngày)'
           };
 
           if (tabLabelMap[cleanId]) {

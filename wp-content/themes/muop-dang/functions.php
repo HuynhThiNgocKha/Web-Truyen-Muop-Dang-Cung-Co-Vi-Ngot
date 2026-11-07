@@ -1340,7 +1340,25 @@ function muop_setup_tables() {
 
     ) $charset_collate;";
 
-
+    $table_trash = $wpdb->prefix . 'muop_trash';
+    $sql_trash = "CREATE TABLE $table_trash (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        item_type VARCHAR(50) NOT NULL,
+        item_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+        item_name VARCHAR(255) NOT NULL,
+        item_path TEXT NULL,
+        trash_path TEXT NULL,
+        item_size BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+        item_meta LONGTEXT NULL,
+        deleted_by BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+        deleted_at DATETIME NOT NULL,
+        expires_at DATETIME NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'trashed',
+        PRIMARY KEY (id),
+        KEY item_type (item_type),
+        KEY expires_at (expires_at),
+        KEY status (status)
+    ) $charset_collate;";
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
 
@@ -1363,6 +1381,8 @@ function muop_setup_tables() {
     dbDelta($sql_vlogs);
 
     dbDelta($sql_online);
+
+    dbDelta($sql_trash);
 
 
 
@@ -6255,6 +6275,8 @@ function muop_ajax_admin_action_handler() {
 
 
             $chapters_list = array();
+            $story_total_text = 0;
+            $story_total_audio = 0;
 
             foreach ($chapters as $ch) {
 
@@ -6262,77 +6284,114 @@ function muop_ajax_admin_action_handler() {
 
                 $ch_views = (int) get_post_meta($ch->ID, '_chuong_views', true);
 
-                
+                $text_len = strlen($ch->post_content);
+                $story_total_text += $text_len;
 
                 $raw_content = trim(strip_tags($ch->post_content));
 
                 $words = count(preg_split('/\s+/u', $raw_content, -1, PREG_SPLIT_NO_EMPTY));
 
+                $audio_url = get_post_meta($ch->ID, '_chuong_audio_url', true);
+                if (!$audio_url) $audio_url = get_post_meta($ch->ID, '_chapter_audio_url', true);
+                $ch_audio_bytes = 0;
+                $has_audio = false;
+                if ($audio_url) {
+                    $audio_path = muop_url_to_physical_path($audio_url);
+                    if ($audio_path && file_exists($audio_path)) {
+                        $ch_audio_bytes = filesize($audio_path);
+                        $has_audio = true;
+                        $story_total_audio += $ch_audio_bytes;
+                    }
+                }
 
+                $ch_total = $text_len + $ch_audio_bytes;
 
                 $chapters_list[] = array(
 
-                    'id'          => $ch->ID,
+                    'id'              => $ch->ID,
 
-                    'number'      => (int) $num,
+                    'number'          => (int) $num,
 
-                    'title'       => $ch->post_title,
+                    'title'           => $ch->post_title,
 
-                    'words'       => $words,
+                    'words'           => $words,
 
-                    'views'       => $ch_views,
+                    'views'           => $ch_views,
 
-                    'status'      => $ch->post_status,
+                    'status'          => $ch->post_status,
 
-                    'date'        => date('d/m/Y H:i', strtotime($ch->post_date)),
+                    'date'            => date('d/m/Y H:i', strtotime($ch->post_date)),
 
-                    'permalink'   => get_permalink($ch->ID)
+                    'permalink'       => get_permalink($ch->ID),
+
+                    'has_audio'       => $has_audio,
+                    'audio_url'       => $audio_url,
+                    'text_bytes'      => $text_len,
+                    'text_formatted'  => muop_format_bytes($text_len),
+                    'audio_bytes'     => $ch_audio_bytes,
+                    'audio_formatted' => $has_audio ? muop_format_bytes($ch_audio_bytes) : 'Chưa có',
+                    'total_bytes'     => $ch_total,
+                    'total_formatted' => muop_format_bytes($ch_total)
 
                 );
 
             }
 
-
+            $thumb_id = get_post_thumbnail_id($story_id);
+            $cover_bytes = 0;
+            if ($thumb_id) {
+                $thumb_file = get_attached_file($thumb_id);
+                if ($thumb_file && file_exists($thumb_file)) {
+                    $cover_bytes = filesize($thumb_file);
+                }
+            }
+            $story_grand_total = $cover_bytes + $story_total_text + $story_total_audio;
 
             wp_send_json_success(array(
 
-                'id'              => $story->ID,
+                'id'                    => $story->ID,
 
-                'title'           => $story->post_title,
+                'title'                 => $story->post_title,
 
-                'author_name'     => $author_text,
+                'author_name'           => $author_text,
 
-                'posted_by'       => $author_name,
+                'posted_by'             => $author_name,
 
-                'team_name'       => $team_name,
+                'team_name'             => $team_name,
 
-                'team_url'        => $team_url,
+                'team_url'              => $team_url,
 
-                'views_all'       => $views_all,
+                'views_all'             => $views_all,
 
-                'views_month'     => $views_month,
+                'views_month'           => $views_month,
 
-                'progress'        => $progress,
+                'progress'              => $progress,
 
-                'post_status'     => $story->post_status,
+                'post_status'           => $story->post_status,
 
-                'nominated'       => $nominated,
+                'nominated'             => $nominated,
 
-                'genres'          => implode(', ', $genre_names) ?: 'Chưa phân loại',
+                'genres'                => implode(', ', $genre_names) ?: 'Chưa phân loại',
 
-                'thumbnail'       => $thumb ?: '',
+                'thumbnail'             => $thumb ?: '',
 
-                'description'     => muop_format_story_summary($story->post_content),
+                'description'           => muop_format_story_summary($story->post_content),
 
-                'raw_description' => $story->post_content,
+                'raw_description'       => $story->post_content,
 
-                'permalink'       => add_query_arg('from', 'admin', get_permalink($story_id)),
+                'permalink'             => add_query_arg('from', 'admin', get_permalink($story_id)),
 
-                'add_chapter_url' => add_query_arg(array('story_id' => $story->ID, 'from' => 'admin', 'from_admin' => 1), home_url('/them-chuong/')),
+                'add_chapter_url'       => add_query_arg(array('story_id' => $story->ID, 'from' => 'admin', 'from_admin' => 1), home_url('/them-chuong/')),
 
-                'chapters'        => $chapters_list,
+                'chapters'              => $chapters_list,
 
-                'total_chapters'  => count($chapters_list)
+                'total_chapters'        => count($chapters_list),
+
+                'cover_bytes'           => $cover_bytes,
+                'cover_formatted'       => muop_format_bytes($cover_bytes),
+                'total_text_formatted'  => muop_format_bytes($story_total_text),
+                'total_audio_formatted' => muop_format_bytes($story_total_audio),
+                'grand_total_formatted' => muop_format_bytes($story_grand_total)
 
             ));
 
@@ -7064,45 +7123,13 @@ function muop_ajax_delete_story_handler() {
 
 
 
-    // Delete all chapters of this story
-
-    $chapters = get_posts(array(
-
-        'post_type'      => 'chuong',
-
-        'posts_per_page' => -1,
-
-        'post_status'    => 'any',
-
-        'meta_query'     => array(
-
-            array(
-
-                'key'   => '_chuong_truyen_id',
-
-                'value' => $story_id
-
-            )
-
-        )
-
-    ));
-
-    foreach ($chapters as $chap) {
-
-        wp_delete_post($chap->ID, true);
-
+    // Chuyển truyện và toàn bộ chương vào Thùng rác (lưu giữ 15 ngày)
+    $trashed = muop_trash_story($story_id, $current_user_id);
+    if ($trashed) {
+        wp_send_json_success(array('message' => 'Đã chuyển bộ truyện vào Thùng rác! (Lưu giữ trong 15 ngày trước khi tự động xóa vĩnh viễn)'));
+    } else {
+        wp_send_json_error(array('message' => 'Lỗi khi chuyển truyện vào Thùng rác!'));
     }
-
-
-
-    // Delete story
-
-    wp_delete_post($story_id, true);
-
-
-
-    wp_send_json_success(array('message' => 'Đã xóa bộ truyện và toàn bộ chương thành công!'));
 
 }
 
@@ -9300,14 +9327,10 @@ function muop_ajax_delete_chapter_handler() {
 
 
 
-    // Xóa vĩnh viễn chương
-
-    $res = wp_delete_post($chapter_id, true);
-
+    // Chuyển chương vào Thùng rác (lưu giữ 15 ngày)
+    $res = muop_trash_chapter($chapter_id, $current_user_id);
     if (!$res) {
-
-        wp_send_json_error(array('message' => 'Không thể xóa chương. Vui lòng thử lại!'));
-
+        wp_send_json_error(array('message' => 'Không thể chuyển chương vào Thùng rác. Vui lòng thử lại!'));
     }
 
 
@@ -18980,4 +19003,1151 @@ function muop_pure_php_vietnamese_tts($text, $output_file_path) {
     }
 
     return false;
+}
+
+/* =========================================================================
+ * 15. HỆ THỐNG QUẢN LÝ DUNG LƯỢNG (STORAGE) & THÙNG RÁC HỆ THỐNG (TRASH 15 NGÀY)
+ * ========================================================================= */
+
+/**
+ * Định dạng dung lượng byte sang B, KB, MB, GB dễ đọc
+ */
+function muop_format_bytes($bytes, $precision = 2) {
+    $bytes = (float) $bytes;
+    if ($bytes <= 0) return '0 B';
+    $units = array('B', 'KB', 'MB', 'GB', 'TB');
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    $bytes /= pow(1024, $pow);
+    return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
+/**
+ * Chuyển đổi URL upload thành đường dẫn file vật lý trên hosting
+ */
+function muop_url_to_physical_path($url) {
+    if (empty($url)) return false;
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    $pos = strpos($url, '/wp-content/uploads/');
+    if ($pos !== false) {
+        $rel = urldecode(substr($url, $pos + strlen('/wp-content/uploads/')));
+        $path = $base_dir . '/' . ltrim($rel, '/\\');
+        return str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $path);
+    }
+    return false;
+}
+
+/**
+ * Khởi tạo bảng thùng rác wp_muop_trash và thư mục uploads/trash/
+ */
+function muop_init_trash_table() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_trash';
+    $charset_collate = $wpdb->get_charset_collate();
+    $sql = "CREATE TABLE IF NOT EXISTS $table (
+        id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+        item_type VARCHAR(50) NOT NULL,
+        item_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+        item_name VARCHAR(255) NOT NULL,
+        item_path TEXT NULL,
+        trash_path TEXT NULL,
+        item_size BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+        item_meta LONGTEXT NULL,
+        deleted_by BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+        deleted_at DATETIME NOT NULL,
+        expires_at DATETIME NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'trashed',
+        PRIMARY KEY (id),
+        KEY item_type (item_type),
+        KEY expires_at (expires_at),
+        KEY status (status)
+    ) $charset_collate;";
+    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+    dbDelta($sql);
+
+    // Tạo thư mục uploads/trash/ nếu chưa có
+    $upload_dir = wp_upload_dir();
+    $trash_dir = $upload_dir['basedir'] . DIRECTORY_SEPARATOR . 'trash';
+    if (!is_dir($trash_dir)) {
+        wp_mkdir_p($trash_dir);
+        @file_put_contents($trash_dir . DIRECTORY_SEPARATOR . 'index.html', '');
+    }
+}
+
+/**
+ * Tự động xóa vĩnh viễn các mục trong thùng rác đã quá 15 ngày
+ */
+function muop_trash_auto_purge() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_trash';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) return;
+
+    $now = current_time('mysql');
+    $expired_items = $wpdb->get_results(
+        $wpdb->prepare("SELECT id FROM $table WHERE expires_at <= %s AND status = 'trashed'", $now)
+    );
+    if (!empty($expired_items)) {
+        foreach ($expired_items as $exp) {
+            muop_trash_purge_item($exp->id);
+        }
+    }
+}
+add_action('admin_init', 'muop_trash_auto_purge');
+
+/**
+ * Chuyển một bộ truyện vào Thùng rác (lưu giữ 15 ngày)
+ */
+function muop_trash_story($story_id, $user_id = 0) {
+    global $wpdb;
+    muop_init_trash_table();
+
+    $story = get_post($story_id);
+    if (!$story || $story->post_type !== 'truyen') return false;
+
+    if (!$user_id) $user_id = get_current_user_id();
+
+    $upload_dir = wp_upload_dir();
+    $trash_dir = $upload_dir['basedir'] . DIRECTORY_SEPARATOR . 'trash';
+    if (!is_dir($trash_dir)) wp_mkdir_p($trash_dir);
+
+    // 1. Thu thập ảnh bìa
+    $thumb_id = get_post_thumbnail_id($story_id);
+    $cover_file = $thumb_id ? get_attached_file($thumb_id) : '';
+    $cover_size = ($cover_file && file_exists($cover_file)) ? filesize($cover_file) : 0;
+
+    // 2. Thu thập toàn bộ chương của truyện
+    $chapters = get_posts(array(
+        'post_type'      => 'chuong',
+        'posts_per_page' => -1,
+        'post_status'    => 'any',
+        'meta_query'     => array(
+            array('key' => '_chuong_truyen_id', 'value' => $story_id)
+        )
+    ));
+
+    $chapters_meta = array();
+    $total_text_bytes = 0;
+    $total_audio_bytes = 0;
+
+    foreach ($chapters as $chap) {
+        $ch_text_len = strlen($chap->post_content);
+        $total_text_bytes += $ch_text_len;
+
+        $audio_url = get_post_meta($chap->ID, '_chuong_audio_url', true);
+        if (!$audio_url) $audio_url = get_post_meta($chap->ID, '_chapter_audio_url', true);
+
+        $audio_moved = false;
+        $audio_orig_path = '';
+        $audio_trash_path = '';
+        $audio_size = 0;
+
+        if ($audio_url) {
+            $orig_path = muop_url_to_physical_path($audio_url);
+            if ($orig_path && file_exists($orig_path)) {
+                $audio_size = filesize($orig_path);
+                $total_audio_bytes += $audio_size;
+                $audio_orig_path = $orig_path;
+                $dest_filename = 'st_' . $story_id . '_ch_' . $chap->ID . '_' . basename($orig_path);
+                $trash_dest = $trash_dir . DIRECTORY_SEPARATOR . $dest_filename;
+                if (@rename($orig_path, $trash_dest)) {
+                    $audio_moved = true;
+                    $audio_trash_path = $trash_dest;
+                }
+            }
+        }
+
+        $chapters_meta[] = array(
+            'id'               => $chap->ID,
+            'title'            => $chap->post_title,
+            'number'           => get_post_meta($chap->ID, '_chuong_number', true) ?: 1,
+            'original_status'  => $chap->post_status,
+            'text_size'        => $ch_text_len,
+            'audio_url'        => $audio_url,
+            'audio_orig_path'  => $audio_orig_path,
+            'audio_trash_path' => $audio_trash_path,
+            'audio_size'       => $audio_size,
+            'audio_moved'      => $audio_moved
+        );
+
+        // Đặt trạng thái chương sang trash
+        wp_update_post(array('ID' => $chap->ID, 'post_status' => 'trash'));
+    }
+
+    // Đặt trạng thái truyện sang trash
+    $orig_story_status = $story->post_status;
+    wp_update_post(array('ID' => $story_id, 'post_status' => 'trash'));
+
+    $grand_total_size = $cover_size + $total_text_bytes + $total_audio_bytes;
+
+    $metadata = array(
+        'story_id'        => $story_id,
+        'original_status' => $orig_story_status,
+        'chapters_count'  => count($chapters),
+        'cover_file'      => $cover_file,
+        'cover_size'      => $cover_size,
+        'text_size'       => $total_text_bytes,
+        'audio_size'      => $total_audio_bytes,
+        'chapters'        => $chapters_meta
+    );
+
+    $now = current_time('mysql');
+    $expires = date('Y-m-d H:i:s', strtotime('+15 days', current_time('timestamp')));
+
+    $table = $wpdb->prefix . 'muop_trash';
+    $wpdb->insert(
+        $table,
+        array(
+            'item_type'   => 'story',
+            'item_id'     => $story_id,
+            'item_name'   => $story->post_title,
+            'item_path'   => '',
+            'trash_path'  => '',
+            'item_size'   => $grand_total_size,
+            'item_meta'   => wp_json_encode($metadata),
+            'deleted_by'  => $user_id,
+            'deleted_at'  => $now,
+            'expires_at'  => $expires,
+            'status'      => 'trashed'
+        ),
+        array('%s', '%d', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s')
+    );
+
+    delete_transient('muop_storage_stats');
+    return true;
+}
+
+/**
+ * Chuyển một chương vào Thùng rác (lưu giữ 15 ngày)
+ */
+function muop_trash_chapter($chapter_id, $user_id = 0) {
+    global $wpdb;
+    muop_init_trash_table();
+
+    $chap = get_post($chapter_id);
+    if (!$chap || $chap->post_type !== 'chuong') return false;
+
+    if (!$user_id) $user_id = get_current_user_id();
+
+    $upload_dir = wp_upload_dir();
+    $trash_dir = $upload_dir['basedir'] . DIRECTORY_SEPARATOR . 'trash';
+    if (!is_dir($trash_dir)) wp_mkdir_p($trash_dir);
+
+    $story_id = (int) get_post_meta($chapter_id, '_chuong_truyen_id', true);
+    $chap_num = get_post_meta($chapter_id, '_chuong_number', true) ?: 1;
+    $orig_status = $chap->post_status;
+    $text_size = strlen($chap->post_content);
+
+    $audio_url = get_post_meta($chapter_id, '_chuong_audio_url', true);
+    if (!$audio_url) $audio_url = get_post_meta($chapter_id, '_chapter_audio_url', true);
+
+    $audio_moved = false;
+    $audio_orig_path = '';
+    $audio_trash_path = '';
+    $audio_size = 0;
+
+    if ($audio_url) {
+        $orig_path = muop_url_to_physical_path($audio_url);
+        if ($orig_path && file_exists($orig_path)) {
+            $audio_size = filesize($orig_path);
+            $audio_orig_path = $orig_path;
+            $dest_filename = 'ch_' . $chapter_id . '_' . basename($orig_path);
+            $trash_dest = $trash_dir . DIRECTORY_SEPARATOR . $dest_filename;
+            if (@rename($orig_path, $trash_dest)) {
+                $audio_moved = true;
+                $audio_trash_path = $trash_dest;
+            }
+        }
+    }
+
+    // Đặt trạng thái chương sang trash
+    wp_update_post(array('ID' => $chapter_id, 'post_status' => 'trash'));
+
+    $total_chap_size = $text_size + $audio_size;
+    $metadata = array(
+        'chapter_id'       => $chapter_id,
+        'story_id'         => $story_id,
+        'chapter_number'   => $chap_num,
+        'original_status'  => $orig_status,
+        'text_size'        => $text_size,
+        'audio_url'        => $audio_url,
+        'audio_orig_path'  => $audio_orig_path,
+        'audio_trash_path' => $audio_trash_path,
+        'audio_size'       => $audio_size,
+        'audio_moved'      => $audio_moved
+    );
+
+    $now = current_time('mysql');
+    $expires = date('Y-m-d H:i:s', strtotime('+15 days', current_time('timestamp')));
+
+    $table = $wpdb->prefix . 'muop_trash';
+    $wpdb->insert(
+        $table,
+        array(
+            'item_type'   => 'chapter',
+            'item_id'     => $chapter_id,
+            'item_name'   => 'Chương ' . $chap_num . ': ' . $chap->post_title,
+            'item_path'   => $audio_orig_path,
+            'trash_path'  => $audio_trash_path,
+            'item_size'   => $total_chap_size,
+            'item_meta'   => wp_json_encode($metadata),
+            'deleted_by'  => $user_id,
+            'deleted_at'  => $now,
+            'expires_at'  => $expires,
+            'status'      => 'trashed'
+        ),
+        array('%s', '%d', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s')
+    );
+
+    delete_transient('muop_storage_stats');
+    return true;
+}
+
+/**
+ * Chuyển một file vật lý độc lập (audio/ảnh) vào Thùng rác (lưu giữ 15 ngày)
+ */
+function muop_trash_file($file_path, $type = 'audio', $user_id = 0, $name = '') {
+    global $wpdb;
+    muop_init_trash_table();
+
+    if (!file_exists($file_path)) return false;
+    if (!$user_id) $user_id = get_current_user_id();
+
+    $upload_dir = wp_upload_dir();
+    $trash_dir = $upload_dir['basedir'] . DIRECTORY_SEPARATOR . 'trash';
+    if (!is_dir($trash_dir)) wp_mkdir_p($trash_dir);
+
+    $filesize = filesize($file_path);
+    $basename = basename($file_path);
+    if (empty($name)) $name = $basename;
+
+    $trash_filename = 'file_' . uniqid() . '_' . $basename;
+    $trash_dest = $trash_dir . DIRECTORY_SEPARATOR . $trash_filename;
+
+    if (!@rename($file_path, $trash_dest)) return false;
+
+    $now = current_time('mysql');
+    $expires = date('Y-m-d H:i:s', strtotime('+15 days', current_time('timestamp')));
+
+    $metadata = array(
+        'original_path' => $file_path,
+        'trash_path'    => $trash_dest,
+        'filesize'      => $filesize,
+        'basename'      => $basename
+    );
+
+    $table = $wpdb->prefix . 'muop_trash';
+    $wpdb->insert(
+        $table,
+        array(
+            'item_type'   => $type,
+            'item_id'     => 0,
+            'item_name'   => $name,
+            'item_path'   => $file_path,
+            'trash_path'  => $trash_dest,
+            'item_size'   => $filesize,
+            'item_meta'   => wp_json_encode($metadata),
+            'deleted_by'  => $user_id,
+            'deleted_at'  => $now,
+            'expires_at'  => $expires,
+            'status'      => 'trashed'
+        ),
+        array('%s', '%d', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%s')
+    );
+
+    delete_transient('muop_storage_stats');
+    return true;
+}
+
+/**
+ * Khôi phục một mục từ thùng rác về trạng thái bình thường
+ */
+function muop_trash_restore_item($trash_id) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_trash';
+    $item = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $trash_id));
+    if (!$item) return false;
+
+    $meta = !empty($item->item_meta) ? json_decode($item->item_meta, true) : array();
+
+    if ($item->item_type === 'story') {
+        $story_id = $item->item_id;
+        $orig_status = !empty($meta['original_status']) ? $meta['original_status'] : 'publish';
+        wp_update_post(array('ID' => $story_id, 'post_status' => $orig_status));
+
+        // Khôi phục các chương và file audio
+        if (!empty($meta['chapters'])) {
+            foreach ($meta['chapters'] as $ch_meta) {
+                $ch_id = $ch_meta['id'];
+                $ch_status = !empty($ch_meta['original_status']) ? $ch_meta['original_status'] : 'publish';
+                wp_update_post(array('ID' => $ch_id, 'post_status' => $ch_status));
+
+                if (!empty($ch_meta['audio_moved']) && !empty($ch_meta['audio_trash_path']) && !empty($ch_meta['audio_orig_path'])) {
+                    if (file_exists($ch_meta['audio_trash_path'])) {
+                        $target_dir = dirname($ch_meta['audio_orig_path']);
+                        if (!is_dir($target_dir)) wp_mkdir_p($target_dir);
+                        @rename($ch_meta['audio_trash_path'], $ch_meta['audio_orig_path']);
+                    }
+                }
+            }
+        }
+    } elseif ($item->item_type === 'chapter') {
+        $chap_id = $item->item_id;
+        $orig_status = !empty($meta['original_status']) ? $meta['original_status'] : 'publish';
+        wp_update_post(array('ID' => $chap_id, 'post_status' => $orig_status));
+
+        if (!empty($meta['audio_moved']) && !empty($meta['audio_trash_path']) && !empty($meta['audio_orig_path'])) {
+            if (file_exists($meta['audio_trash_path'])) {
+                $target_dir = dirname($meta['audio_orig_path']);
+                if (!is_dir($target_dir)) wp_mkdir_p($target_dir);
+                @rename($meta['audio_trash_path'], $meta['audio_orig_path']);
+            }
+        }
+    } elseif (in_array($item->item_type, array('audio', 'image', 'file'))) {
+        if (!empty($item->trash_path) && file_exists($item->trash_path) && !empty($item->item_path)) {
+            $target_dir = dirname($item->item_path);
+            if (!is_dir($target_dir)) wp_mkdir_p($target_dir);
+            @rename($item->trash_path, $item->item_path);
+        }
+    }
+
+    $wpdb->delete($table, array('id' => $trash_id), array('%d'));
+    delete_transient('muop_storage_stats');
+    return true;
+}
+
+/**
+ * Xóa vĩnh viễn một mục trong thùng rác
+ */
+function muop_trash_purge_item($trash_id) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_trash';
+    $item = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $trash_id));
+    if (!$item) return false;
+
+    $meta = !empty($item->item_meta) ? json_decode($item->item_meta, true) : array();
+
+    if ($item->item_type === 'story') {
+        $story_id = $item->item_id;
+        // Xóa các chương
+        if (!empty($meta['chapters'])) {
+            foreach ($meta['chapters'] as $ch_meta) {
+                $ch_id = $ch_meta['id'];
+                if (!empty($ch_meta['audio_trash_path']) && file_exists($ch_meta['audio_trash_path'])) {
+                    @unlink($ch_meta['audio_trash_path']);
+                }
+                wp_delete_post($ch_id, true);
+            }
+        } else {
+            $chaps = get_posts(array(
+                'post_type'      => 'chuong',
+                'posts_per_page' => -1,
+                'post_status'    => 'any',
+                'meta_query'     => array(
+                    array('key' => '_chuong_truyen_id', 'value' => $story_id)
+                )
+            ));
+            foreach ($chaps as $ch) {
+                muop_delete_chapter_audio_file($ch->ID);
+                wp_delete_post($ch->ID, true);
+            }
+        }
+        wp_delete_post($story_id, true);
+    } elseif ($item->item_type === 'chapter') {
+        $chap_id = $item->item_id;
+        if (!empty($meta['audio_trash_path']) && file_exists($meta['audio_trash_path'])) {
+            @unlink($meta['audio_trash_path']);
+        }
+        wp_delete_post($chap_id, true);
+    } elseif (in_array($item->item_type, array('audio', 'image', 'file'))) {
+        if (!empty($item->trash_path) && file_exists($item->trash_path)) {
+            @unlink($item->trash_path);
+        }
+    }
+
+    $wpdb->delete($table, array('id' => $trash_id), array('%d'));
+    delete_transient('muop_storage_stats');
+    return true;
+}
+
+/**
+ * Xóa vĩnh viễn toàn bộ mục trong thùng rác (Empty Trash)
+ */
+function muop_trash_purge_all() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_trash';
+    $items = $wpdb->get_results("SELECT id FROM $table WHERE status = 'trashed'");
+    $purged_count = 0;
+    $freed_bytes = 0;
+
+    foreach ($items as $it) {
+        $row = $wpdb->get_row($wpdb->prepare("SELECT item_size FROM $table WHERE id = %d", $it->id));
+        if ($row) $freed_bytes += (int) $row->item_size;
+        if (muop_trash_purge_item($it->id)) {
+            $purged_count++;
+        }
+    }
+
+    // Dọn sạch file rác sót lại trong thư mục uploads/trash/
+    $upload_dir = wp_upload_dir();
+    $trash_dir = $upload_dir['basedir'] . DIRECTORY_SEPARATOR . 'trash';
+    if (is_dir($trash_dir)) {
+        $files = scandir($trash_dir);
+        foreach ($files as $f) {
+            if ($f === '.' || $f === '..' || $f === 'index.html') continue;
+            $fp = $trash_dir . DIRECTORY_SEPARATOR . $f;
+            if (is_file($fp)) {
+                $freed_bytes += filesize($fp);
+                @unlink($fp);
+            }
+        }
+    }
+
+    delete_transient('muop_storage_stats');
+    return array(
+        'purged_count' => $purged_count,
+        'freed_bytes'  => $freed_bytes,
+        'freed_mb'     => round($freed_bytes / 1024 / 1024, 2)
+    );
+}
+
+/**
+ * Lấy danh sách các mục trong thùng rác
+ */
+function muop_get_trash_items($type = '', $search = '') {
+    global $wpdb;
+    muop_trash_auto_purge();
+
+    $table = $wpdb->prefix . 'muop_trash';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) return array();
+
+    $where = array("status = 'trashed'");
+    if (!empty($type) && $type !== 'all') {
+        $where[] = $wpdb->prepare("item_type = %s", $type);
+    }
+    if (!empty($search)) {
+        $like = '%' . $wpdb->esc_like($search) . '%';
+        $where[] = $wpdb->prepare("item_name LIKE %s", $like);
+    }
+
+    $where_sql = implode(' AND ', $where);
+    $results = $wpdb->get_results("SELECT * FROM $table WHERE $where_sql ORDER BY deleted_at DESC");
+
+    $items = array();
+    $now_ts = current_time('timestamp');
+
+    foreach ($results as $row) {
+        $expires_ts = strtotime($row->expires_at);
+        $diff_sec = max(0, $expires_ts - $now_ts);
+        $days_left = max(0, ceil($diff_sec / 86400));
+        $hours_left = max(0, ceil($diff_sec / 3600));
+
+        $user = get_userdata($row->deleted_by);
+        $user_name = $user ? $user->display_name : 'Quản trị viên';
+
+        $items[] = array(
+            'id'                  => (int) $row->id,
+            'item_type'           => $row->item_type,
+            'item_id'             => (int) $row->item_id,
+            'item_name'           => $row->item_name,
+            'item_size'           => (int) $row->item_size,
+            'item_size_formatted' => muop_format_bytes($row->item_size),
+            'deleted_by'          => (int) $row->deleted_by,
+            'deleted_by_name'     => $user_name,
+            'deleted_at'          => date('d/m/Y H:i', strtotime($row->deleted_at)),
+            'expires_at'          => date('d/m/Y H:i', strtotime($row->expires_at)),
+            'days_left'           => $days_left,
+            'hours_left'          => $hours_left,
+            'is_expiring_soon'    => ($days_left <= 3)
+        );
+    }
+
+    return $items;
+}
+
+/**
+ * Đếm số lượng mục trong thùng rác
+ */
+function muop_get_trash_count() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'muop_trash';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) return 0;
+    return (int) $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE status = 'trashed'");
+}
+
+/**
+ * Lấy toàn bộ số liệu thống kê dung lượng web
+ */
+function muop_get_system_storage_stats($force_refresh = false) {
+    global $wpdb;
+
+    if (!$force_refresh) {
+        $cached = get_transient('muop_storage_stats');
+        if ($cached && is_array($cached)) return $cached;
+    }
+
+    // 1. Quét thư mục Uploads
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+
+    $uploads_total_bytes = 0;
+    $uploads_total_files = 0;
+    $audio_bytes = 0;
+    $audio_count = 0;
+    $image_bytes = 0;
+    $image_count = 0;
+    $trash_bytes = 0;
+    $trash_count = 0;
+    $other_bytes = 0;
+
+    $trash_dir_norm = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $base_dir . '/trash'));
+
+    if (is_dir($base_dir)) {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($base_dir, FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $sz = $file->getSize();
+                $uploads_total_bytes += $sz;
+                $uploads_total_files++;
+
+                $file_path_norm = strtolower($file->getPathname());
+                if (strpos($file_path_norm, $trash_dir_norm) === 0) {
+                    $trash_bytes += $sz;
+                    $trash_count++;
+                    continue;
+                }
+
+                $ext = strtolower($file->getExtension());
+                if (in_array($ext, array('mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'))) {
+                    $audio_bytes += $sz;
+                    $audio_count++;
+                } elseif (in_array($ext, array('jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'))) {
+                    $image_bytes += $sz;
+                    $image_count++;
+                } else {
+                    $other_bytes += $sz;
+                }
+            }
+        }
+    }
+
+    // 2. Dung lượng Cơ sở dữ liệu MySQL
+    $db_row = $wpdb->get_row("SELECT SUM(data_length + index_length) as total_db_size FROM information_schema.TABLES WHERE table_schema = DATABASE()");
+    $db_bytes = $db_row ? (int) $db_row->total_db_size : 0;
+
+    // 3. Dung lượng Văn bản của các chương truyện
+    $chaps_row = $wpdb->get_row("SELECT COUNT(ID) as cnt, SUM(OCTET_LENGTH(post_content)) as text_bytes FROM {$wpdb->posts} WHERE post_type = 'chuong' AND post_status != 'trash'");
+    $chapters_count = $chaps_row ? (int) $chaps_row->cnt : 0;
+    $chapters_text_bytes = $chaps_row ? (int) $chaps_row->text_bytes : 0;
+
+    // 4. Số bộ truyện
+    $stories_count = (int) $wpdb->get_var("SELECT COUNT(ID) FROM {$wpdb->posts} WHERE post_type = 'truyen' AND post_status != 'trash'");
+
+    // 5. Tổng dung lượng web
+    $grand_total_bytes = $uploads_total_bytes + $db_bytes;
+    if ($grand_total_bytes <= 0) $grand_total_bytes = 1;
+
+    // Tỷ trọng %
+    $pct_audio = round(($audio_bytes / $grand_total_bytes) * 100, 1);
+    $pct_image = round(($image_bytes / $grand_total_bytes) * 100, 1);
+    $pct_db_text = round((($db_bytes + $chapters_text_bytes) / $grand_total_bytes) * 100, 1);
+    $pct_trash = round(($trash_bytes / $grand_total_bytes) * 100, 1);
+    $pct_other = max(0, round(100 - ($pct_audio + $pct_image + $pct_db_text + $pct_trash), 1));
+
+    $stats = array(
+        'grand_total_bytes'     => $grand_total_bytes,
+        'grand_total_formatted' => muop_format_bytes($grand_total_bytes),
+        'uploads_bytes'         => $uploads_total_bytes,
+        'uploads_formatted'     => muop_format_bytes($uploads_total_bytes),
+        'uploads_files_count'   => $uploads_total_files,
+        'audio_bytes'           => $audio_bytes,
+        'audio_formatted'       => muop_format_bytes($audio_bytes),
+        'audio_count'           => $audio_count,
+        'audio_percent'         => $pct_audio,
+        'image_bytes'           => $image_bytes,
+        'image_formatted'       => muop_format_bytes($image_bytes),
+        'image_count'           => $image_count,
+        'image_percent'         => $pct_image,
+        'db_bytes'              => $db_bytes,
+        'db_formatted'          => muop_format_bytes($db_bytes),
+        'text_bytes'            => $chapters_text_bytes,
+        'text_formatted'        => muop_format_bytes($chapters_text_bytes),
+        'chapters_count'        => $chapters_count,
+        'stories_count'         => $stories_count,
+        'db_text_percent'       => $pct_db_text,
+        'trash_bytes'           => $trash_bytes,
+        'trash_formatted'       => muop_format_bytes($trash_bytes),
+        'trash_count'           => $trash_count,
+        'trash_items_count'     => muop_get_trash_count(),
+        'trash_percent'         => $pct_trash,
+        'other_percent'         => $pct_other
+    );
+
+    set_transient('muop_storage_stats', $stats, 5 * MINUTE_IN_SECONDS);
+    return $stats;
+}
+
+/**
+ * Lấy danh sách thống kê dung lượng theo từng bộ truyện
+ */
+function muop_get_all_stories_storage_list() {
+    global $wpdb;
+
+    $stories = get_posts(array(
+        'post_type'      => 'truyen',
+        'posts_per_page' => -1,
+        'post_status'    => array('publish', 'draft', 'pending', 'future'),
+        'orderby'        => 'ID',
+        'order'          => 'DESC'
+    ));
+
+    $stories_data = array();
+    $system_stats = muop_get_system_storage_stats();
+    $grand_total_web = $system_stats['grand_total_bytes'] ?: 1;
+
+    foreach ($stories as $st) {
+        $story_id = $st->ID;
+
+        // 1. Ảnh bìa
+        $thumb_id = get_post_thumbnail_id($story_id);
+        $cover_bytes = 0;
+        $cover_url = get_the_post_thumbnail_url($story_id, 'thumbnail') ?: '';
+        if ($thumb_id) {
+            $thumb_file = get_attached_file($thumb_id);
+            if ($thumb_file && file_exists($thumb_file)) {
+                $cover_bytes = filesize($thumb_file);
+            }
+        }
+
+        // 2. Các chương
+        $chapters = get_posts(array(
+            'post_type'      => 'chuong',
+            'posts_per_page' => -1,
+            'post_status'    => 'any',
+            'meta_query'     => array(
+                array('key' => '_chuong_truyen_id', 'value' => $story_id)
+            )
+        ));
+
+        $text_bytes = 0;
+        $audio_bytes = 0;
+        $audio_count = 0;
+
+        foreach ($chapters as $ch) {
+            $text_bytes += strlen($ch->post_content);
+            $audio_url = get_post_meta($ch->ID, '_chuong_audio_url', true);
+            if (!$audio_url) $audio_url = get_post_meta($ch->ID, '_chapter_audio_url', true);
+            if ($audio_url) {
+                $audio_path = muop_url_to_physical_path($audio_url);
+                if ($audio_path && file_exists($audio_path)) {
+                    $audio_bytes += filesize($audio_path);
+                    $audio_count++;
+                }
+            }
+        }
+
+        $total_story_bytes = $cover_bytes + $text_bytes + $audio_bytes;
+        $pct = round(($total_story_bytes / $grand_total_web) * 100, 2);
+
+        $stories_data[] = array(
+            'id'                   => $story_id,
+            'title'                => $st->post_title,
+            'cover_url'            => $cover_url,
+            'cover_bytes'          => $cover_bytes,
+            'cover_formatted'      => muop_format_bytes($cover_bytes),
+            'chapters_count'       => count($chapters),
+            'text_bytes'           => $text_bytes,
+            'text_formatted'       => muop_format_bytes($text_bytes),
+            'audio_bytes'          => $audio_bytes,
+            'audio_formatted'      => muop_format_bytes($audio_bytes),
+            'audio_count'          => $audio_count,
+            'total_bytes'          => $total_story_bytes,
+            'total_formatted'      => muop_format_bytes($total_story_bytes),
+            'percent_web'          => $pct,
+            'status'               => $st->post_status,
+            'progress'             => get_post_meta($story_id, '_truyen_status', true) ?: 'dang_ra'
+        );
+    }
+
+    // Sắp xếp mặc định theo tổng dung lượng giảm dần (truyện nặng nhất lên đầu)
+    usort($stories_data, function($a, $b) {
+        return $b['total_bytes'] - $a['total_bytes'];
+    });
+
+    return $stories_data;
+}
+
+/**
+ * Lấy chi tiết dung lượng từng chương của một bộ truyện
+ */
+function muop_get_story_chapters_storage_list($story_id) {
+    $story = get_post($story_id);
+    if (!$story) return array();
+
+    $chapters = get_posts(array(
+        'post_type'      => 'chuong',
+        'posts_per_page' => -1,
+        'post_status'    => array('publish', 'draft', 'pending', 'future'),
+        'meta_key'       => '_chuong_number',
+        'orderby'        => 'meta_value_num',
+        'order'          => 'ASC',
+        'meta_query'     => array(
+            array('key' => '_chuong_truyen_id', 'value' => $story_id)
+        )
+    ));
+
+    $chapters_data = array();
+
+    foreach ($chapters as $ch) {
+        $num = (int) (get_post_meta($ch->ID, '_chuong_number', true) ?: 1);
+        $text_bytes = strlen($ch->post_content);
+        $raw_content = trim(strip_tags($ch->post_content));
+        $words = count(preg_split('/\s+/u', $raw_content, -1, PREG_SPLIT_NO_EMPTY));
+
+        $audio_url = get_post_meta($ch->ID, '_chuong_audio_url', true);
+        if (!$audio_url) $audio_url = get_post_meta($ch->ID, '_chapter_audio_url', true);
+
+        $audio_bytes = 0;
+        $has_audio = false;
+
+        if ($audio_url) {
+            $audio_path = muop_url_to_physical_path($audio_url);
+            if ($audio_path && file_exists($audio_path)) {
+                $audio_bytes = filesize($audio_path);
+                $has_audio = true;
+            }
+        }
+
+        $total_bytes = $text_bytes + $audio_bytes;
+
+        $chapters_data[] = array(
+            'id'              => $ch->ID,
+            'number'          => $num,
+            'title'           => $ch->post_title,
+            'words'           => $words,
+            'text_bytes'      => $text_bytes,
+            'text_formatted'  => muop_format_bytes($text_bytes),
+            'has_audio'       => $has_audio,
+            'audio_url'       => $audio_url,
+            'audio_bytes'     => $audio_bytes,
+            'audio_formatted' => $has_audio ? muop_format_bytes($audio_bytes) : 'Chưa có',
+            'total_bytes'     => $total_bytes,
+            'total_formatted' => muop_format_bytes($total_bytes),
+            'status'          => $ch->post_status,
+            'date'            => date('d/m/Y H:i', strtotime($ch->post_date))
+        );
+    }
+
+    return $chapters_data;
+}
+
+/**
+ * Lấy danh sách tất cả các file audio trên hosting
+ */
+function muop_get_audio_files_storage_list() {
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    $base_url = $upload_dir['baseurl'];
+
+    $audio_files = array();
+    $trash_dir_norm = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $base_dir . '/trash'));
+
+    if (is_dir($base_dir)) {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($base_dir, FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $ext = strtolower($file->getExtension());
+                if (in_array($ext, array('mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'))) {
+                    $path_norm = strtolower($file->getPathname());
+                    if (strpos($path_norm, $trash_dir_norm) === 0) continue; // Bỏ qua file trong thùng rác
+
+                    $sz = $file->getSize();
+                    $rel = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($base_dir)));
+                    $url = $base_url . $rel;
+
+                    // Nhận diện loại audio
+                    $filename = $file->getFilename();
+                    $type_label = 'Chương truyện';
+                    if (strpos($filename, 'voice_') === 0 || strpos($filename, 'giong_') !== false) {
+                        $type_label = 'Giọng mẫu AI';
+                    } elseif (strpos($filename, 'tts_') === 0) {
+                        $type_label = 'TTS AI';
+                    }
+
+                    $audio_files[] = array(
+                        'filename'       => $filename,
+                        'path'           => $file->getPathname(),
+                        'url'            => $url,
+                        'size'           => $sz,
+                        'size_formatted' => muop_format_bytes($sz),
+                        'modified'       => date('d/m/Y H:i', $file->getMTime()),
+                        'type_label'     => $type_label
+                    );
+                }
+            }
+        }
+    }
+
+    // Sắp xếp file nặng nhất lên đầu
+    usort($audio_files, function($a, $b) {
+        return $b['size'] - $a['size'];
+    });
+
+    return $audio_files;
+}
+
+/**
+ * Lấy danh sách các file hình ảnh trên hosting (Ảnh bìa & Media)
+ */
+function muop_get_image_files_storage_list() {
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    $base_url = $upload_dir['baseurl'];
+
+    $images = array();
+    $trash_dir_norm = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $base_dir . '/trash'));
+
+    if (is_dir($base_dir)) {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($base_dir, FilesystemIterator::SKIP_DOTS)
+        );
+        $count = 0;
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $ext = strtolower($file->getExtension());
+                if (in_array($ext, array('jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'))) {
+                    $path_norm = strtolower($file->getPathname());
+                    if (strpos($path_norm, $trash_dir_norm) === 0) continue;
+
+                    $sz = $file->getSize();
+                    $rel = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($base_dir)));
+                    $url = $base_url . $rel;
+
+                    $images[] = array(
+                        'filename'       => $file->getFilename(),
+                        'path'           => $file->getPathname(),
+                        'url'            => $url,
+                        'size'           => $sz,
+                        'size_formatted' => muop_format_bytes($sz),
+                        'modified'       => date('d/m/Y H:i', $file->getMTime())
+                    );
+
+                    $count++;
+                    if ($count >= 150) break; // Giới hạn 150 ảnh để tối ưu tốc độ render
+                }
+            }
+        }
+    }
+
+    usort($images, function($a, $b) {
+        return $b['size'] - $a['size'];
+    });
+
+    return $images;
+}
+
+/* =========================================================================
+ * CÁC AJAX HANDLERS CHO DUNG LƯỢNG & THÙNG RÁC
+ * ========================================================================= */
+
+/**
+ * AJAX: Lấy toàn bộ số liệu thống kê dung lượng hệ thống
+ */
+add_action('wp_ajax_muop_get_storage_stats', 'muop_ajax_get_storage_stats_handler');
+function muop_ajax_get_storage_stats_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $force_refresh = !empty($_POST['refresh']);
+    $stats = muop_get_system_storage_stats($force_refresh);
+    $stories = muop_get_all_stories_storage_list();
+    $audios = muop_get_audio_files_storage_list();
+    $images = muop_get_image_files_storage_list();
+
+    wp_send_json_success(array(
+        'stats'   => $stats,
+        'stories' => $stories,
+        'audios'  => $audios,
+        'images'  => $images
+    ));
+}
+
+/**
+ * AJAX: Lấy danh sách chương và dung lượng của 1 bộ truyện
+ */
+add_action('wp_ajax_muop_get_story_chapters_storage', 'muop_ajax_get_story_chapters_storage_handler');
+function muop_ajax_get_story_chapters_storage_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $story_id = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+    if (!$story_id) {
+        wp_send_json_error(array('message' => 'Truyện không hợp lệ!'));
+    }
+
+    $story = get_post($story_id);
+    if (!$story) {
+        wp_send_json_error(array('message' => 'Không tìm thấy bộ truyện này!'));
+    }
+
+    $thumb_url = get_the_post_thumbnail_url($story_id, 'medium');
+    $chapters = muop_get_story_chapters_storage_list($story_id);
+
+    // Tính tổng
+    $total_text = 0;
+    $total_audio = 0;
+    $thumb_id = get_post_thumbnail_id($story_id);
+    $cover_bytes = 0;
+    if ($thumb_id) {
+        $thumb_file = get_attached_file($thumb_id);
+        if ($thumb_file && file_exists($thumb_file)) {
+            $cover_bytes = filesize($thumb_file);
+        }
+    }
+
+    foreach ($chapters as $ch) {
+        $total_text += $ch['text_bytes'];
+        $total_audio += $ch['audio_bytes'];
+    }
+
+    $grand_total = $cover_bytes + $total_text + $total_audio;
+
+    wp_send_json_success(array(
+        'story_id'              => $story_id,
+        'story_title'           => $story->post_title,
+        'cover_url'             => $thumb_url,
+        'cover_formatted'       => muop_format_bytes($cover_bytes),
+        'total_text_formatted'  => muop_format_bytes($total_text),
+        'total_audio_formatted' => muop_format_bytes($total_audio),
+        'grand_total_formatted' => muop_format_bytes($grand_total),
+        'chapters_count'        => count($chapters),
+        'chapters'              => $chapters
+    ));
+}
+
+/**
+ * AJAX: Lấy danh sách các mục trong thùng rác
+ */
+add_action('wp_ajax_muop_get_trash_list', 'muop_ajax_get_trash_list_handler');
+function muop_ajax_get_trash_list_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $type = isset($_POST['type']) ? sanitize_text_field($_POST['type']) : 'all';
+    $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
+
+    $items = muop_get_trash_items($type, $search);
+    $total_trash_bytes = 0;
+    foreach ($items as $it) {
+        $total_trash_bytes += $it['item_size'];
+    }
+
+    wp_send_json_success(array(
+        'items'                 => $items,
+        'count'                 => count($items),
+        'total_bytes'           => $total_trash_bytes,
+        'total_bytes_formatted' => muop_format_bytes($total_trash_bytes)
+    ));
+}
+
+/**
+ * AJAX: Khôi phục một mục từ thùng rác
+ */
+add_action('wp_ajax_muop_restore_trash_item', 'muop_ajax_restore_trash_item_handler');
+function muop_ajax_restore_trash_item_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $trash_id = isset($_POST['trash_id']) ? intval($_POST['trash_id']) : 0;
+    if (!$trash_id) {
+        wp_send_json_error(array('message' => 'ID mục thùng rác không hợp lệ!'));
+    }
+
+    $res = muop_trash_restore_item($trash_id);
+    if ($res) {
+        wp_send_json_success(array('message' => 'Đã khôi phục thành công mục về vị trí ban đầu!'));
+    } else {
+        wp_send_json_error(array('message' => 'Lỗi khi khôi phục mục!'));
+    }
+}
+
+/**
+ * AJAX: Xóa vĩnh viễn một mục trong thùng rác
+ */
+add_action('wp_ajax_muop_purge_trash_item', 'muop_ajax_purge_trash_item_handler');
+function muop_ajax_purge_trash_item_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $trash_id = isset($_POST['trash_id']) ? intval($_POST['trash_id']) : 0;
+    if (!$trash_id) {
+        wp_send_json_error(array('message' => 'ID mục thùng rác không hợp lệ!'));
+    }
+
+    $res = muop_trash_purge_item($trash_id);
+    if ($res) {
+        wp_send_json_success(array('message' => 'Đã xóa vĩnh viễn mục và giải phóng dung lượng máy chủ thành công!'));
+    } else {
+        wp_send_json_error(array('message' => 'Lỗi khi xóa vĩnh viễn mục!'));
+    }
+}
+
+/**
+ * AJAX: Dọn sạch thùng rác (Xóa tất cả vĩnh viễn)
+ */
+add_action('wp_ajax_muop_empty_trash', 'muop_ajax_empty_trash_handler');
+function muop_ajax_empty_trash_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $res = muop_trash_purge_all();
+    wp_send_json_success(array(
+        'message'      => sprintf('Đã dọn sạch thùng rác thành công! Đã xóa vĩnh viễn %d mục và giải phóng %s MB dung lượng.', $res['purged_count'], $res['freed_mb']),
+        'purged_count' => $res['purged_count'],
+        'freed_mb'     => $res['freed_mb']
+    ));
+}
+
+/**
+ * AJAX: Chuyển một file vào thùng rác từ Quản lý dung lượng
+ */
+add_action('wp_ajax_muop_trash_file', 'muop_ajax_trash_file_handler');
+function muop_ajax_trash_file_handler() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện thao tác này!'));
+    }
+
+    $file_path = isset($_POST['file_path']) ? wp_unslash($_POST['file_path']) : '';
+    $type = isset($_POST['type']) ? sanitize_text_field($_POST['type']) : 'audio';
+
+    if (empty($file_path) || !file_exists($file_path)) {
+        wp_send_json_error(array('message' => 'File không tồn tại trên máy chủ!'));
+    }
+
+    // Bảo mật: Đảm bảo file nằm trong thư mục uploads
+    $upload_dir = wp_upload_dir();
+    $norm_uploads = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $upload_dir['basedir']));
+    $norm_file = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $file_path));
+
+    if (strpos($norm_file, $norm_uploads) !== 0) {
+        wp_send_json_error(array('message' => 'Đường dẫn file không an toàn!'));
+    }
+
+    $res = muop_trash_file($file_path, $type, get_current_user_id());
+    if ($res) {
+        wp_send_json_success(array('message' => 'Đã chuyển file vào Thùng rác (lưu giữ 15 ngày)!'));
+    } else {
+        wp_send_json_error(array('message' => 'Không thể chuyển file vào Thùng rác!'));
+    }
 }

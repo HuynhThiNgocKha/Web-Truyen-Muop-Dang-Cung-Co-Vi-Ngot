@@ -306,6 +306,13 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                     <span class="badge" id="badgeTodayAudios" style="font-size: 10px; padding: 2px 6px; margin-left: auto; background: #ecfeff; color: #0891b2; font-weight: 700;">Audio</span>
                 </button>
 
+                <!-- 1.3 Quản lý dung lượng hệ thống (Mới) -->
+                <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabStorage" id="navItemStorage">
+                    <span class="nav-item-icon"><i class="fa-solid fa-hard-drive" style="color: #0284c7;"></i></span>
+                    <span class="nav-item-label">Quản lý dung lượng</span>
+                    <span class="badge" id="badgeSidebarStorage" style="font-size: 10px; padding: 2px 6px; margin-left: auto; background: #e0f2fe; color: #0284c7; font-weight: 700;">Dung lượng</span>
+                </button>
+
                 <!-- 2. Quản lý truyện -->
                 <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabStories" id="navItemStories">
                     <span class="nav-item-icon"><i class="fa-solid fa-book"></i></span>
@@ -383,6 +390,13 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                     <span class="nav-item-icon"><i class="fa-solid fa-wand-magic-sparkles" style="color: #8b5cf6;"></i></span>
                     <span class="nav-item-label">Tính năng & Cập nhật</span>
                     <span class="badge badge-green" style="font-size: 10px; padding: 2px 6px; margin-left: auto;">Mới</span>
+                </button>
+
+                <!-- 13. Thùng rác hệ thống (Lưu trữ 15 ngày) (Mới) -->
+                <button type="button" class="dash-tab-btn admin-nav-item" data-tab="admTabTrash" id="navItemTrash">
+                    <span class="nav-item-icon"><i class="fa-solid fa-trash-can" style="color: #ef4444;"></i></span>
+                    <span class="nav-item-label">Thùng rác</span>
+                    <span class="badge" id="badgeSidebarTrash" style="font-size: 10px; padding: 2px 6px; margin-left: auto; background: #fee2e2; color: #ef4444; font-weight: 700;">15 ngày</span>
                 </button>
             </nav>
         </aside>
@@ -677,6 +691,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                         <th style="text-align: center; white-space: nowrap;">Số Chương</th>
                                         <th style="text-align: center; white-space: nowrap;">Lượt Xem</th>
                                         <th style="text-align: center; white-space: nowrap;">Đề Cử</th>
+                                        <th style="text-align: center; white-space: nowrap;">Dung Lượng</th>
                                         <th style="width: 130px; text-align: center; white-space: nowrap;">Hành Động CSDL</th>
                                     </tr>
                                 </thead>
@@ -834,6 +849,14 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                                 </select>
                                             </td>
 
+                                            <!-- Cột Dung Lượng (Mới) -->
+                                            <td style="text-align: center; white-space: nowrap;">
+                                                <button type="button" class="btn btn-outline btn-xs btn-open-story-storage-quick" data-story-id="<?php echo $st->ID; ?>" style="color: #0284c7; border-color: #bae6fd; background: #f0f9ff; font-weight: 700; font-family: monospace; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px;" title="Bấm để xem dung lượng truyện & chi tiết từng chương">
+                                                    <i class="fa-solid fa-hard-drive"></i>
+                                                    <span>Chi tiết</span>
+                                                </button>
+                                            </td>
+
                                             <!-- Cột Hành Động (Hình 1: Dấu 3 chấm dọc với 7 chức năng popup) -->
                                             <td style="text-align: center;">
                                                 <div class="db-row-actions" style="justify-content: center;">
@@ -948,6 +971,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     <div><i class="fa-solid fa-tags"></i> <strong>Thể loại:</strong> <span id="storyDetailGenres">--</span></div>
                                     <div><i class="fa-solid fa-eye"></i> <strong>Tổng views:</strong> <span id="storyDetailViewsAll">0</span></div>
                                     <div><i class="fa-solid fa-chart-line"></i> <strong>Views tháng:</strong> <span id="storyDetailViewsMonth">0</span></div>
+                                    <div><i class="fa-solid fa-hard-drive" style="color:#0284c7;"></i> <strong>Dung lượng:</strong> <span id="storyDetailStorage" style="font-weight:700; color:#0284c7;">--</span></div>
                                 </div>
 
                                 <!-- Mô tả truyện thu gọn/mở rộng -->
@@ -996,6 +1020,7 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                             <th style="width: 70px; text-align: center;">Chương #</th>
                                             <th>Tiêu Đề Chương</th>
                                             <th style="width: 120px;">Số Từ</th>
+                                            <th style="width: 130px; text-align: center;">Dung Lượng</th>
                                             <th style="width: 120px;">Trạng Thái</th>
                                             <th style="width: 130px;">Ngày Đăng</th>
                                             <th style="width: 100px;">Lượt Xem</th>
@@ -1542,6 +1567,203 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                 <!-- Dynamic pagination buttons -->
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <!-- =================================================================
+                     TAB: QUẢN LÝ DUNG LƯỢNG HỆ THỐNG (MỚI)
+                     ================================================================= -->
+                <section id="admTabStorage" class="dash-tab-pane">
+                    <div class="adm-subview-panel">
+                        <!-- 1. Header & Giới thiệu tính năng -->
+                        <div class="db-splitter-container" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px 24px; box-shadow: var(--shadow-sm); margin-bottom: 20px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                                        <i class="fa-solid fa-hard-drive"></i>
+                                    </div>
+                                    <div>
+                                        <h3 style="margin: 0; font-size: 16.5px; font-weight: 700; color: var(--text-color);">Quản Lý & Phân Tích Dung Lượng Hệ Thống</h3>
+                                        <p style="margin: 3px 0 0; font-size: 13px; color: var(--text-muted);">
+                                            Theo dõi tổng dung lượng lưu trữ trên web, phân bổ audio, hình ảnh, văn bản và dung lượng chi tiết từng truyện, từng chương.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-outline btn-sm" id="btnCompressAllAudioFromStorage" style="color: #16a34a; border-color: #86efac; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" title="Quét và nén tất cả các file audio trên hosting xuống dung lượng thấp nhất">
+                                        <i class="fa-solid fa-file-zipper"></i> Nén Toàn Bộ Audio Đã Tải Lên
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshStorageStats">
+                                        <i class="fa-solid fa-arrow-rotate-right"></i> Làm mới dữ liệu
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Thẻ KPI thống kê tổng quan dung lượng -->
+                        <div class="adm-stat-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                            <!-- Card 1: Tổng dung lượng Web -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Tổng Dung Lượng Web</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-server"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #0284c7; margin-top: 6px;" id="statStorageGrandTotal">-- MB</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="statStorageTotalFiles">Đang tính toán...</div>
+                            </div>
+
+                            <!-- Card 2: Dung lượng Audio -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Dung Lượng Audio</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #ecfeff; color: #0891b2; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-headphones"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #0891b2; margin-top: 6px;" id="statStorageAudioTotal">-- MB</div>
+                                <div style="font-size: 12px; color: #0891b2; margin-top: 4px;" id="statStorageAudioCount">-- files (0%)</div>
+                            </div>
+
+                            <!-- Card 3: Dung lượng Hình ảnh -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Dung Lượng Hình Ảnh</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #f5f3ff; color: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-image"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #8b5cf6; margin-top: 6px;" id="statStorageImageTotal">-- MB</div>
+                                <div style="font-size: 12px; color: #8b5cf6; margin-top: 4px;" id="statStorageImageCount">-- ảnh bìa & media (0%)</div>
+                            </div>
+
+                            <!-- Card 4: Văn bản & CSDL -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Văn Bản & Cơ Sở Dữ Liệu</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-database"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #16a34a; margin-top: 6px;" id="statStorageDbTextTotal">-- MB</div>
+                                <div style="font-size: 12px; color: #16a34a; margin-top: 4px;" id="statStorageDbTextCount">-- chương truyện</div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Thanh biểu đồ phân bổ dung lượng trực quan -->
+                        <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px 22px; box-shadow: var(--shadow-sm); margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span style="font-size: 13.5px; font-weight: 700; color: var(--text-color);"><i class="fa-solid fa-chart-pie" style="color:#0284c7;"></i> Tỷ Trọng Chiếm Dụng Ổ Đĩa Trên Hosting</span>
+                                <span style="font-size: 12px; color: var(--text-muted);">Cập nhật theo thời gian thực</span>
+                            </div>
+                            <!-- Progress Bar Container -->
+                            <div style="height: 18px; border-radius: 10px; background: #f1f5f9; display: flex; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 12px;" id="storageDistributionBar">
+                                <div id="barSegmentAudio" style="background: #0891b2; width: 0%; transition: width 0.6s ease;" title="Audio"></div>
+                                <div id="barSegmentImage" style="background: #8b5cf6; width: 0%; transition: width 0.6s ease;" title="Hình ảnh"></div>
+                                <div id="barSegmentDbText" style="background: #16a34a; width: 0%; transition: width 0.6s ease;" title="Văn bản & CSDL"></div>
+                                <div id="barSegmentTrash" style="background: #ea580c; width: 0%; transition: width 0.6s ease;" title="Thùng rác"></div>
+                                <div id="barSegmentOther" style="background: #94a3b8; width: 0%; transition: width 0.6s ease;" title="Khác"></div>
+                            </div>
+                            <!-- Legend -->
+                            <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px;">
+                                <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #0891b2; display: inline-block;"></span> <span>Audio: <strong id="legendAudioPct">0%</strong> (<span id="legendAudioSize">0 MB</span>)</span></div>
+                                <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #8b5cf6; display: inline-block;"></span> <span>Hình ảnh: <strong id="legendImagePct">0%</strong> (<span id="legendImageSize">0 MB</span>)</span></div>
+                                <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #16a34a; display: inline-block;"></span> <span>Văn bản & CSDL: <strong id="legendDbTextPct">0%</strong> (<span id="legendDbTextSize">0 MB</span>)</span></div>
+                                <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #ea580c; display: inline-block;"></span> <span>Thùng rác: <strong id="legendTrashPct">0%</strong> (<span id="legendTrashSize">0 MB</span>)</span></div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Thanh Sub-tab chuyển đổi chế độ xem -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                            <div class="adm-story-filter-pills" id="storageSubTabPills">
+                                <button type="button" class="btn-story-filter-pill active" data-subtab="stories">
+                                    <i class="fa-solid fa-book"></i> Dung Lượng Từng Truyện (<span id="storageTabStoriesCount">0</span>)
+                                </button>
+                                <button type="button" class="btn-story-filter-pill" data-subtab="audios">
+                                    <i class="fa-solid fa-headphones" style="color: #0891b2;"></i> Kho File Audio (<span id="storageTabAudiosCount">0</span>)
+                                </button>
+                                <button type="button" class="btn-story-filter-pill" data-subtab="images">
+                                    <i class="fa-solid fa-image" style="color: #8b5cf6;"></i> Kho File Hình Ảnh (<span id="storageTabImagesCount">0</span>)
+                                </button>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="storageSearchInput" class="form-input" placeholder="Tìm kiếm theo tên..." style="height: 32px; font-size: 12.5px; width: 220px;" />
+                            </div>
+                        </div>
+
+                        <!-- 5.1 Khung xem 1: Dung lượng theo từng Truyện -->
+                        <div id="storageViewStories" class="storage-subview">
+                            <div class="table-responsive db-table-container">
+                                <table class="data-table db-data-table" id="tableStorageStories" style="width: 100%; font-size: 13px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 45px; text-align: center;">STT</th>
+                                            <th style="width: 50px; text-align: center;">Bìa</th>
+                                            <th style="min-width: 220px;">Tên Bộ Truyện</th>
+                                            <th style="width: 100px; text-align: center;">Số Chương</th>
+                                            <th style="width: 110px; text-align: center;">Ảnh Bìa</th>
+                                            <th style="width: 110px; text-align: center;">Văn Bản</th>
+                                            <th style="width: 130px; text-align: center;">Audio</th>
+                                            <th style="width: 130px; text-align: center; color: #0284c7;">TỔNG DUNG LƯỢNG</th>
+                                            <th style="width: 90px; text-align: center;">% Web</th>
+                                            <th style="width: 150px; text-align: center;">Thao Tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="storageStoriesTbody">
+                                        <tr>
+                                            <td colspan="10" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                                                <i class="fa-solid fa-spinner fa-spin"></i> Đang tải dữ liệu dung lượng từng truyện...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 5.2 Khung xem 2: Kho File Audio -->
+                        <div id="storageViewAudios" class="storage-subview" style="display: none;">
+                            <div class="table-responsive db-table-container">
+                                <table class="data-table db-data-table" id="tableStorageAudios" style="width: 100%; font-size: 13px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 45px; text-align: center;">STT</th>
+                                            <th>Tên File Audio</th>
+                                            <th style="width: 120px; text-align: center;">Phân Loại</th>
+                                            <th style="width: 120px; text-align: center;">Dung Lượng</th>
+                                            <th style="width: 140px; text-align: center;">Ngày Tải Lên</th>
+                                            <th style="min-width: 200px; text-align: center;">Nghe Thử</th>
+                                            <th style="width: 120px; text-align: center;">Hành Động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="storageAudiosTbody">
+                                        <tr>
+                                            <td colspan="7" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                                                <i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách file audio...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 5.3 Khung xem 3: Kho File Hình Ảnh -->
+                        <div id="storageViewImages" class="storage-subview" style="display: none;">
+                            <div class="table-responsive db-table-container">
+                                <table class="data-table db-data-table" id="tableStorageImages" style="width: 100%; font-size: 13px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 45px; text-align: center;">STT</th>
+                                            <th style="width: 60px; text-align: center;">Xem Trước</th>
+                                            <th>Tên File Ảnh</th>
+                                            <th style="width: 120px; text-align: center;">Dung Lượng</th>
+                                            <th style="width: 140px; text-align: center;">Ngày Tải Lên</th>
+                                            <th style="width: 140px; text-align: center;">Hành Động</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="storageImagesTbody">
+                                        <tr>
+                                            <td colspan="6" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                                                <i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách hình ảnh...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                     </div>
                 </section>
 
@@ -3624,6 +3846,121 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                     </div>
                 </section>
 
+                <!-- =================================================================
+                     TAB: THÙNG RÁC HỆ THỐNG (LƯU TRỮ 15 NGÀY) (MỚI)
+                     ================================================================= -->
+                <section id="admTabTrash" class="dash-tab-pane">
+                    <div class="adm-subview-panel">
+                        <!-- 1. Header & Giới thiệu tính năng -->
+                        <div class="db-splitter-container" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px 24px; box-shadow: var(--shadow-sm); margin-bottom: 20px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 44px; height: 44px; border-radius: 10px; background: #fee2e2; color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </div>
+                                    <div>
+                                        <h3 style="margin: 0; font-size: 16.5px; font-weight: 700; color: var(--text-color);">Thùng Rác Hệ Thống (Lưu Trữ An Toàn 15 Ngày)</h3>
+                                        <p style="margin: 3px 0 0; font-size: 13px; color: var(--text-muted);">
+                                            Mọi truyện, chương hoặc file khi bị xóa sẽ được giữ tại đây trong <strong>15 ngày</strong>. Sau 15 ngày hệ thống sẽ tự động xóa vĩnh viễn khỏi hosting.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-outline btn-sm" id="btnEmptyAllTrash" style="color: #dc2626; border-color: #fca5a5; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" title="Xóa vĩnh viễn toàn bộ mục trong thùng rác và giải phóng ổ đĩa">
+                                        <i class="fa-solid fa-trash-can"></i> Dọn Sạch Thùng Rác (Xóa Tất Cả)
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshTrashList">
+                                        <i class="fa-solid fa-arrow-rotate-right"></i> Làm mới
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Thẻ KPI thống kê Thùng rác -->
+                        <div class="adm-stat-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                            <!-- Card 1: Số mục trong thùng rác -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Mục Đang Trong Thùng Rác</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #fee2e2; color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-box-archive"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #ef4444; margin-top: 6px;" id="statTrashCount">0 mục</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Có thể khôi phục bất cứ lúc nào</div>
+                            </div>
+
+                            <!-- Card 2: Dung lượng chờ giải phóng -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Dung Lượng Chờ Giải Phóng</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-hard-drive"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #d97706; margin-top: 6px;" id="statTrashSize">0 B</div>
+                                <div style="font-size: 12px; color: #d97706; margin-top: 4px;">Sẽ được giải phóng khi xóa vĩnh viễn</div>
+                            </div>
+
+                            <!-- Card 3: Chính sách tự động xóa 15 ngày -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm);">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 700;">Chính Sách Tự Động Xóa</span>
+                                    <span style="width: 32px; height: 32px; border-radius: 8px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 14px;"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                                </div>
+                                <div style="font-size: 26px; font-weight: 800; color: #16a34a; margin-top: 6px;">15 Ngày</div>
+                                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Tự động thanh trừng sau 15 ngày kể từ ngày xóa</div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Bộ lọc theo loại & Tìm kiếm -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                            <div class="adm-story-filter-pills" id="trashFilterPills">
+                                <button type="button" class="btn-story-filter-pill active" data-trash-type="all">
+                                    <i class="fa-solid fa-layer-group"></i> Tất cả
+                                </button>
+                                <button type="button" class="btn-story-filter-pill" data-trash-type="story">
+                                    <i class="fa-solid fa-book" style="color: #0284c7;"></i> Truyện
+                                </button>
+                                <button type="button" class="btn-story-filter-pill" data-trash-type="chapter">
+                                    <i class="fa-solid fa-file-lines" style="color: #10b981;"></i> Chương
+                                </button>
+                                <button type="button" class="btn-story-filter-pill" data-trash-type="audio">
+                                    <i class="fa-solid fa-headphones" style="color: #0891b2;"></i> File Audio
+                                </button>
+                                <button type="button" class="btn-story-filter-pill" data-trash-type="image">
+                                    <i class="fa-solid fa-image" style="color: #8b5cf6;"></i> File Ảnh
+                                </button>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="trashSearchInput" class="form-input" placeholder="Tìm kiếm trong thùng rác..." style="height: 32px; font-size: 12.5px; width: 220px;" />
+                            </div>
+                        </div>
+
+                        <!-- 4. Bảng danh sách mục trong Thùng rác -->
+                        <div class="table-responsive db-table-container">
+                            <table class="data-table db-data-table" id="tableTrashList" style="width: 100%; font-size: 13px;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 45px; text-align: center;">STT</th>
+                                        <th style="min-width: 240px;">Tên Mục / File Đã Xóa</th>
+                                        <th style="width: 120px; text-align: center;">Phân Loại</th>
+                                        <th style="width: 120px; text-align: center;">Dung Lượng</th>
+                                        <th style="width: 150px; text-align: center;">Ngày Xóa</th>
+                                        <th style="width: 170px; text-align: center;">Thời Gian Còn Lại</th>
+                                        <th style="width: 190px; text-align: center;">Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trashListTbody">
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; padding: 36px; color: var(--text-muted);">
+                                            <i class="fa-solid fa-trash-can" style="font-size: 24px; opacity: 0.4; margin-bottom: 8px; display: block;"></i>
+                                            Thùng rác hiện đang trống.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </section>
+
             </div>
 
             <!-- 4. FOOTER CỦA MAIN WORKSPACE THEO ĐÚNG ẢNH 2 -->
@@ -3820,6 +4157,65 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
     </div>
 </div>
 
+<!-- =========================================================================
+     MODAL POPUP: XEM CHI TIẾT DUNG LƯỢNG TỪNG CHƯƠNG CỦA BỘ TRUYỆN (MỚI)
+     ========================================================================= -->
+<div id="modalStoryChaptersStorage" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: var(--bg-card); width: 100%; max-width: 950px; max-height: 90vh; border-radius: var(--radius-md); box-shadow: 0 10px 25px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden; animation: admModalIn 0.25s ease;">
+        <!-- Modal Header -->
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-main);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <img id="modalStorageStoryCover" src="" alt="Bìa" style="width: 42px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);" />
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-color);" id="modalStorageStoryTitle">...</h3>
+                    <div style="margin-top: 4px; font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span><i class="fa-solid fa-image"></i> Bìa: <strong id="modalStorageCoverSize" style="color: #8b5cf6;">--</strong></span>
+                        <span><i class="fa-solid fa-file-lines"></i> Văn bản: <strong id="modalStorageTextSize" style="color: #16a34a;">--</strong></span>
+                        <span><i class="fa-solid fa-headphones"></i> Audio: <strong id="modalStorageAudioSize" style="color: #0891b2;">--</strong></span>
+                        <span style="background: #e0f2fe; color: #0284c7; padding: 2px 8px; border-radius: 4px; font-weight: 700;">
+                            <i class="fa-solid fa-hard-drive"></i> Tổng: <span id="modalStorageGrandTotal">--</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn-close-modal-storage" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px 8px;" title="Đóng popup">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body: Bảng danh sách chương -->
+        <div style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+            <div class="table-responsive db-table-container">
+                <table class="data-table db-data-table" style="width: 100%; font-size: 13px;" id="tableModalStoryChaptersStorage">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px; text-align: center;">Chương #</th>
+                            <th style="min-width: 200px;">Tiêu Đề Chương</th>
+                            <th style="width: 90px; text-align: center;">Số Từ</th>
+                            <th style="width: 110px; text-align: center;">Văn Bản</th>
+                            <th style="width: 120px; text-align: center;">Audio</th>
+                            <th style="width: 130px; text-align: center; color: #0284c7;">TỔNG DUNG LƯỢNG</th>
+                            <th style="min-width: 160px; text-align: center;">Nghe Thử Audio</th>
+                            <th style="width: 100px; text-align: center;">Thao Tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalStoryChaptersStorageTbody">
+                        <tr><td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải dữ liệu dung lượng từng chương...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="padding: 12px 20px; border-top: 1px solid var(--border-color); background: var(--bg-card); display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 12px; color: var(--text-muted);">
+                <i class="fa-solid fa-circle-info" style="color: #0284c7;"></i> Bấm "Chuyển thùng rác" nếu muốn xóa riêng chương đó mà không mất dữ liệu ngay lập tức.
+            </span>
+            <button type="button" class="btn btn-secondary btn-close-modal-storage" style="padding: 6px 18px; font-size: 13px;">Đóng</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // Inline JS for Admin Portal interactions
 jQuery(document).ready(function($) {
@@ -3924,7 +4320,9 @@ jQuery(document).ready(function($) {
         'admTabComments': 'Bình luận & Đánh giá',
         'admTabReports': 'Báo lỗi chương',
         'admTabBroadcast': 'Thông báo hệ thống',
-        'admTabFeatures': 'Tính năng & Cập nhật hệ thống'
+        'admTabFeatures': 'Tính năng & Cập nhật hệ thống',
+        'admTabStorage': 'Quản lý dung lượng',
+        'admTabTrash': 'Thùng rác hệ thống (Lưu 15 ngày)'
       };
 
       if (tabLabelMap[cleanId]) {
@@ -3948,6 +4346,10 @@ jQuery(document).ready(function($) {
         if (typeof loadVisitorLogs === 'function') loadVisitorLogs(1);
       } else if (cleanId === 'admTabAudio') {
         if (typeof loadAudioLogs === 'function') loadAudioLogs(1);
+      } else if (cleanId === 'admTabStorage') {
+        if (typeof loadStorageStats === 'function') loadStorageStats();
+      } else if (cleanId === 'admTabTrash') {
+        if (typeof loadTrashList === 'function') loadTrashList();
       } else if (cleanId === 'admTabVivuCrawler') {
         $('#toolbarGroupVivuCrawler').show();
       } else if (cleanId === 'admTabAnalytics') {
@@ -6410,6 +6812,677 @@ jQuery(document).ready(function($) {
 
   setTimeout(initTableScrollControls, 100);
   setTimeout(initTableScrollControls, 400);
+
+  /* =========================================================================
+   * HỆ THỐNG QUẢN LÝ DUNG LƯỢNG (STORAGE) & THÙNG RÁC (TRASH) JAVASCRIPT
+   * ========================================================================= */
+  let cachedStorageData = null;
+  let currentStorageSubTab = 'stories';
+  let currentTrashType = 'all';
+
+  // 1. Tải và hiển thị dữ liệu Quản Lý Dung Lượng
+  window.loadStorageStats = function(forceRefresh = false) {
+    if (forceRefresh) {
+      $('#statStorageGrandTotal').html('<i class="fa-solid fa-spinner fa-spin"></i>');
+      $('#storageStoriesTbody').html('<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tính toán lại toàn bộ dung lượng trên hosting...</td></tr>');
+    }
+
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_storage_stats',
+        nonce: muopConfig.nonce,
+        refresh: forceRefresh ? 1 : 0
+      },
+      success: function(res) {
+        if (res && res.success && res.data) {
+          cachedStorageData = res.data;
+          renderStorageStats(res.data);
+        } else {
+          muopAlert((res && res.data && res.data.message) ? res.data.message : 'Không thể tải thống kê dung lượng!', 'error');
+        }
+      },
+      error: function(xhr, status, err) {
+        muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ khi tính dung lượng!'), 'error');
+      }
+    });
+  };
+
+  function renderStorageStats(data) {
+    const s = data.stats || {};
+    // KPI Cards
+    $('#statStorageGrandTotal').text(s.grand_total_formatted || '0 MB');
+    $('#statStorageTotalFiles').text('Gồm ' + (s.uploads_files_count || 0) + ' files trên máy chủ');
+    $('#badgeSidebarStorage').text(s.grand_total_formatted || 'Dung lượng');
+
+    $('#statStorageAudioTotal').text(s.audio_formatted || '0 MB');
+    $('#statStorageAudioCount').text((s.audio_count || 0) + ' files audio (' + (s.audio_percent || 0) + '%)');
+
+    $('#statStorageImageTotal').text(s.image_formatted || '0 MB');
+    $('#statStorageImageCount').text((s.image_count || 0) + ' ảnh (' + (s.image_percent || 0) + '%)');
+
+    $('#statStorageDbTextTotal').text(s.text_formatted || '0 MB');
+    $('#statStorageDbTextCount').text((s.chapters_count || 0) + ' chương (' + (s.db_formatted || '0 MB') + ' CSDL)');
+
+    // Distribution Bar
+    $('#barSegmentAudio').css('width', (s.audio_percent || 0) + '%');
+    $('#barSegmentImage').css('width', (s.image_percent || 0) + '%');
+    $('#barSegmentDbText').css('width', (s.db_text_percent || 0) + '%');
+    $('#barSegmentTrash').css('width', (s.trash_percent || 0) + '%');
+    $('#barSegmentOther').css('width', (s.other_percent || 0) + '%');
+
+    // Legend
+    $('#legendAudioPct').text((s.audio_percent || 0) + '%');
+    $('#legendAudioSize').text(s.audio_formatted || '0 MB');
+    $('#legendImagePct').text((s.image_percent || 0) + '%');
+    $('#legendImageSize').text(s.image_formatted || '0 MB');
+    $('#legendDbTextPct').text((s.db_text_percent || 0) + '%');
+    $('#legendDbTextSize').text(s.text_formatted || '0 MB');
+    $('#legendTrashPct').text((s.trash_percent || 0) + '%');
+    $('#legendTrashSize').text(s.trash_formatted || '0 B');
+
+    // Counts on Sub-tabs
+    $('#storageTabStoriesCount').text((data.stories || []).length);
+    $('#storageTabAudiosCount').text((data.audios || []).length);
+    $('#storageTabImagesCount').text((data.images || []).length);
+
+    // Render active subtab
+    filterAndRenderStorageViews();
+  }
+
+  function filterAndRenderStorageViews() {
+    if (!cachedStorageData) return;
+    const query = ($('#storageSearchInput').val() || '').toLowerCase().trim();
+
+    // 1. Stories Subtab
+    if (currentStorageSubTab === 'stories') {
+      const stories = cachedStorageData.stories || [];
+      const filtered = stories.filter(st => {
+        if (!query) return true;
+        return (st.title || '').toLowerCase().includes(query) || ('' + st.id).includes(query);
+      });
+
+      const $tbody = $('#storageStoriesTbody').empty();
+      if (filtered.length === 0) {
+        $tbody.html('<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Không tìm thấy bộ truyện nào phù hợp!</td></tr>');
+      } else {
+        filtered.forEach((st, idx) => {
+          const coverImg = st.cover_url 
+            ? `<img src="${st.cover_url}" alt="Bìa" style="width: 32px; height: 44px; object-fit: cover; border-radius: 4px;" />` 
+            : `<div style="width: 32px; height: 44px; background: #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #94a3b8;"><i class="fa-solid fa-book"></i></div>`;
+
+          const rowHtml = `
+            <tr>
+              <td style="text-align: center; font-weight: 600; color: #64748b;">${idx + 1}</td>
+              <td style="text-align: center;">${coverImg}</td>
+              <td>
+                <div style="font-weight: 700; color: var(--text-color);">${st.title}</div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">ID: #${st.id} • ${st.progress === 'hoan_thanh' ? '<span style="color:#10b981;">Full</span>' : '<span style="color:#0284c7;">Đang ra</span>'}</div>
+              </td>
+              <td style="text-align: center; font-weight: 600;">${st.chapters_count} chương</td>
+              <td style="text-align: center; color: #8b5cf6; font-weight: 600;">${st.cover_formatted}</td>
+              <td style="text-align: center; color: #16a34a; font-weight: 600;">${st.text_formatted}</td>
+              <td style="text-align: center; color: #0891b2; font-weight: 600;">
+                ${st.audio_formatted}
+                ${st.audio_count > 0 ? `<div style="font-size: 10.5px; color: #0891b2;">(${st.audio_count} chương audio)</div>` : ''}
+              </td>
+              <td style="text-align: center;">
+                <span class="badge" style="background: #e0f2fe; color: #0284c7; font-weight: 800; font-family: monospace; font-size: 12.5px; padding: 4px 8px;">
+                  ${st.total_formatted}
+                </span>
+              </td>
+              <td style="text-align: center; font-size: 12px; color: var(--text-muted);">${st.percent_web}%</td>
+              <td style="text-align: center;">
+                <div style="display: flex; gap: 6px; justify-content: center;">
+                  <button type="button" class="btn btn-outline btn-xs btn-open-story-storage-detail" data-story-id="${st.id}" style="color: #0284c7; border-color: #bae6fd;" title="Xem chi tiết dung lượng từng chương">
+                    <i class="fa-solid fa-list-check"></i> Từng chương
+                  </button>
+                  <button type="button" class="btn btn-outline btn-xs btn-trash-story-item" data-story-id="${st.id}" data-story-title="${st.title.replace(/"/g, '&quot;')}" style="color: #ef4444; border-color: #fca5a5;" title="Chuyển truyện vào Thùng rác (lưu giữ 15 ngày)">
+                    <i class="fa-solid fa-trash-can"></i> Xóa
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+          $tbody.append(rowHtml);
+        });
+      }
+    }
+
+    // 2. Audios Subtab
+    else if (currentStorageSubTab === 'audios') {
+      const audios = cachedStorageData.audios || [];
+      const filtered = audios.filter(a => {
+        if (!query) return true;
+        return (a.filename || '').toLowerCase().includes(query);
+      });
+
+      const $tbody = $('#storageAudiosTbody').empty();
+      if (filtered.length === 0) {
+        $tbody.html('<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Không tìm thấy file audio nào!</td></tr>');
+      } else {
+        filtered.forEach((a, idx) => {
+          const rowHtml = `
+            <tr>
+              <td style="text-align: center; font-weight: 600; color: #64748b;">${idx + 1}</td>
+              <td>
+                <div style="font-weight: 600; color: var(--text-color); font-family: monospace; word-break: break-all;">${a.filename}</div>
+              </td>
+              <td style="text-align: center;">
+                <span class="badge" style="background: #ecfeff; color: #0891b2; font-size: 11px;">${a.type_label}</span>
+              </td>
+              <td style="text-align: center;">
+                <span class="badge" style="background: #f0fdf4; color: #16a34a; font-weight: 700; font-family: monospace; font-size: 12px;">${a.size_formatted}</span>
+              </td>
+              <td style="text-align: center; font-size: 12px; color: var(--text-muted);">${a.modified}</td>
+              <td style="text-align: center;">
+                <audio controls preload="none" style="height: 32px; width: 220px; max-width: 100%;">
+                  <source src="${a.url}" type="audio/mpeg">
+                </audio>
+              </td>
+              <td style="text-align: center;">
+                <button type="button" class="btn btn-outline btn-xs btn-trash-file-item" data-file-path="${a.path.replace(/"/g, '&quot;')}" data-file-name="${a.filename.replace(/"/g, '&quot;')}" data-type="audio" style="color: #ef4444; border-color: #fca5a5;" title="Chuyển file này vào Thùng rác (lưu 15 ngày)">
+                  <i class="fa-solid fa-trash-can"></i> Xóa
+                </button>
+              </td>
+            </tr>
+          `;
+          $tbody.append(rowHtml);
+        });
+      }
+    }
+
+    // 3. Images Subtab
+    else if (currentStorageSubTab === 'images') {
+      const images = cachedStorageData.images || [];
+      const filtered = images.filter(img => {
+        if (!query) return true;
+        return (img.filename || '').toLowerCase().includes(query);
+      });
+
+      const $tbody = $('#storageImagesTbody').empty();
+      if (filtered.length === 0) {
+        $tbody.html('<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Không tìm thấy hình ảnh nào!</td></tr>');
+      } else {
+        filtered.forEach((img, idx) => {
+          const rowHtml = `
+            <tr>
+              <td style="text-align: center; font-weight: 600; color: #64748b;">${idx + 1}</td>
+              <td style="text-align: center;">
+                <a href="${img.url}" target="_blank">
+                  <img src="${img.url}" alt="Preview" style="width: 44px; height: 58px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color);" />
+                </a>
+              </td>
+              <td>
+                <div style="font-weight: 600; color: var(--text-color); font-family: monospace; word-break: break-all;">${img.filename}</div>
+              </td>
+              <td style="text-align: center;">
+                <span class="badge" style="background: #f5f3ff; color: #8b5cf6; font-weight: 700; font-family: monospace; font-size: 12px;">${img.size_formatted}</span>
+              </td>
+              <td style="text-align: center; font-size: 12px; color: var(--text-muted);">${img.modified}</td>
+              <td style="text-align: center;">
+                <div style="display: flex; gap: 6px; justify-content: center;">
+                  <a href="${img.url}" target="_blank" class="btn btn-outline btn-xs" style="color: #0284c7; border-color: #bae6fd;">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Xem ảnh
+                  </a>
+                  <button type="button" class="btn btn-outline btn-xs btn-trash-file-item" data-file-path="${img.path.replace(/"/g, '&quot;')}" data-file-name="${img.filename.replace(/"/g, '&quot;')}" data-type="image" style="color: #ef4444; border-color: #fca5a5;" title="Chuyển ảnh này vào Thùng rác (lưu 15 ngày)">
+                    <i class="fa-solid fa-trash-can"></i> Xóa
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+          $tbody.append(rowHtml);
+        });
+      }
+    }
+  }
+
+  // Switch Storage Sub-tabs
+  $('#storageSubTabPills .btn-story-filter-pill').on('click', function() {
+    $('#storageSubTabPills .btn-story-filter-pill').removeClass('active');
+    $(this).addClass('active');
+    currentStorageSubTab = $(this).data('subtab');
+
+    $('.storage-subview').hide();
+    if (currentStorageSubTab === 'stories') $('#storageViewStories').show();
+    else if (currentStorageSubTab === 'audios') $('#storageViewAudios').show();
+    else if (currentStorageSubTab === 'images') $('#storageViewImages').show();
+
+    filterAndRenderStorageViews();
+  });
+
+  // Search in Storage
+  $('#storageSearchInput').on('input', function() {
+    filterAndRenderStorageViews();
+  });
+
+  // Refresh Storage Stats Button
+  $('#btnRefreshStorageStats').on('click', function() {
+    loadStorageStats(true);
+  });
+
+  // Compress All Audio from Storage Button
+  $('#btnCompressAllAudioFromStorage').on('click', function() {
+    $('#btnCompressAllAudio').trigger('click');
+  });
+
+  // 2. Xem chi tiết dung lượng từng chương của một bộ truyện
+  window.muopOpenStoryStorageDetail = function(storyId) {
+    if (!storyId) return;
+    $('#modalStoryChaptersStorage').css('display', 'flex');
+    $('#modalStorageStoryTitle').text('Đang tải dữ liệu...');
+    $('#modalStorageCoverSize').text('--');
+    $('#modalStorageTextSize').text('--');
+    $('#modalStorageAudioSize').text('--');
+    $('#modalStorageGrandTotal').text('--');
+    $('#modalStoryChaptersStorageTbody').html('<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tính toán chi tiết dung lượng từng chương...</td></tr>');
+
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_story_chapters_storage',
+        nonce: muopConfig.nonce,
+        story_id: storyId
+      },
+      success: function(res) {
+        if (res && res.success && res.data) {
+          const d = res.data;
+          $('#modalStorageStoryTitle').text(d.story_title);
+          if (d.cover_url) $('#modalStorageStoryCover').attr('src', d.cover_url).show();
+          else $('#modalStorageStoryCover').hide();
+
+          $('#modalStorageCoverSize').text(d.cover_formatted);
+          $('#modalStorageTextSize').text(d.total_text_formatted);
+          $('#modalStorageAudioSize').text(d.total_audio_formatted);
+          $('#modalStorageGrandTotal').text(d.grand_total_formatted);
+
+          const $tbody = $('#modalStoryChaptersStorageTbody').empty();
+          const chaps = d.chapters || [];
+          if (chaps.length === 0) {
+            $tbody.html('<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-circle-info"></i> Truyện này chưa có chương nào!</td></tr>');
+          } else {
+            chaps.forEach(ch => {
+              const audioPlayer = ch.has_audio 
+                ? `<audio controls preload="none" style="height: 30px; width: 170px;"><source src="${ch.audio_url}" type="audio/mpeg"></audio>`
+                : `<span style="color: var(--text-muted); font-size: 11px;">Chưa có audio</span>`;
+
+              const rowHtml = `
+                <tr>
+                  <td style="text-align: center; font-weight: 700;">Chương ${ch.number}</td>
+                  <td><strong>${ch.title}</strong></td>
+                  <td style="text-align: center;"><span class="badge badge-green" style="font-size: 11px;">${ch.words.toLocaleString('vi-VN')} từ</span></td>
+                  <td style="text-align: center; color: #16a34a; font-weight: 600;">${ch.text_formatted}</td>
+                  <td style="text-align: center; color: #0891b2; font-weight: 600;">${ch.audio_formatted}</td>
+                  <td style="text-align: center;">
+                    <span class="badge" style="background: #e0f2fe; color: #0284c7; font-weight: 800; font-family: monospace; font-size: 12px;">
+                      ${ch.total_formatted}
+                    </span>
+                  </td>
+                  <td style="text-align: center;">${audioPlayer}</td>
+                  <td style="text-align: center;">
+                    <button type="button" class="btn btn-outline btn-xs btn-trash-chapter-from-modal" data-chapter-id="${ch.id}" data-chapter-title="Chương ${ch.number}: ${ch.title.replace(/"/g, '&quot;')}" style="color: #ef4444; border-color: #fca5a5;" title="Chuyển chương này vào Thùng rác (lưu 15 ngày)">
+                      <i class="fa-solid fa-trash-can"></i> Xóa
+                    </button>
+                  </td>
+                </tr>
+              `;
+              $tbody.append(rowHtml);
+            });
+          }
+        } else {
+          muopAlert((res && res.data && res.data.message) ? res.data.message : 'Lỗi tải dung lượng chương!', 'error');
+        }
+      },
+      error: function(xhr, status, err) {
+        muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ!'), 'error');
+      }
+    });
+  };
+
+  // Click open story storage modal
+  $(document).on('click', '.btn-open-story-storage-quick, .btn-open-story-storage-detail', function() {
+    const storyId = $(this).data('story-id');
+    muopOpenStoryStorageDetail(storyId);
+  });
+
+  // Close story storage modal
+  $(document).on('click', '.btn-close-modal-storage, #modalStoryChaptersStorage', function(e) {
+    if (e.target === this || $(this).hasClass('btn-close-modal-storage') || $(this).parents('.btn-close-modal-storage').length) {
+      $('#modalStoryChaptersStorage').hide();
+    }
+  });
+
+  // 3. TẢI VÀ QUẢN LÝ THÙNG RÁC (TRASH 15 NGÀY)
+  window.loadTrashList = function() {
+    const q = ($('#trashSearchInput').val() || '').trim();
+    $('#trashListTbody').html('<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Đang tải danh sách mục trong thùng rác...</td></tr>');
+
+    $.ajax({
+      url: muopConfig.ajaxUrl,
+      type: 'POST',
+      data: {
+        action: 'muop_get_trash_list',
+        nonce: muopConfig.nonce,
+        type: currentTrashType,
+        search: q
+      },
+      success: function(res) {
+        if (res && res.success && res.data) {
+          const d = res.data;
+          $('#statTrashCount').text((d.count || 0) + ' mục');
+          $('#statTrashSize').text(d.total_bytes_formatted || '0 B');
+
+          if (d.count > 0) {
+            $('#badgeSidebarTrash').text(d.count).show();
+          } else {
+            $('#badgeSidebarTrash').text('15 ngày');
+          }
+
+          const $tbody = $('#trashListTbody').empty();
+          const items = d.items || [];
+          if (items.length === 0) {
+            $tbody.html(`
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                  <i class="fa-solid fa-trash-can" style="font-size: 28px; opacity: 0.35; margin-bottom: 8px; display: block;"></i>
+                  Thùng rác hiện đang trống. Mọi mục đã xóa sẽ xuất hiện tại đây và được lưu trong 15 ngày!
+                </td>
+              </tr>
+            `);
+          } else {
+            items.forEach((it, idx) => {
+              let typeBadge = '';
+              let typeIcon = '';
+              if (it.item_type === 'story') {
+                typeBadge = '<span class="badge" style="background:#e0f2fe; color:#0284c7;"><i class="fa-solid fa-book"></i> Truyện</span>';
+              } else if (it.item_type === 'chapter') {
+                typeBadge = '<span class="badge" style="background:#f0fdf4; color:#16a34a;"><i class="fa-solid fa-file-lines"></i> Chương</span>';
+              } else if (it.item_type === 'audio') {
+                typeBadge = '<span class="badge" style="background:#ecfeff; color:#0891b2;"><i class="fa-solid fa-headphones"></i> Audio</span>';
+              } else if (it.item_type === 'image') {
+                typeBadge = '<span class="badge" style="background:#f5f3ff; color:#8b5cf6;"><i class="fa-solid fa-image"></i> Ảnh</span>';
+              } else {
+                typeBadge = '<span class="badge badge-secondary">Khác</span>';
+              }
+
+              const expireBadge = it.is_expiring_soon
+                ? `<span class="badge" style="background: #fee2e2; color: #dc2626; font-weight: 700;"><i class="fa-solid fa-triangle-exclamation"></i> Sắp xóa (còn ${it.days_left} ngày)</span>`
+                : `<span class="badge" style="background: #fef3c7; color: #d97706; font-weight: 700;"><i class="fa-solid fa-clock"></i> Còn ${it.days_left} ngày (${it.hours_left} giờ)</span>`;
+
+              const rowHtml = `
+                <tr>
+                  <td style="text-align: center; font-weight: 600; color: #64748b;">${idx + 1}</td>
+                  <td>
+                    <div style="font-weight: 700; color: var(--text-color);">${it.item_name}</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Tự động xóa vĩnh viễn lúc: ${it.expires_at}</div>
+                  </td>
+                  <td style="text-align: center;">${typeBadge}</td>
+                  <td style="text-align: center;">
+                    <span class="badge" style="background: #f1f5f9; color: #334155; font-family: monospace; font-size: 12px; font-weight: 700;">
+                      ${it.item_size_formatted}
+                    </span>
+                  </td>
+                  <td style="text-align: center; font-size: 12px; color: var(--text-muted);">
+                    <div>${it.deleted_at}</div>
+                    <div style="font-size: 11px;">Bởi: ${it.deleted_by_name}</div>
+                  </td>
+                  <td style="text-align: center;">${expireBadge}</td>
+                  <td style="text-align: center;">
+                    <div style="display: flex; gap: 6px; justify-content: center;">
+                      <button type="button" class="btn btn-outline btn-xs btn-restore-trash-item" data-trash-id="${it.id}" data-item-name="${it.item_name.replace(/"/g, '&quot;')}" style="color: #16a34a; border-color: #86efac; font-weight: 700;" title="Khôi phục lại mục này">
+                        <i class="fa-solid fa-rotate-left"></i> Khôi phục
+                      </button>
+                      <button type="button" class="btn btn-outline btn-xs btn-purge-trash-item" data-trash-id="${it.id}" data-item-name="${it.item_name.replace(/"/g, '&quot;')}" style="color: #dc2626; border-color: #fca5a5; font-weight: 700;" title="Xóa vĩnh viễn ngay lập tức khỏi máy chủ">
+                        <i class="fa-solid fa-trash-can"></i> Xóa vĩnh viễn
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+              $tbody.append(rowHtml);
+            });
+          }
+        }
+      },
+      error: function(xhr, status, err) {
+        muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối khi tải danh sách thùng rác!'), 'error');
+      }
+    });
+  };
+
+  // Filter Pills for Trash
+  $('#trashFilterPills .btn-story-filter-pill').on('click', function() {
+    $('#trashFilterPills .btn-story-filter-pill').removeClass('active');
+    $(this).addClass('active');
+    currentTrashType = $(this).data('trash-type');
+    loadTrashList();
+  });
+
+  // Search in Trash
+  let trashSearchTimer = null;
+  $('#trashSearchInput').on('input', function() {
+    clearTimeout(trashSearchTimer);
+    trashSearchTimer = setTimeout(function() {
+      loadTrashList();
+    }, 300);
+  });
+
+  // Refresh Trash List
+  $('#btnRefreshTrashList').on('click', function() {
+    loadTrashList();
+  });
+
+  // Restore Item from Trash
+  $(document).on('click', '.btn-restore-trash-item', function() {
+    const trashId = $(this).data('trash-id');
+    const name = $(this).data('item-name') || 'Mục này';
+    const $btn = $(this);
+
+    muopConfirm(`Bạn có chắc chắn muốn khôi phục "${name}" trở lại hoạt động bình thường không?`, function() {
+      $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_restore_trash_item',
+          nonce: muopConfig.nonce,
+          trash_id: trashId
+        },
+        success: function(res) {
+          if (res && res.success) {
+            muopAlert(res.data.message || 'Đã khôi phục thành công!', 'success');
+            loadTrashList();
+            if (cachedStorageData) loadStorageStats(true);
+          } else {
+            muopAlert((res && res.data && res.data.message) ? res.data.message : 'Không thể khôi phục!', 'error');
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-rotate-left"></i> Khôi phục');
+          }
+        },
+        error: function(xhr, status, err) {
+          muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ!'), 'error');
+          $btn.prop('disabled', false).html('<i class="fa-solid fa-rotate-left"></i> Khôi phục');
+        }
+      });
+    }, null, { confirmText: 'Khôi phục ngay' });
+  });
+
+  // Purge Single Item from Trash Permanently
+  $(document).on('click', '.btn-purge-trash-item', function() {
+    const trashId = $(this).data('trash-id');
+    const name = $(this).data('item-name') || 'mục này';
+    const $btn = $(this);
+
+    muopConfirm(`CẢNH BÁO: Bạn có chắc chắn muốn XÓA VĨNH VIỄN "${name}" không? File và dữ liệu sẽ bị xóa triệt để khỏi máy chủ và KHÔNG THỂ KHÔI PHỤC!`, function() {
+      $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_purge_trash_item',
+          nonce: muopConfig.nonce,
+          trash_id: trashId
+        },
+        success: function(res) {
+          if (res && res.success) {
+            muopAlert(res.data.message || 'Đã xóa vĩnh viễn!', 'success');
+            loadTrashList();
+            if (cachedStorageData) loadStorageStats(true);
+          } else {
+            muopAlert((res && res.data && res.data.message) ? res.data.message : 'Không thể xóa vĩnh viễn!', 'error');
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa vĩnh viễn');
+          }
+        },
+        error: function(xhr, status, err) {
+          muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ!'), 'error');
+          $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa vĩnh viễn');
+        }
+      });
+    }, null, { isDanger: true, confirmText: 'Xóa vĩnh viễn' });
+  });
+
+  // Empty Trash (Xóa Tất Cả Vĩnh Viễn)
+  $('#btnEmptyAllTrash').on('click', function() {
+    muopConfirm('CẢNH BÁO NGUY HIỂM: Bạn có chắc chắn muốn XÓA VĨNH VIỄN TOÀN BỘ các mục đang nằm trong Thùng rác không? Toàn bộ file và dữ liệu sẽ bị xóa sạch khỏi hosting và không thể hoàn tác!', function() {
+      const $btn = $('#btnEmptyAllTrash');
+      $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang dọn sạch...');
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_empty_trash',
+          nonce: muopConfig.nonce
+        },
+        success: function(res) {
+          $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Dọn Sạch Thùng Rác (Xóa Tất Cả)');
+          if (res && res.success) {
+            muopAlert(res.data.message || 'Đã dọn sạch thùng rác thành công!', 'success');
+            loadTrashList();
+            if (cachedStorageData) loadStorageStats(true);
+          } else {
+            muopAlert((res && res.data && res.data.message) ? res.data.message : 'Không thể dọn sạch thùng rác!', 'error');
+          }
+        },
+        error: function(xhr, status, err) {
+          $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Dọn Sạch Thùng Rác (Xóa Tất Cả)');
+          muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ!'), 'error');
+        }
+      });
+    }, null, { isDanger: true, confirmText: 'Xác nhận xóa tất cả' });
+  });
+
+  // Trash Story from Storage table
+  $(document).on('click', '.btn-trash-story-item', function() {
+    const storyId = $(this).data('story-id');
+    const title = $(this).data('story-title') || 'Bộ truyện này';
+    const $btn = $(this);
+
+    muopConfirm(`Bạn có chắc chắn muốn chuyển bộ truyện "${title}" vào Thùng rác không? Truyện và toàn bộ chương sẽ nằm trong Thùng rác 15 ngày trước khi tự động xóa vĩnh viễn.`, function() {
+      $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_delete_story',
+          nonce: muopConfig.nonce,
+          story_id: storyId
+        },
+        success: function(res) {
+          if (res && res.success) {
+            muopAlert(res.data.message || 'Đã chuyển vào Thùng rác!', 'success');
+            loadStorageStats(true);
+            loadTrashList();
+          } else {
+            muopAlert((res && res.data && res.data.message) ? res.data.message : 'Lỗi khi chuyển vào thùng rác!', 'error');
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+          }
+        },
+        error: function(xhr, status, err) {
+          muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ!'), 'error');
+          $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+        }
+      });
+    }, null, { isDanger: true, confirmText: 'Chuyển vào thùng rác' });
+  });
+
+  // Trash Chapter from Modal
+  $(document).on('click', '.btn-trash-chapter-from-modal', function() {
+    const chapId = $(this).data('chapter-id');
+    const title = $(this).data('chapter-title') || 'Chương này';
+    const $btn = $(this);
+
+    muopConfirm(`Bạn có chắc chắn muốn chuyển "${title}" vào Thùng rác không?`, function() {
+      $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_delete_chapter',
+          nonce: muopConfig.nonce,
+          chapter_id: chapId
+        },
+        success: function(res) {
+          if (res && res.success) {
+            muopAlert(res.data.message || 'Đã chuyển chương vào Thùng rác!', 'success');
+            $btn.closest('tr').fadeOut(300, function() { $(this).remove(); });
+            loadStorageStats(true);
+            loadTrashList();
+          } else {
+            muopAlert((res && res.data && res.data.message) ? res.data.message : 'Lỗi khi xóa chương!', 'error');
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+          }
+        },
+        error: function(xhr, status, err) {
+          muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ!'), 'error');
+          $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+        }
+      });
+    }, null, { isDanger: true, confirmText: 'Chuyển vào thùng rác' });
+  });
+
+  // Trash File (Audio / Image) from Storage
+  $(document).on('click', '.btn-trash-file-item', function() {
+    const filePath = $(this).data('file-path');
+    const fileName = $(this).data('file-name') || 'File này';
+    const type = $(this).data('type') || 'audio';
+    const $btn = $(this);
+
+    muopConfirm(`Bạn có chắc chắn muốn chuyển file "${fileName}" vào Thùng rác không? File sẽ được lưu giữ 15 ngày tại Thùng rác.`, function() {
+      $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i>');
+      $.ajax({
+        url: muopConfig.ajaxUrl,
+        type: 'POST',
+        data: {
+          action: 'muop_trash_file',
+          nonce: muopConfig.nonce,
+          file_path: filePath,
+          type: type
+        },
+        success: function(res) {
+          if (res && res.success) {
+            muopAlert(res.data.message || 'Đã chuyển file vào Thùng rác!', 'success');
+            $btn.closest('tr').fadeOut(300, function() { $(this).remove(); });
+            loadStorageStats(true);
+            loadTrashList();
+          } else {
+            muopAlert((res && res.data && res.data.message) ? res.data.message : 'Không thể chuyển file vào Thùng rác!', 'error');
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+          }
+        },
+        error: function(xhr, status, err) {
+          muopAlert(parseAjaxErrorMessage(xhr, status, err, 'Lỗi kết nối máy chủ!'), 'error');
+          $btn.prop('disabled', false).html('<i class="fa-solid fa-trash-can"></i> Xóa');
+        }
+      });
+    }, null, { isDanger: true, confirmText: 'Chuyển vào thùng rác' });
+  });
+
+  // Tự động kiểm tra số lượng thùng rác khi vào trang admin
+  setTimeout(function() {
+    loadTrashList();
+  }, 1000);
 
   $(window).on('resize', function() {
     initTableScrollControls();
