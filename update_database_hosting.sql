@@ -176,3 +176,23 @@ UPDATE `wp_options` SET `option_value` = '24' WHERE `option_name` = 'posts_per_p
 INSERT INTO `wp_options` (`option_name`, `option_value`, `autoload`)
 SELECT 'posts_per_page', '24', 'yes'
 WHERE NOT EXISTS (SELECT 1 FROM `wp_options` WHERE `option_name` = 'posts_per_page');
+
+-- 12. Bảng Thùng Rác hệ thống (Lưu trữ an toàn 15 ngày, tự động xóa vĩnh viễn)
+CREATE TABLE IF NOT EXISTS `wp_muop_trash` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `item_type` varchar(50) NOT NULL,
+  `item_id` bigint(20) unsigned NOT NULL DEFAULT 0,
+  `item_name` varchar(255) NOT NULL,
+  `item_path` text NULL,
+  `trash_path` text NULL,
+  `item_size` bigint(20) unsigned NOT NULL DEFAULT 0,
+  `item_meta` longtext NULL,
+  `deleted_by` bigint(20) unsigned NOT NULL DEFAULT 0,
+  `deleted_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'trashed',
+  PRIMARY KEY (`id`),
+  KEY `item_type` (`item_type`),
+  KEY `expires_at` (`expires_at`),
+  KEY `status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
