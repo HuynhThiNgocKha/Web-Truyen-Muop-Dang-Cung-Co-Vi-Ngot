@@ -15843,100 +15843,199 @@ function muop_ajax_get_story_audio_list_handler() {
 
  */
 
+/**
+ * Nén file âm thanh giọng nói xuống mức dung lượng thấp nhất nhưng đảm bảo âm thanh mượt mà, rõ ràng:
+ * - Mono (1 kênh, chuẩn giọng đọc đọc truyện)
+ * - Tần số lấy mẫu: 24,000 Hz (Bao phủ toàn bộ dải hài âm giọng nói con người, trong trẻo, tự nhiên)
+ * - Bitrate: 36 kbps LAME CBR (Chỉ ~270KB / phút, tiết kiệm 70% - 90% dung lượng hosting)
+ * - Bộ lọc âm học giọng nói: highpass 60Hz + lowpass 11kHz + acompressor làm mịn + loudnorm chuẩn phát thanh
+ */
 function muop_compress_audio_file($file_path) {
-
-    if (!file_exists($file_path) || filesize($file_path) < 30000) {
-
+    if (!file_exists($file_path) || filesize($file_path) < 15000) {
         return $file_path; // File quá nhỏ hoặc không tồn tại
-
     }
-
-
 
     $ext = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
-
     $allowed = array('mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac');
-
     if (!in_array($ext, $allowed)) {
-
         return $file_path;
-
     }
 
-
-
+    $orig_size = filesize($file_path);
     $temp_out = dirname($file_path) . '/cmp_' . uniqid() . '.mp3';
 
+    // 1. Thử nén trực tiếp bằng FFmpeg
+    $ffmpeg_bins = array('ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg');
+    $filter = 'highpass=f=60,lowpass=f=11000,acompressor=threshold=-16dB:ratio=2.5:attack=20:release=150:makeup=1.5dB,loudnorm=I=-16:TP=-1.5:LRA=10';
+    $compressed_ok = false;
 
-
-    // Xây dựng bộ lọc làm sạch âm thanh và nén giọng nói tối đa
-
-    $filter = 'highpass=f=65,lowpass=f=11500,loudnorm=I=-16:TP=-1.5:LRA=11';
-
-
-
-    $cmd = sprintf(
-
-        'ffmpeg -y -i %s -af %s -ac 1 -ar 24000 -c:a libmp3lame -b:a 40k %s 2>&1',
-
-        escapeshellarg($file_path),
-
-        escapeshellarg($filter),
-
-        escapeshellarg($temp_out)
-
-    );
-
-
-
-    @exec($cmd, $out, $ret);
-
-
-
-    if ($ret === 0 && file_exists($temp_out) && filesize($temp_out) > 1000) {
-
-        // Nếu file nén nhỏ hơn file gốc hoặc file gốc không phải MP3
-
-        if (filesize($temp_out) < filesize($file_path) || $ext !== 'mp3') {
-
-            @unlink($file_path);
-
-            if ($ext === 'mp3') {
-
-                @rename($temp_out, $file_path);
-
-                return $file_path;
-
-            } else {
-
-                $new_mp3_path = preg_replace('/\.[^.]+$/', '.mp3', $file_path);
-
-                @rename($temp_out, $new_mp3_path);
-
-                return $new_mp3_path;
-
-            }
-
-        } else {
-
-            @unlink($temp_out);
-
+    foreach ($ffmpeg_bins as $fb) {
+        $cmd = sprintf(
+            '%s -y -i %s -af %s -ac 1 -ar 24000 -c:a libmp3lame -b:a 36k %s 2>&1',
+            $fb,
+            escapeshellarg($file_path),
+            escapeshellarg($filter),
+            escapeshellarg($temp_out)
+        );
+        @exec($cmd, $out, $ret);
+        if ($ret === 0 && file_exists($temp_out) && filesize($temp_out) > 500) {
+            $compressed_ok = true;
+            break;
         }
-
-    } else {
-
-        if (file_exists($temp_out)) {
-
-            @unlink($temp_out);
-
-        }
-
     }
 
+    // 2. Nếu FFmpeg trực tiếp gặp lỗi: Gọi qua Python script
+    if (!$compressed_ok || !file_exists($temp_out) || filesize($temp_out) < 500) {
+        $py_script = function_exists('muop_get_voice_clone_script_path') ? muop_get_voice_clone_script_path() : '';
+        if ($py_script && file_exists($py_script)) {
+            $is_win = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
+            $py_bins = $is_win ? array('python', 'py') : array('python3', '/usr/bin/python3', '/usr/local/bin/python3', 'python');
+            foreach ($py_bins as $pb) {
+                $py_cmd = sprintf(
+                    '%s %s --compress-audio %s --output %s 2>&1',
+                    $pb,
+                    escapeshellarg($py_script),
+                    escapeshellarg($file_path),
+                    escapeshellarg($temp_out)
+                );
+                $py_out = @shell_exec($py_cmd);
+                if (file_exists($temp_out) && filesize($temp_out) > 500) {
+                    $compressed_ok = true;
+                    break;
+                }
+            }
+        }
+    }
 
+    if ($compressed_ok && file_exists($temp_out) && filesize($temp_out) > 500) {
+        $new_size = filesize($temp_out);
+        // Thay thế nếu file nén nhỏ hơn file gốc hoặc nếu định dạng gốc khác MP3 (wav, m4a, flac)
+        if ($new_size < $orig_size || $ext !== 'mp3') {
+            @unlink($file_path);
+            if ($ext === 'mp3') {
+                @rename($temp_out, $file_path);
+                return $file_path;
+            } else {
+                $new_mp3_path = preg_replace('/\.[^.]+$/', '.mp3', $file_path);
+                @rename($temp_out, $new_mp3_path);
+                return $new_mp3_path;
+            }
+        } else {
+            @unlink($temp_out);
+        }
+    } else {
+        if (file_exists($temp_out)) {
+            @unlink($temp_out);
+        }
+    }
 
     return $file_path;
+}
 
+/**
+ * Nén toàn bộ file âm thanh đã tải lên trên hệ thống (Quét thư mục wp-content/uploads/):
+ * - Tìm tất cả các file .mp3, .wav, .m4a, .aac, .ogg, .flac
+ * - Áp dụng nén chuẩn Mono 24kHz 36k Speech-Optimized
+ * - Đồng bộ lại URL trong database nếu có file đổi đuôi sang .mp3
+ */
+function muop_batch_compress_all_uploaded_audio() {
+    @set_time_limit(600);
+    @ini_set('max_execution_time', '600');
+
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    if (!is_dir($base_dir)) {
+        return array('success' => false, 'message' => 'Không tìm thấy thư mục uploads!');
+    }
+
+    $audio_extensions = array('mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac');
+    $scanned_count = 0;
+    $compressed_count = 0;
+    $total_orig_bytes = 0;
+    $total_new_bytes = 0;
+    $log_details = array();
+
+    // Dùng RecursiveDirectoryIterator để duyệt toàn bộ cây thư mục uploads
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($base_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($iterator as $item) {
+        if ($item->isFile()) {
+            $ext = strtolower($item->getExtension());
+            if (in_array($ext, $audio_extensions)) {
+                $path = wp_normalize_path($item->getPathname());
+                $orig_size = $item->getSize();
+                if ($orig_size < 15000) continue; // Bỏ qua file quá nhỏ
+
+                $scanned_count++;
+                $total_orig_bytes += $orig_size;
+
+                $new_path = muop_compress_audio_file($path);
+                $new_size = file_exists($new_path) ? filesize($new_path) : $orig_size;
+                $total_new_bytes += $new_size;
+
+                if ($new_size < $orig_size || $new_path !== $path) {
+                    $compressed_count++;
+                    $saved = $orig_size - $new_size;
+                    $percent = round(($saved / $orig_size) * 100, 1);
+                    $log_details[] = array(
+                        'file'     => basename($path),
+                        'orig_kb'  => round($orig_size / 1024),
+                        'new_kb'   => round($new_size / 1024),
+                        'saved_kb' => round($saved / 1024),
+                        'percent'  => $percent
+                    );
+
+                    // Nếu file đổi đuôi sang .mp3, cập nhật lại postmeta trong CSDL
+                    if ($new_path !== $path) {
+                        $old_url = str_replace($base_dir, $upload_dir['baseurl'], $path);
+                        $new_url = str_replace($base_dir, $upload_dir['baseurl'], $new_path);
+                        global $wpdb;
+                        $wpdb->query($wpdb->prepare(
+                            "UPDATE {$wpdb->postmeta} SET meta_value = %s WHERE meta_key = '_chuong_audio_url' AND meta_value = %s",
+                            $new_url,
+                            $old_url
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    $saved_bytes = max(0, $total_orig_bytes - $total_new_bytes);
+    $saved_mb = round($saved_bytes / (1024 * 1024), 2);
+
+    return array(
+        'success'          => true,
+        'scanned_count'    => $scanned_count,
+        'compressed_count' => $compressed_count,
+        'saved_bytes'      => $saved_bytes,
+        'saved_mb'         => $saved_mb,
+        'total_orig_mb'    => round($total_orig_bytes / (1024 * 1024), 2),
+        'total_new_mb'     => round($total_new_bytes / (1024 * 1024), 2),
+        'details'          => array_slice($log_details, 0, 30)
+    );
+}
+
+// AJAX handler cho Admin nén toàn bộ audio
+add_action('wp_ajax_muop_admin_compress_all_audio', 'muop_ajax_admin_compress_all_audio_handler');
+function muop_ajax_admin_compress_all_audio_handler() {
+    if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+    $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '');
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng F5 tải lại trang!'));
+    }
+
+    $result = muop_batch_compress_all_uploaded_audio();
+    if ($result && !empty($result['success'])) {
+        wp_send_json_success($result);
+    } else {
+        wp_send_json_error(array('message' => isset($result['message']) ? $result['message'] : 'Lỗi khi nén audio!'));
+    }
 }
 
 
@@ -16174,7 +16273,9 @@ function muop_ajax_save_chapter_audio_handler() {
             $safe_name = 'audio_c' . $chapter_id . '_' . time() . '_' . wp_generate_password(4, false, false) . '.' . $ext;
             $dest_path = $audio_dir . '/' . $safe_name;
             if (!empty($file['tmp_name']) && (move_uploaded_file($file['tmp_name'], $dest_path) || copy($file['tmp_name'], $dest_path))) {
-                $audio_url = $upload_dir['baseurl'] . '/audio/' . $safe_name;
+                $compressed_dest = function_exists('muop_compress_audio_file') ? muop_compress_audio_file($dest_path) : $dest_path;
+                $audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $compressed_dest);
+                $audio_url = str_replace('\\', '/', $audio_url);
             } else {
                 $err = isset($upload['error']) ? $upload['error'] : 'Không thể lưu file tải lên!';
                 wp_send_json_error(array('message' => 'Lỗi tải lên: ' . $err));
@@ -16341,8 +16442,9 @@ function muop_ajax_analyze_voice_sample_handler() {
             $new_voice_saved_url  = $upload_dir['baseurl'] . '/voices/' . $voice_filename;
 
             if (move_uploaded_file($ref_file['tmp_name'], $new_voice_saved_path)) {
-                $ref_audio_path = $new_voice_saved_path;
-                $ref_audio_url  = $new_voice_saved_url;
+                $compressed_voice = function_exists('muop_compress_audio_file') ? muop_compress_audio_file($new_voice_saved_path) : $new_voice_saved_path;
+                $ref_audio_path = $compressed_voice;
+                $ref_audio_url  = $upload_dir['baseurl'] . '/voices/' . basename($compressed_voice);
                 $is_new_upload = true;
                 $voice_name = !empty($safe_base_name) ? $safe_base_name : 'Giọng Mẫu Mới';
             }
@@ -16533,7 +16635,10 @@ function muop_ajax_convert_tts_chapter_audio_handler() {
             $new_voice_saved_url  = $upload_dir['baseurl'] . '/voices/' . $voice_filename;
 
             if (move_uploaded_file($ref_file['tmp_name'], $new_voice_saved_path)) {
-                $ref_audio_path = $new_voice_saved_path;
+                $compressed_voice = function_exists('muop_compress_audio_file') ? muop_compress_audio_file($new_voice_saved_path) : $new_voice_saved_path;
+                $ref_audio_path = $compressed_voice;
+                $new_voice_saved_path = $compressed_voice;
+                $new_voice_saved_url  = $upload_dir['baseurl'] . '/voices/' . basename($compressed_voice);
                 $is_new_upload = true;
                 $original_voice_name = !empty($safe_base_name) ? $safe_base_name : 'Giọng Mẫu Mới';
             }

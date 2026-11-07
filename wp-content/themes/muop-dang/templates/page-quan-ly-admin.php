@@ -1394,6 +1394,9 @@ $preview_mode = isset($_COOKIE['muop_preview_mode']) ? sanitize_text_field($_COO
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-outline btn-sm" id="btnCompressAllAudio" style="color: #16a34a; border-color: #86efac; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;" title="Quét và nén tất cả các file audio trên hosting xuống dung lượng thấp nhất">
+                                        <i class="fa-solid fa-file-zipper"></i> Nén Toàn Bộ Audio Đã Tải Lên
+                                    </button>
                                     <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshAudioLogs">
                                         <i class="fa-solid fa-arrow-rotate-right"></i> Làm mới
                                     </button>
@@ -5217,6 +5220,42 @@ jQuery(document).ready(function($) {
   // Nút làm mới audio
   $('#btnRefreshAudioLogs').on('click', function() {
     loadAudioLogs(audioLogsCurrentPage);
+  });
+
+  // Nút Nén toàn bộ audio đã tải lên
+  $('#btnCompressAllAudio').on('click', function(e) {
+    e.preventDefault();
+    const $btn = $(this);
+    if (!confirm('Hệ thống sẽ quét toàn bộ thư mục uploads và nén tất cả file audio xuống chuẩn nhẹ nhất (Mono 24kHz 36k, tiết kiệm 70-90% dung lượng, giữ nguyên chất lượng âm thanh rõ và mượt). Bạn có muốn tiếp tục?')) {
+      return;
+    }
+    const origHtml = $btn.html();
+    $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang quét và nén audio...');
+
+    $.ajax({
+      url: (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : '/wp-admin/admin-ajax.php',
+      type: 'POST',
+      data: {
+        action: 'muop_admin_compress_all_audio',
+        nonce: (typeof muopConfig !== 'undefined' && muopConfig.nonce) ? muopConfig.nonce : ''
+      },
+      success: function(res) {
+        $btn.prop('disabled', false).html(origHtml);
+        if (typeof res === 'string') { try { res = JSON.parse(res); } catch(e) {} }
+        if (res && res.success && res.data) {
+          const d = res.data;
+          const msg = `✅ Hoàn tất nén audio!\n- Quét: ${d.scanned_count} file\n- Đã nén tối ưu: ${d.compressed_count} file\n- Tiết kiệm dung lượng: ${d.saved_mb} MB (${d.total_orig_mb}MB ➔ ${d.total_new_mb}MB)`;
+          alert(msg);
+          loadAudioLogs(1);
+        } else {
+          alert((res && res.data && res.data.message) || 'Có lỗi xảy ra khi nén audio!');
+        }
+      },
+      error: function() {
+        $btn.prop('disabled', false).html(origHtml);
+        alert('Lỗi kết nối khi nén audio!');
+      }
+    });
   });
 
   // Phân trang audio

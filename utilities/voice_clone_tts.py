@@ -465,6 +465,76 @@ def synthesize_chapter_audio(text, ref_audio_path, output_mp3_path, speed=1.0, c
             pass
 
 
+def compress_audio_file(input_path, output_path=None, bitrate="36k"):
+    """
+    Nén file âm thanh giọng nói xuống mức thấp nhất nhưng đảm bảo âm thanh mượt mà, rõ ràng:
+    - Mono 1 kênh (Chuẩn giọng đọc truyện)
+    - Tần số lấy mẫu 24,000 Hz (Bao phủ toàn bộ dải hài âm giọng nói con người)
+    - Bộ lọc: highpass 60Hz + lowpass 11kHz + acompressor làm mịn + loudnorm chuẩn phát thanh
+    - LAME MP3 CBR 36kbps siêu nhẹ (chỉ ~270KB / phút, tiết kiệm 70% - 90% dung lượng)
+    """
+    if not os.path.exists(input_path):
+        return {"success": False, "error": f"Không tìm thấy file: {input_path}"}
+
+    if not output_path:
+        output_path = input_path
+
+    temp_out = input_path + ".cmp.mp3"
+    filter_str = "highpass=f=60,lowpass=f=11000,acompressor=threshold=-16dB:ratio=2.5:attack=20:release=150:makeup=1.5dB,loudnorm=I=-16:TP=-1.5:LRA=10"
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-af", filter_str,
+        "-ac", "1",
+        "-ar", "24000",
+        "-c:a", "libmp3lame",
+        "-b:a", bitrate,
+        temp_out
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0 or not os.path.exists(temp_out) or os.path.getsize(temp_out) < 500:
+        cmd_fallback = [
+            "ffmpeg", "-y",
+            "-i", input_path,
+            "-ac", "1",
+            "-ar", "24000",
+            "-c:a", "libmp3lame",
+            "-b:a", bitrate,
+            temp_out
+        ]
+        res = subprocess.run(cmd_fallback, capture_output=True, text=True)
+
+    if os.path.exists(temp_out) and os.path.getsize(temp_out) > 500:
+        orig_size = os.path.getsize(input_path)
+        new_size = os.path.getsize(temp_out)
+        if new_size < orig_size:
+            os.replace(temp_out, output_path)
+            return {
+                "success": True,
+                "orig_size": orig_size,
+                "new_size": new_size,
+                "saved_percent": round((1 - new_size / orig_size) * 100, 1),
+                "output_path": output_path
+            }
+        else:
+            if os.path.exists(temp_out):
+                try:
+                    os.remove(temp_out)
+                except Exception:
+                    pass
+            return {
+                "success": True,
+                "orig_size": orig_size,
+                "new_size": orig_size,
+                "saved_percent": 0.0,
+                "output_path": input_path,
+                "note": "File đã tối ưu sẵn"
+            }
+    else:
+        return {"success": False, "error": "Lỗi khi nén âm thanh bằng FFmpeg"}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Mướp Đắng Voice Clone TTS Engine")
     parser.add_argument("--text-file", default="", help="Đường dẫn file văn bản nội dung chương (UTF-8)")
@@ -475,8 +545,15 @@ def main():
     parser.add_argument("--cached-profile-b64", default="", help="Chuỗi base64 của JSON thông số giọng mẫu")
     parser.add_argument("--cached-profile", default="", help="Chuỗi JSON thông số giọng mẫu có sẵn để bỏ qua phân tích")
     parser.add_argument("--analyze-only", action="store_true", help="Chỉ phân tích chất giọng mẫu và in kết quả JSON, không tạo audio chương")
+    parser.add_argument("--compress-audio", default="", help="Đường dẫn file âm thanh cần nén tối ưu dung lượng")
 
     args = parser.parse_args()
+
+    # Chế độ 0: Nén file âm thanh
+    if args.compress_audio:
+        res = compress_audio_file(args.compress_audio, args.output, bitrate="36k")
+        print(json.dumps(res, ensure_ascii=False))
+        sys.exit(0 if res.get("success") else 1)
 
     # Chế độ 1: Chỉ phân tích mẫu giọng
     if args.analyze_only:
