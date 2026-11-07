@@ -287,6 +287,9 @@ if ($selected_story_id) {
                                 </label>
                                 <div style="display: flex; gap: 8px; align-items: center;">
                                     <input type="file" id="inputTtsReferenceVoice" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 6px 10px; font-size: 12.5px; height: 38px; flex: 1; box-sizing: border-box;" />
+                                    <button type="button" id="btnClearRefVoiceFileAddPage" class="btn btn-outline" style="display: none; height: 38px; padding: 0 10px; font-size: 12px; border-color: #fca5a5; color: #dc2626; white-space: nowrap;" title="Hủy chọn file này để dùng Giọng Gốc">
+                                        <i class="fa-solid fa-xmark"></i> Xóa File
+                                    </button>
                                     <button type="button" id="btnAnalyzeVoiceChapter" class="btn btn-outline" style="height: 38px; padding: 0 14px; font-size: 12.5px; border-color: #86efac; color: #166534; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;" title="Phân tích chất giọng mẫu này trước khi tạo audio">
                                         <i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích Giọng
                                     </button>
@@ -479,6 +482,31 @@ if ($selected_story_id) {
                     });
                 }
 
+                // Xử lý nút xóa file và tự động đồng bộ khi đổi giọng mẫu
+                var btnClearRefFile = document.getElementById('btnClearRefVoiceFileAddPage');
+                if (refFileEl && btnClearRefFile) {
+                    refFileEl.addEventListener('change', function() {
+                        if (this.files && this.files.length > 0) {
+                            btnClearRefFile.style.display = 'inline-flex';
+                        } else {
+                            btnClearRefFile.style.display = 'none';
+                        }
+                    });
+                    btnClearRefFile.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        refFileEl.value = '';
+                        btnClearRefFile.style.display = 'none';
+                    });
+                }
+                if (savedVoiceSelect && refFileEl) {
+                    savedVoiceSelect.addEventListener('change', function() {
+                        if (this.value) {
+                            refFileEl.value = '';
+                            if (btnClearRefFile) btnClearRefFile.style.display = 'none';
+                        }
+                    });
+                }
+
                 // Xóa giọng mẫu khỏi kho của dịch giả
                 if (btnDeleteSaved && savedVoiceSelect) {
                     btnDeleteSaved.addEventListener('click', function(e) {
@@ -621,10 +649,10 @@ if ($selected_story_id) {
                         fd.append('story_id', storyId || 0);
                         fd.append('chapter_id', 0);
                         fd.append('content', contentText);
-                        if (selectedSavedVoiceId && !hasNewFile) {
-                            fd.append('saved_voice_id', selectedSavedVoiceId);
-                        } else if (hasNewFile) {
+                        if (hasNewFile) {
                             fd.append('reference_voice', refFileEl.files[0]);
+                        } else if (selectedSavedVoiceId) {
+                            fd.append('saved_voice_id', selectedSavedVoiceId);
                         }
 
                         fetch(ajaxUrl, { method: 'POST', body: fd })

@@ -432,6 +432,9 @@ if (is_wp_error($all_genres)) $all_genres = array();
                                 </label>
                                 <div style="display: flex; gap: 8px; align-items: center;">
                                     <input type="file" id="editChapterRefVoiceFile" accept="audio/*,.mp3,.wav,.m4a" class="form-input" style="padding: 5px 8px; font-size: 12px; height: 36px; flex: 1; box-sizing: border-box;" />
+                                    <button type="button" id="btnClearRefVoiceFileInEditModal" class="btn btn-outline" style="display: none; height: 36px; padding: 0 10px; font-size: 12px; border-color: #fca5a5; color: #dc2626; white-space: nowrap;" title="Hủy chọn file này để dùng Giọng Gốc">
+                                        <i class="fa-solid fa-xmark"></i> Xóa File
+                                    </button>
                                     <button type="button" id="btnAnalyzeVoiceInEditChapter" class="btn btn-outline" style="height: 36px; padding: 0 12px; font-size: 12px; border-color: #86efac; color: #166534; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;" title="Phân tích chất giọng mẫu trước khi tạo audio">
                                         <i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích Giọng
                                     </button>

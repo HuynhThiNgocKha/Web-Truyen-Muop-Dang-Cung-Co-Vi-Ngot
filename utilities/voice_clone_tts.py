@@ -262,26 +262,41 @@ def analyze_reference_voice(ref_audio_path):
 def fetch_tts_chunk(idx, chunk, temp_dir, base_voice="vi-VN-HoaiMyNeural"):
     """
     Tải một đoạn TTS:
-    1. Ưu tiên Microsoft Neural (Hoài My cực ngọt ngào, mượt mà / Nam Minh trầm ấm).
+    1. Ưu tiên Microsoft Neural (Hoài My cực ngọt ngào, mượt mà / Nam Minh trầm ấm) qua direct async / CLI.
     2. Tự động fallback sang gTTS nếu mất mạng hoặc lỗi kết nối.
     """
     chunk_file = os.path.join(temp_dir, f"chunk_{idx:04d}.mp3")
 
-    # Thử gọi Microsoft Edge TTS CLI
+    # 1. Gọi trực tiếp thư viện edge_tts qua async (nhanh, in-process, không tạo subprocess)
+    try:
+        import asyncio
+        import edge_tts
+
+        async def _edge_gen():
+            communicate = edge_tts.Communicate(chunk, base_voice)
+            await communicate.save(chunk_file)
+
+        asyncio.run(_edge_gen())
+        if os.path.exists(chunk_file) and os.path.getsize(chunk_file) > 100:
+            return idx, chunk_file
+    except Exception:
+        pass
+
+    # 2. Thử gọi edge_tts qua subprocess sử dụng sys.executable
     try:
         cmd = [
-            "python", "-m", "edge_tts",
+            sys.executable, "-m", "edge_tts",
             "--voice", base_voice,
             "--text", chunk,
             "--write-media", chunk_file
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
         if res.returncode == 0 and os.path.exists(chunk_file) and os.path.getsize(chunk_file) > 100:
             return idx, chunk_file
     except Exception:
         pass
 
-    # Fallback dự phòng qua gTTS nếu cần
+    # 3. Fallback dự phòng qua gTTS nếu cần
     for attempt in range(2):
         try:
             tts = gTTS(text=chunk, lang='vi', slow=False)
@@ -456,6 +471,8 @@ def main():
     parser.add_argument("--ref-audio", default="", help="Đường dẫn file âm thanh mẫu giọng đọc cần bắt chước")
     parser.add_argument("--output", default="", help="Đường dẫn file MP3 đầu ra")
     parser.add_argument("--speed", type=float, default=1.0, help="Tốc độ đọc (mặc định 1.0)")
+    parser.add_argument("--profile-file", default="", help="Đường dẫn file JSON chứa thông số giọng mẫu")
+    parser.add_argument("--cached-profile-b64", default="", help="Chuỗi base64 của JSON thông số giọng mẫu")
     parser.add_argument("--cached-profile", default="", help="Chuỗi JSON thông số giọng mẫu có sẵn để bỏ qua phân tích")
     parser.add_argument("--analyze-only", action="store_true", help="Chỉ phân tích chất giọng mẫu và in kết quả JSON, không tạo audio chương")
 
@@ -487,7 +504,20 @@ def main():
         text = f.read()
 
     cached_prof = None
-    if args.cached_profile:
+    if args.profile_file and os.path.exists(args.profile_file):
+        try:
+            with open(args.profile_file, 'r', encoding='utf-8', errors='ignore') as pf:
+                cached_prof = json.load(pf)
+        except Exception:
+            cached_prof = None
+    elif args.cached_profile_b64:
+        try:
+            import base64
+            raw_json = base64.b64decode(args.cached_profile_b64.encode('ascii')).decode('utf-8', errors='ignore')
+            cached_prof = json.loads(raw_json)
+        except Exception:
+            cached_prof = None
+    elif args.cached_profile:
         try:
             cached_prof = json.loads(args.cached_profile)
         except Exception:

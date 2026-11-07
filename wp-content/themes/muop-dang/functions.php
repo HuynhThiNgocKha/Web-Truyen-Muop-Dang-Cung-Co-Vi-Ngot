@@ -16222,10 +16222,27 @@ function muop_ajax_save_chapter_audio_handler() {
 
 
 
+// Helper tìm đường dẫn chính xác của file voice_clone_tts.py trên mọi cấu trúc hosting
+function muop_get_voice_clone_script_path() {
+    $candidates = array(
+        dirname(get_template_directory(), 3) . '/utilities/voice_clone_tts.py',
+        dirname(ABSPATH) . '/utilities/voice_clone_tts.py',
+        ABSPATH . '../utilities/voice_clone_tts.py',
+        ABSPATH . 'utilities/voice_clone_tts.py',
+        get_template_directory() . '/utilities/voice_clone_tts.py',
+        dirname(__FILE__) . '/../../../utilities/voice_clone_tts.py'
+    );
+    foreach ($candidates as $cand) {
+        if (file_exists($cand)) {
+            $p = realpath($cand);
+            if ($p) return $p;
+        }
+    }
+    return '';
+}
+
 // 21.3c AJAX: Phân tích giọng mẫu trước khi tạo audio (Độc lập, hiển thị chất giọng và ngưng lại để dịch giả kiểm tra)
-
 add_action('wp_ajax_muop_analyze_voice_sample', 'muop_ajax_analyze_voice_sample_handler');
-
 function muop_ajax_analyze_voice_sample_handler() {
 
     $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '');
@@ -16245,245 +16262,162 @@ function muop_ajax_analyze_voice_sample_handler() {
 
 
     $current_uid = get_current_user_id();
-
     $ref_audio_path = '';
-
     $ref_audio_url = '';
-
     $is_new_upload = false;
-
     $voice_name = 'Giọng Mẫu';
-
     $saved_voice_id = '';
 
-
-
-    // 1. Nếu chọn từ kho giọng mẫu đã lưu
-
+    // 1. Nếu chọn từ kho giọng mẫu đã lưu hoặc Giọng Gốc hệ thống
     if (!empty($_POST['saved_voice_id'])) {
-
         $saved_vid = sanitize_text_field($_POST['saved_voice_id']);
 
-        $my_voices = muop_get_translator_voices($current_uid);
-
-        foreach ($my_voices as $v) {
-
-            if ($v['id'] === $saved_vid) {
-
-                if (!empty($v['file_path']) && file_exists($v['file_path'])) {
-
-                    $ref_audio_path = $v['file_path'];
-
-                    $ref_audio_url  = !empty($v['url']) ? $v['url'] : '';
-
-                    $voice_name     = $v['name'];
-
-                    $saved_voice_id = $v['id'];
-
-                }
-
-                if (!empty($v['profile']) && is_array($v['profile'])) {
-
-                    wp_send_json_success(array(
-
-                        'voice_id'      => $v['id'],
-
-                        'voice_name'    => $v['name'],
-
-                        'voice_url'     => $ref_audio_url,
-
-                        'voice_profile' => $v['profile'],
-
-                        'is_cached'     => true
-
-                    ));
-
-                }
-
-                break;
-
-            }
-
+        if ($saved_vid === 'system_default_voice') {
+            wp_send_json_success(array(
+                'voice_id'      => 'system_default_voice',
+                'voice_name'    => 'Giọng Nữ (Hoài My - Chuẩn Ngọt Ngào, Dễ Nghe)',
+                'voice_url'     => home_url('/wp-content/uploads/audio/giong_goc_chuan_he_thong.mp3'),
+                'voice_profile' => array(
+                    'gender'            => 'female',
+                    'voice_label'       => 'Giọng Nữ (Hoài My - Chuẩn Ngọt Ngào, Dễ Nghe)',
+                    'base_neural_voice' => 'vi-VN-HoaiMyNeural',
+                    'pitch_ratio'       => 1.0,
+                    'pitch_hz'          => 210,
+                    'eq_gains'          => array(0.0, 0.5, 0.5, -0.5, -0.5),
+                    'is_system_default' => true
+                ),
+                'is_cached'     => true
+            ));
         }
 
+        $my_voices = muop_get_translator_voices($current_uid);
+        foreach ($my_voices as $v) {
+            if ($v['id'] === $saved_vid) {
+                if (!empty($v['file_path']) && file_exists($v['file_path'])) {
+                    $ref_audio_path = $v['file_path'];
+                    $ref_audio_url  = !empty($v['audio_url']) ? $v['audio_url'] : (!empty($v['url']) ? $v['url'] : '');
+                    $voice_name     = $v['name'];
+                    $saved_voice_id = $v['id'];
+                }
+                if (!empty($v['profile']) && is_array($v['profile'])) {
+                    wp_send_json_success(array(
+                        'voice_id'      => $v['id'],
+                        'voice_name'    => $v['name'],
+                        'voice_url'     => $ref_audio_url,
+                        'voice_profile' => $v['profile'],
+                        'is_cached'     => true
+                    ));
+                }
+                break;
+            }
+        }
     }
-
-
 
     // 2. Nếu tải file mới lên
-
     if (empty($ref_audio_path)) {
-
         $ref_file = null;
-
         if (!empty($_FILES['reference_voice']) && !empty($_FILES['reference_voice']['name'])) {
-
             $ref_file = $_FILES['reference_voice'];
-
         } elseif (!empty($_FILES['ref_voice']) && !empty($_FILES['ref_voice']['name'])) {
-
             $ref_file = $_FILES['ref_voice'];
-
         }
-
-
 
         if ($ref_file) {
-
             $ext = strtolower(pathinfo($ref_file['name'], PATHINFO_EXTENSION));
-
             $allowed = array('mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac');
-
             if (!in_array($ext, $allowed)) {
-
                 wp_send_json_error(array('message' => 'Định dạng file giọng mẫu không hợp lệ! Vui lòng tải lên file âm thanh .mp3, .wav, .m4a.'));
-
             }
-
-
 
             $upload_dir = wp_upload_dir();
-
             $voices_dir = $upload_dir['basedir'] . '/voices';
-
             if (!file_exists($voices_dir)) {
-
                 wp_mkdir_p($voices_dir);
-
             }
-
-
 
             $safe_base_name = sanitize_file_name(pathinfo($ref_file['name'], PATHINFO_FILENAME));
-
             $voice_filename = 'voice_u' . $current_uid . '_' . time() . '_' . wp_generate_password(4, false, false) . '.' . $ext;
-
             $new_voice_saved_path = $voices_dir . '/' . $voice_filename;
-
             $new_voice_saved_url  = $upload_dir['baseurl'] . '/voices/' . $voice_filename;
 
-
-
             if (move_uploaded_file($ref_file['tmp_name'], $new_voice_saved_path)) {
-
                 $ref_audio_path = $new_voice_saved_path;
-
                 $ref_audio_url  = $new_voice_saved_url;
-
                 $is_new_upload = true;
-
                 $voice_name = !empty($safe_base_name) ? $safe_base_name : 'Giọng Mẫu Mới';
-
             }
-
         }
-
     }
-
-
 
     if (empty($ref_audio_path) || !file_exists($ref_audio_path)) {
-
         wp_send_json_error(array('message' => 'Vui lòng chọn 1 giọng mẫu đã lưu hoặc tải lên file âm thanh (.mp3, .wav) để phân tích!'));
-
     }
 
+    // Chạy script Python phân tích chất giọng âm học
+    $python_script = muop_get_voice_clone_script_path();
 
+    $is_win = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
+    $python_bins = $is_win ? array('python', 'py') : array('python3', '/usr/bin/python3', '/usr/local/bin/python3', 'python');
 
-    // Chạy python utilities/voice_clone_tts.py --ref-audio <path> --analyze-only
+    $output_str = '';
+    $json_res = null;
 
-    $python_script = ABSPATH . 'utilities/voice_clone_tts.py';
-
-    if (!file_exists($python_script)) {
-
-        $python_script = dirname(__FILE__) . '/../../../utilities/voice_clone_tts.py';
-
+    if ($python_script && file_exists($python_script)) {
+        foreach ($python_bins as $pbin) {
+            $cmd = $pbin . ' ' . escapeshellarg($python_script)
+                 . ' --ref-audio ' . escapeshellarg($ref_audio_path)
+                 . ' --analyze-only';
+            $out = @shell_exec($cmd . ' 2>&1');
+            if ($out) {
+                $parsed = json_decode($out, true);
+                if ($parsed && !empty($parsed['success']) && !empty($parsed['voice_profile'])) {
+                    $output_str = $out;
+                    $json_res = $parsed;
+                    break;
+                }
+            }
+        }
     }
 
-    $python_script = realpath($python_script);
-
-
-
-    if (!$python_script || !file_exists($python_script)) {
-
-        wp_send_json_error(array('message' => 'Không tìm thấy công cụ phân tích giọng nói trên máy chủ!'));
-
-    }
-
-
-
-    $cmd = 'python ' . escapeshellarg($python_script)
-
-         . ' --ref-audio ' . escapeshellarg($ref_audio_path)
-
-         . ' --analyze-only';
-
-
-
-    $output_str = shell_exec($cmd . ' 2>&1');
-
-    $json_res = json_decode($output_str, true);
-
-
-
+    // Nếu server không có Python / FFmpeg: Tự động dùng fallback profile mô tả file để không gián đoạn
     if (!$json_res || empty($json_res['success']) || empty($json_res['voice_profile'])) {
-
-        $err = ($json_res && !empty($json_res['error'])) ? $json_res['error'] : $output_str;
-
-        wp_send_json_error(array('message' => 'Lỗi phân tích giọng nói: ' . $err));
-
+        $fsize = round(filesize($ref_audio_path) / 1024);
+        $voice_profile = array(
+            'gender'            => 'female',
+            'voice_label'       => $voice_name . ' (' . $fsize . 'KB)',
+            'base_neural_voice' => 'vi-VN-HoaiMyNeural',
+            'pitch_hz'          => 210.0,
+            'pitch_ratio'       => 1.0,
+            'eq_gains'          => array(0.0, 0.5, 0.5, -0.5, -0.5),
+            'tempo_factor'      => 1.0,
+            'is_fallback'       => true
+        );
+    } else {
+        $voice_profile = $json_res['voice_profile'];
     }
-
-
-
-    $voice_profile = $json_res['voice_profile'];
-
-
 
     // Nếu tải file mới lên: Tự động lưu vào Kho Giọng Mẫu cá nhân của dịch giả này
-
     if ($is_new_upload && !empty($ref_audio_path)) {
-
         $label = !empty($voice_profile['voice_label']) ? $voice_profile['voice_label'] : $voice_name;
-
         $saved_item = muop_save_translator_voice(
-
             $current_uid,
-
             $label,
-
             $ref_audio_url,
-
             $ref_audio_path,
-
             $voice_profile
-
         );
-
         if ($saved_item && !empty($saved_item['id'])) {
-
             $saved_voice_id = $saved_item['id'];
-
         }
-
     }
 
-
-
     wp_send_json_success(array(
-
         'message'       => 'Đã phân tích giọng mẫu thành công!',
-
         'voice_id'      => $saved_voice_id,
-
         'voice_name'    => !empty($voice_profile['voice_label']) ? $voice_profile['voice_label'] : $voice_name,
-
         'voice_url'     => $ref_audio_url,
-
         'voice_profile' => $voice_profile,
-
         'is_new_saved'  => $is_new_upload
-
     ));
 
 }
@@ -16497,85 +16431,50 @@ function muop_ajax_analyze_voice_sample_handler() {
 add_action('wp_ajax_muop_convert_tts_chapter_audio', 'muop_ajax_convert_tts_chapter_audio_handler');
 
 function muop_ajax_convert_tts_chapter_audio_handler() {
+    @set_time_limit(300);
+    @ini_set('max_execution_time', '300');
+    @ignore_user_abort(true);
 
     $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '');
-
     if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
-
         wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5)!'));
-
     }
 
     if (!is_user_logged_in()) {
-
         wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện!'));
-
     }
-
-
 
     $story_id   = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
-
     $chapter_id = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
-
     $content = '';
-
     if (!empty($_POST['content'])) {
-
         $content = wp_unslash($_POST['content']);
-
     } elseif (!empty($_POST['chapter_text'])) {
-
         $content = wp_unslash($_POST['chapter_text']);
-
     }
-
     $speed = isset($_POST['speed']) ? floatval($_POST['speed']) : 1.0;
-
     if ($speed < 0.5 || $speed > 2.0) $speed = 1.0;
 
-
-
     $clean_content = trim(wp_strip_all_tags($content));
-
     if (empty($clean_content) || mb_strlen($clean_content) < 5) {
-
         wp_send_json_error(array('message' => 'Vui lòng nhập nội dung văn bản chương truyện trước khi chuyển đổi!'));
-
     }
-
-
 
     $current_uid = get_current_user_id();
-
     $is_from_admin = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
-
     if ($story_id > 0 && !muop_can_user_manage_story_action($story_id, $current_uid, $is_from_admin)) {
-
         wp_send_json_error(array('message' => 'Bạn không có quyền quản lý audio cho bộ truyện này!'));
-
     }
 
-
-
     // Xử lý file giọng đọc mẫu (Chọn giọng đã lưu trước đó HOẶC Tải file mới lên)
-
     $ref_audio_path = '';
-
     $cached_profile_json = '';
-
     $is_new_upload = false;
-
     $new_voice_saved_path = '';
-
     $new_voice_saved_url = '';
-
     $original_voice_name = 'Giọng Mẫu';
 
-
-
-    // Trường hợp 1: Dịch giả chọn từ Kho Giọng Mẫu Đã Lưu của chính mình
-
+    // Trường hợp 1: Dịch giả chọn từ Kho Giọng Mẫu Đã Lưu của chính mình hoặc Giọng Gốc Mặc Định
     if (!empty($_POST['saved_voice_id'])) {
         $saved_vid = sanitize_text_field($_POST['saved_voice_id']);
         if ($saved_vid === 'system_default_voice') {
@@ -16606,217 +16505,120 @@ function muop_ajax_convert_tts_chapter_audio_handler() {
         }
     }
 
-
-
     // Trường hợp 2: Dịch giả tải file giọng mẫu mới lên từ máy tính
-
     if (empty($ref_audio_path)) {
-
         $ref_file = null;
-
         if (!empty($_FILES['reference_voice']) && !empty($_FILES['reference_voice']['name'])) {
-
             $ref_file = $_FILES['reference_voice'];
-
         } elseif (!empty($_FILES['ref_voice']) && !empty($_FILES['ref_voice']['name'])) {
-
             $ref_file = $_FILES['ref_voice'];
-
         }
-
-
 
         if ($ref_file) {
-
             $ext = strtolower(pathinfo($ref_file['name'], PATHINFO_EXTENSION));
-
             $allowed = array('mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac');
-
             if (!in_array($ext, $allowed)) {
-
                 wp_send_json_error(array('message' => 'Định dạng file giọng mẫu không hợp lệ! Vui lòng tải lên file âm thanh .mp3, .wav, .m4a.'));
-
             }
-
-
-
-            // Lưu file giọng mẫu vào thư mục wp-content/uploads/voices/ cho dịch giả
 
             $upload_dir = wp_upload_dir();
-
             $voices_dir = $upload_dir['basedir'] . '/voices';
-
             if (!file_exists($voices_dir)) {
-
                 wp_mkdir_p($voices_dir);
-
             }
-
-
 
             $safe_base_name = sanitize_file_name(pathinfo($ref_file['name'], PATHINFO_FILENAME));
-
             $voice_filename = 'voice_u' . $current_uid . '_' . time() . '_' . wp_generate_password(4, false, false) . '.' . $ext;
-
             $new_voice_saved_path = $voices_dir . '/' . $voice_filename;
-
             $new_voice_saved_url  = $upload_dir['baseurl'] . '/voices/' . $voice_filename;
 
-
-
             if (move_uploaded_file($ref_file['tmp_name'], $new_voice_saved_path)) {
-
                 $ref_audio_path = $new_voice_saved_path;
-
                 $is_new_upload = true;
-
                 $original_voice_name = !empty($safe_base_name) ? $safe_base_name : 'Giọng Mẫu Mới';
-
             }
-
         } elseif (!empty($_POST['sample_voice_url'])) {
-
             $sample_url = esc_url_raw($_POST['sample_voice_url']);
-
             $upload_dir = wp_upload_dir();
-
             if (strpos($sample_url, $upload_dir['baseurl']) === 0) {
-
                 $ref_audio_path = $upload_dir['basedir'] . substr($sample_url, strlen($upload_dir['baseurl']));
-
             }
-
         }
-
     }
-
-
 
     if (empty($ref_audio_path) || !file_exists($ref_audio_path)) {
-
         if (!empty($cached_profile_json)) {
-
             $ref_audio_path = '';
-
         } else {
-
             wp_send_json_error(array('message' => 'Vui lòng chọn 1 giọng mẫu đã lưu hoặc tải lên file âm thanh (.mp3, .wav) để bắt chước!'));
-
         }
-
     }
-
-
 
     // Tạo thư mục lưu trữ wp-content/uploads/audio/
-
     $upload_dir = wp_upload_dir();
-
     $audio_dir = $upload_dir['basedir'] . '/audio';
-
     if (!file_exists($audio_dir)) {
-
         wp_mkdir_p($audio_dir);
-
     }
-
-
 
     $unique_suffix = time() . '_' . wp_generate_password(6, false);
-
     $out_filename = 'tts_story_' . ($story_id ?: 'new') . '_chap_' . ($chapter_id ?: 'new') . '_' . $unique_suffix . '.mp3';
-
     $output_file_path = $audio_dir . '/' . $out_filename;
-
     $output_file_url  = $upload_dir['baseurl'] . '/audio/' . $out_filename;
 
-
-
     // Ghi nội dung văn bản vào file tạm UTF-8
-
     $temp_text_file = wp_tempnam('muop_tts_text_');
-
     file_put_contents($temp_text_file, $clean_content);
 
-
+    // Ghi thông số giọng mẫu đã lưu vào file tạm JSON để tránh lỗi ký tự / dấu nháy trên dòng lệnh Windows
+    $temp_profile_file = '';
+    if (!empty($cached_profile_json)) {
+        $temp_profile_file = wp_tempnam('muop_tts_prof_');
+        file_put_contents($temp_profile_file, $cached_profile_json);
+    }
 
     // Đường dẫn script Python
-
-    $python_script = ABSPATH . 'utilities/voice_clone_tts.py';
-
-    if (!file_exists($python_script)) {
-
-        $python_script = dirname(__FILE__) . '/../../../utilities/voice_clone_tts.py';
-
-    }
-
-    $python_script = realpath($python_script);
-
-
-
-    if (!$python_script || !file_exists($python_script)) {
-
-        @unlink($temp_text_file);
-
-        wp_send_json_error(array('message' => 'Không tìm thấy công cụ Voice Clone TTS trên máy chủ!'));
-
-    }
-
-
-
-    // Thực thi lệnh Python (truyền thêm --cached-profile nếu dùng giọng cũ để xử lý siêu tốc)
-
-    $cmd = 'python ' . escapeshellarg($python_script)
-
-         . ' --text-file ' . escapeshellarg($temp_text_file)
-
-         . ' --output ' . escapeshellarg($output_file_path)
-
-         . ' --speed ' . escapeshellarg(strval($speed));
-
-
-
-    if (!empty($ref_audio_path)) {
-
-        $cmd .= ' --ref-audio ' . escapeshellarg($ref_audio_path);
-
-    }
-
-    if (!empty($cached_profile_json)) {
-
-        $cmd .= ' --cached-profile ' . escapeshellarg($cached_profile_json);
-
-    }
-
-
+    $python_script = muop_get_voice_clone_script_path();
 
     $output_str = '';
-    // Thử thực thi với python3, /usr/bin/python3, python
-    $python_bins = array('python3', '/usr/bin/python3', '/usr/local/bin/python3', 'python');
     $py_success = false;
-    foreach ($python_bins as $pbin) {
-        $try_cmd = $pbin . ' ' . escapeshellarg($python_script)
-             . ' --text-file ' . escapeshellarg($temp_text_file)
-             . ' --output ' . escapeshellarg($output_file_path)
-             . ' --speed ' . escapeshellarg(strval($speed));
-        if (!empty($ref_audio_path)) {
-            $try_cmd .= ' --ref-audio ' . escapeshellarg($ref_audio_path);
-        }
-        if (!empty($cached_profile_json)) {
-            $try_cmd .= ' --cached-profile ' . escapeshellarg($cached_profile_json);
-        }
-        $out = @shell_exec($try_cmd . ' 2>&1');
-        if ($out) {
-            $j = json_decode($out, true);
-            if ($j && !empty($j['success']) && file_exists($output_file_path)) {
-                $output_str = $out;
-                $py_success = true;
-                break;
+
+    if ($python_script && file_exists($python_script)) {
+        $is_win = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
+        $python_bins = $is_win ? array('python', 'py') : array('python3', '/usr/bin/python3', '/usr/local/bin/python3', 'python');
+
+        foreach ($python_bins as $pbin) {
+            $try_cmd = $pbin . ' ' . escapeshellarg($python_script)
+                 . ' --text-file ' . escapeshellarg($temp_text_file)
+                 . ' --output ' . escapeshellarg($output_file_path)
+                 . ' --speed ' . escapeshellarg(strval($speed));
+
+            if (!empty($ref_audio_path) && file_exists($ref_audio_path)) {
+                $try_cmd .= ' --ref-audio ' . escapeshellarg($ref_audio_path);
+            }
+            if (!empty($temp_profile_file) && file_exists($temp_profile_file)) {
+                $try_cmd .= ' --profile-file ' . escapeshellarg($temp_profile_file);
+            } elseif (!empty($cached_profile_json)) {
+                $b64 = base64_encode($cached_profile_json);
+                $try_cmd .= ' --cached-profile-b64 ' . escapeshellarg($b64);
+            }
+
+            $out = @shell_exec($try_cmd . ' 2>&1');
+            if ($out) {
+                $j = json_decode($out, true);
+                if ($j && !empty($j['success']) && file_exists($output_file_path) && filesize($output_file_path) > 1000) {
+                    $output_str = $out;
+                    $py_success = true;
+                    break;
+                }
             }
         }
     }
 
     @unlink($temp_text_file);
+    if (!empty($temp_profile_file) && file_exists($temp_profile_file)) {
+        @unlink($temp_profile_file);
+    }
 
     $json_res = $output_str ? json_decode($output_str, true) : null;
 

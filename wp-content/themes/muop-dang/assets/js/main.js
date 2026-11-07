@@ -6684,21 +6684,113 @@
             if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
             if (res && res.success && res.data && res.data.voices) {
               const voices = res.data.voices;
-              if (voices.length === 0) {
-                $select.html('<option value="">-- Bạn chưa có giọng mẫu nào đã lưu (Hãy tải lên file mới ở dưới) --</option>');
-                return;
-              }
-              let html = '<option value="">-- Chọn 1 giọng mẫu đã lưu của bạn (' + voices.length + ' giọng) --</option>';
+              let html = '';
               voices.forEach((v) => {
                 let profStr = '';
                 if (v.profile && v.profile.voice_label) profStr = ' • ' + v.profile.voice_label;
-                html += '<option value="' + v.id + '" data-url="' + (v.audio_url || '') + '">' + (v.name || 'Giọng Mẫu') + profStr + ' (' + (v.created_fmt || '') + ')</option>';
+                const isSel = (v.id === 'system_default_voice') ? ' selected' : '';
+                html += '<option value="' + v.id + '" data-url="' + (v.audio_url || '') + '"' + isSel + '>' + (v.name || 'Giọng Mẫu') + profStr + '</option>';
               });
+              if (!html) {
+                html = '<option value="system_default_voice" selected>Giọng Gốc (Chuẩn Mặc Định - Dùng Chung) • Giọng Nữ (Hoài My - Chuẩn Ngọt Ngào, Dễ Nghe)</option>';
+              }
               $select.html(html);
             }
           }
         });
       };
+
+      // Khi chọn file giọng mẫu mới: Hiển thị nút Xóa File
+      $(document).on('change', '#editChapterRefVoiceFile', function() {
+        if (this.files && this.files.length > 0) {
+          $('#btnClearRefVoiceFileInEditModal').show();
+        } else {
+          $('#btnClearRefVoiceFileInEditModal').hide();
+        }
+      });
+
+      // Nút Xóa File giọng mẫu đã chọn để quay lại dùng Giọng Gốc / Giọng Đã Lưu
+      $(document).on('click', '#btnClearRefVoiceFileInEditModal', function(e) {
+        e.preventDefault();
+        $('#editChapterRefVoiceFile').val('');
+        $(this).hide();
+      });
+
+      // Khi đổi lựa chọn giọng đã lưu hoặc Giọng Gốc: Tự động xóa file input đang chọn để ưu tiên giọng đã lưu
+      $(document).on('change', '#editChapterSavedVoiceSelect', function() {
+        if ($(this).val()) {
+          $('#editChapterRefVoiceFile').val('');
+          $('#btnClearRefVoiceFileInEditModal').hide();
+        }
+      });
+
+      // Xử lý nút Phân Tích Giọng trong Modal Sửa Chương
+      $(document).on('click', '#btnAnalyzeVoiceInEditChapter', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const refFileInput = document.getElementById('editChapterRefVoiceFile');
+        const hasNewFile = (refFileInput && refFileInput.files && refFileInput.files[0]);
+        const savedVoiceId = $('#editChapterSavedVoiceSelect').val();
+        const $card = $('#editChapterVoiceAnalysisCard');
+        const $text = $('#editChapterVoiceAnalysisText');
+
+        if (!hasNewFile && !savedVoiceId) {
+          if (typeof muopAlert === 'function') muopAlert('Vui lòng chọn 1 giọng mẫu đã lưu hoặc tải lên file âm thanh để phân tích!', 'warning');
+          else alert('Vui lòng chọn 1 giọng mẫu đã lưu hoặc tải lên file âm thanh để phân tích!');
+          return;
+        }
+
+        // Nếu là Giọng Gốc hệ thống và không có file tải lên: Hiển thị ngay kết quả
+        if (savedVoiceId === 'system_default_voice' && !hasNewFile) {
+          $card.css('display', 'flex');
+          $text.html('✅ <strong style="color: #15803d;">Đã phân tích xong!</strong> Nhận diện: Giọng Nữ (Hoài My - Chuẩn Ngọt Ngào, Dễ Nghe) — 210Hz. Bấm <strong>"Tạo Audio"</strong> để tạo audio.');
+          return;
+        }
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích...');
+        $card.css('display', 'flex');
+        $text.html('<i class="fa-solid fa-spinner fa-spin"></i> Đang phân tích cao độ (Pitch F0) và cân bằng âm sắc 5 dải Formant...');
+
+        const formData = new FormData();
+        formData.append('action', 'muop_analyze_voice_sample');
+        if (hasNewFile) {
+          formData.append('reference_voice', refFileInput.files[0]);
+        } else if (savedVoiceId) {
+          formData.append('saved_voice_id', savedVoiceId);
+        }
+        if (typeof muopConfig !== 'undefined' && muopConfig.nonce) {
+          formData.append('nonce', muopConfig.nonce);
+        }
+
+        $.ajax({
+          url: (typeof muopConfig !== 'undefined' && muopConfig.ajaxUrl) ? muopConfig.ajaxUrl : getAjaxUrl(),
+          type: 'POST',
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: (res) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích Giọng');
+            if (typeof res === 'string') { try { res = JSON.parse(res); } catch (e) {} }
+            if (res && res.success && res.data) {
+              const vp = res.data.voice_profile || {};
+              const label = res.data.voice_name || vp.voice_label || 'Giọng Mẫu';
+              $text.html('✅ <strong style="color: #15803d;">Đã phân tích xong:</strong> ' + label + ' (Pitch: ' + (vp.pitch_hz || '210') + 'Hz • Tỷ lệ: ' + (vp.pitch_ratio || '1.0') + '). Bấm <strong>"Tạo Audio"</strong> để tạo audio.');
+              if (res.data.is_new_saved) {
+                loadEditModalSavedVoices();
+              }
+            } else {
+              const msg = (res && res.data && res.data.message) || (res && res.message) || 'Lỗi khi phân tích giọng!';
+              $text.html('<span style="color: #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> ' + msg + '</span>');
+            }
+          },
+          error: (xhr) => {
+            $btn.prop('disabled', false).html('<i class="fa-solid fa-wand-magic-sparkles"></i> Phân Tích Giọng');
+            let msg = 'Không thể kết nối máy chủ phân tích giọng!';
+            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            $text.html('<span style="color: #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> ' + msg + '</span>');
+          }
+        });
+      });
 
       // Nghe thử giọng mẫu đã lưu trong Modal Sửa Chương
       $(document).on('click', '#btnPreviewSavedVoiceEditModal', function(e) {
@@ -6790,10 +6882,10 @@
         formData.append('chapter_id', chapterId);
         formData.append('story_id', storyId);
         formData.append('chapter_text', textContent);
-        if (savedVoiceId && !hasNewFile) {
-          formData.append('saved_voice_id', savedVoiceId);
-        } else if (hasNewFile) {
+        if (hasNewFile) {
           formData.append('ref_voice', refFileInput.files[0]);
+        } else if (savedVoiceId) {
+          formData.append('saved_voice_id', savedVoiceId);
         }
         if (typeof muopConfig !== 'undefined' && muopConfig.nonce) {
           formData.append('nonce', muopConfig.nonce);
@@ -6842,7 +6934,18 @@
           error: (xhr) => {
             $btn.prop('disabled', false).html('<i class="fa-solid fa-wand-magic-sparkles"></i> Bấm Chuyển Đổi Audio Mới');
             let msg = 'Lỗi kết nối máy chủ khi chuyển đổi giọng nói!';
-            if (xhr && xhr.responseJSON) msg = getAjaxMsg(xhr.responseJSON, msg);
+            if (xhr && xhr.responseJSON) {
+              msg = getAjaxMsg(xhr.responseJSON, msg);
+            } else if (xhr && xhr.responseText) {
+              try {
+                const parsed = JSON.parse(xhr.responseText);
+                msg = getAjaxMsg(parsed, msg);
+              } catch(e) {
+                if (xhr.status === 504 || xhr.status === 502) {
+                  msg = 'Quá thời gian phản hồi từ máy chủ (Timeout). Vui lòng thử lại với nội dung ngắn hơn!';
+                }
+              }
+            }
             $alert.removeClass('alert-info alert-success').addClass('alert-error').html('<i class="fa-solid fa-circle-exclamation"></i> ' + msg).show();
           }
         });
