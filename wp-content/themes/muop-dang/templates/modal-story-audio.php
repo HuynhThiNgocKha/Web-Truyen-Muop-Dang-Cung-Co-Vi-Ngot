@@ -240,6 +240,10 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
                         <div>
                             <label class="form-label" for="manageAudioFileInput" style="font-size: 12.5px; font-weight: 700;">Chọn File Audio (.mp3, .m4a, .wav):</label>
                             <input type="file" id="manageAudioFileInput" name="audio_file" class="form-input" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" style="padding: 6px 10px; font-size: 12.5px; height: 38px; width: 100%; box-sizing: border-box;" />
+                            <label style="display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: #15803d; cursor: pointer;">
+                                <input type="checkbox" id="manageAutoCompressBeforeUpload" checked style="accent-color: #16a34a; width: 14px; height: 14px;">
+                                <span><strong>Tự động tối ưu dung lượng</strong> (nén xuống Mono 24kHz nhẹ 70-80%, tải lên siêu nhanh)</span>
+                            </label>
                         </div>
                     </div>
 
@@ -779,50 +783,84 @@ define('MUOP_MODAL_STORY_AUDIO_LOADED', true);
             }
 
             var origHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải lên...';
+            var rawFile = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            var autoCompress = document.getElementById('manageAutoCompressBeforeUpload');
+            var shouldCompress = autoCompress && autoCompress.checked && rawFile && (typeof window.muopCompressAudioInBrowser === 'function');
 
-            var fd = new FormData();
-            fd.append('action', 'muop_save_chapter_audio');
-            fd.append('story_id', storyId);
-            fd.append('chapter_id', chapterId);
-            fd.append('nonce', nonceVal);
-            if (fileInput.files && fileInput.files[0]) {
-                fd.append('audio_file', fileInput.files[0]);
-            }
-            if (urlInput.value) {
-                fd.append('audio_url', urlInput.value.trim());
-            }
+            var executeUpload = function(fileToSend) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tải lên máy chủ...';
 
-            fetch(ajaxUrl, { method: 'POST', body: fd })
-                .then(function(r) { return r.json(); })
-                .then(function(res) {
-                    btn.disabled = false;
-                    btn.innerHTML = origHtml;
-                    if (res.success) {
-                        fileInput.value = '';
-                        urlInput.value = '';
-                        loadManageAudioChapters(storyId);
-                        var alertEl = document.getElementById('manageAudioAlert');
-                        if (alertEl) {
-                            alertEl.style.display = 'block';
-                            alertEl.className = 'alert-box alert-success';
-                            alertEl.style.background = '#f0fdf4';
-                            alertEl.style.color = '#166534';
-                            alertEl.style.border = '1px solid #bbf7d0';
-                            alertEl.style.padding = '10px 14px';
-                            alertEl.style.borderRadius = '6px';
-                            alertEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + (res.data && res.data.message ? res.data.message : 'Đã cập nhật audio thành công!');
+                var fd = new FormData();
+                fd.append('action', 'muop_save_chapter_audio');
+                fd.append('story_id', storyId);
+                fd.append('chapter_id', chapterId);
+                fd.append('nonce', nonceVal);
+                if (fileToSend) {
+                    fd.append('audio_file', fileToSend, rawFile ? rawFile.name : 'audio.mp3');
+                }
+                if (urlInput.value) {
+                    fd.append('audio_url', urlInput.value.trim());
+                }
+
+                fetch(ajaxUrl, { method: 'POST', body: fd })
+                    .then(function(r) { return r.json(); })
+                    .then(function(res) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        if (res.success) {
+                            fileInput.value = '';
+                            urlInput.value = '';
+                            loadManageAudioChapters(storyId);
+                            var alertEl = document.getElementById('manageAudioAlert');
+                            if (alertEl) {
+                                alertEl.style.display = 'block';
+                                alertEl.className = 'alert-box alert-success';
+                                alertEl.style.background = '#f0fdf4';
+                                alertEl.style.color = '#166534';
+                                alertEl.style.border = '1px solid #bbf7d0';
+                                alertEl.style.padding = '10px 14px';
+                                alertEl.style.borderRadius = '6px';
+                                alertEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + (res.data && res.data.message ? res.data.message : 'Đã cập nhật audio thành công!');
+                            }
+                        } else {
+                            if (typeof muopAlert === 'function') {
+                                muopAlert(res.data && res.data.message ? res.data.message : 'Có lỗi khi lưu audio!', 'error');
+                            } else {
+                                alert(res.data && res.data.message ? res.data.message : 'Có lỗi khi lưu audio!');
+                            }
                         }
+                    })
+                    .catch(function(err) {
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                        var userMsg = 'Không thể tải lên file audio này! Vui lòng kiểm tra dung lượng file hoặc thử lại sau.';
+                        if (typeof muopAlert === 'function') {
+                            muopAlert(userMsg, 'error');
+                        } else {
+                            alert(userMsg);
+                        }
+                    });
+            };
+
+            if (shouldCompress && rawFile.size > 200000) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang nén âm thanh (0%)...';
+                window.muopCompressAudioInBrowser(rawFile, function(p) {
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + p.text;
+                }).then(function(compResult) {
+                    if (compResult && compResult.blob && compResult.savedBytes > 0) {
+                        executeUpload(compResult.blob);
                     } else {
-                        alert(res.data && res.data.message ? res.data.message : 'Có lỗi khi lưu audio!');
+                        executeUpload(rawFile);
                     }
-                })
-                .catch(function() {
-                    btn.disabled = false;
-                    btn.innerHTML = origHtml;
-                    alert('Lỗi kết nối máy chủ!');
+                }).catch(function(err) {
+                    console.warn('Lỗi nén audio trên trình duyệt, tải file gốc:', err);
+                    executeUpload(rawFile);
                 });
+            } else {
+                executeUpload(rawFile);
+            }
         });
     }
 

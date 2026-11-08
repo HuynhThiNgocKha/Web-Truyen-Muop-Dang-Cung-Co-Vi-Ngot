@@ -1646,7 +1646,9 @@ function muop_enqueue_scripts() {
 
 
 
-    wp_enqueue_script('muop-main-script', MUOP_THEME_URI . '/assets/js/main.js', array('jquery'), MUOP_THEME_VERSION, true);
+    wp_enqueue_script('muop-lamejs', MUOP_THEME_URI . '/assets/js/lame.min.js', array(), '1.2.1', true);
+    wp_enqueue_script('muop-audio-compressor', MUOP_THEME_URI . '/assets/js/muop-audio-compressor.js', array('muop-lamejs'), MUOP_THEME_VERSION, true);
+    wp_enqueue_script('muop-main-script', MUOP_THEME_URI . '/assets/js/main.js', array('jquery', 'muop-lamejs', 'muop-audio-compressor'), MUOP_THEME_VERSION, true);
 
 
 
@@ -15866,12 +15868,52 @@ function muop_ajax_get_story_audio_list_handler() {
 
  */
 
+// Helper kiểm tra xem FFmpeg có khả dụng trên máy chủ không (chạy thử lệnh và cache kết quả để không tốn tài nguyên)
+function muop_is_ffmpeg_available() {
+    static $available = null;
+    if ($available !== null) return $available;
+
+    if (!function_exists('exec')) {
+        $available = false;
+        return false;
+    }
+    $disabled = explode(',', (string)ini_get('disable_functions'));
+    $disabled = array_map('trim', $disabled);
+    if (in_array('exec', $disabled, true)) {
+        $available = false;
+        return false;
+    }
+
+    $out = array();
+    $ret = -1;
+    @exec('ffmpeg -version 2>&1', $out, $ret);
+    if ($ret === 0) {
+        $available = 'ffmpeg';
+        return 'ffmpeg';
+    }
+
+    foreach (array('/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg') as $bin) {
+        if (@file_exists($bin)) {
+            $out = array();
+            $ret = -1;
+            @exec($bin . ' -version 2>&1', $out, $ret);
+            if ($ret === 0) {
+                $available = $bin;
+                return $bin;
+            }
+        }
+    }
+
+    $available = false;
+    return false;
+}
+
 /**
  * Nén file âm thanh giọng nói xuống mức dung lượng thấp nhất nhưng đảm bảo âm thanh mượt mà, rõ ràng:
  * - Mono (1 kênh, chuẩn giọng đọc đọc truyện)
  * - Tần số lấy mẫu: 24,000 Hz (Bao phủ toàn bộ dải hài âm giọng nói con người, trong trẻo, tự nhiên)
  * - Bitrate: 36 kbps LAME CBR (Chỉ ~270KB / phút, tiết kiệm 70% - 90% dung lượng hosting)
- * - Bộ lọc âm học giọng nói: highpass 60Hz + lowpass 11kHz + acompressor làm mịn + loudnorm chuẩn phát thanh
+ * - Nén 1-pass siêu tốc (~1-2 giây / file), an toàn, không gây quá tải hoặc timeout máy chủ
  */
 function muop_compress_audio_file($file_path) {
     if (!file_exists($file_path) || filesize($file_path) < 15000) {
@@ -15884,55 +15926,25 @@ function muop_compress_audio_file($file_path) {
         return $file_path;
     }
 
+    $fb = muop_is_ffmpeg_available();
+    if (!$fb) {
+        return $file_path; // FFmpeg không khả dụng, giữ nguyên file gốc
+    }
+
     $orig_size = filesize($file_path);
     $temp_out = dirname($file_path) . '/cmp_' . uniqid() . '.mp3';
 
-    // 1. Thử nén trực tiếp bằng FFmpeg
-    $ffmpeg_bins = array('ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg');
-    $filter = 'highpass=f=60,lowpass=f=11000,acompressor=threshold=-16dB:ratio=2.5:attack=20:release=150:makeup=1.5dB,loudnorm=I=-16:TP=-1.5:LRA=10';
-    $compressed_ok = false;
+    // Nén nhanh 1-pass CBR chuẩn Lame Mono 24kHz 36k (Không dùng filter 2-pass chậm gây timeout)
+    $cmd = sprintf(
+        '%s -y -i %s -ac 1 -ar 24000 -c:a libmp3lame -b:a 36k %s 2>&1',
+        $fb,
+        escapeshellarg($file_path),
+        escapeshellarg($temp_out)
+    );
+    @exec($cmd, $out, $ret);
 
-    foreach ($ffmpeg_bins as $fb) {
-        $cmd = sprintf(
-            '%s -y -i %s -af %s -ac 1 -ar 24000 -c:a libmp3lame -b:a 36k %s 2>&1',
-            $fb,
-            escapeshellarg($file_path),
-            escapeshellarg($filter),
-            escapeshellarg($temp_out)
-        );
-        @exec($cmd, $out, $ret);
-        if ($ret === 0 && file_exists($temp_out) && filesize($temp_out) > 500) {
-            $compressed_ok = true;
-            break;
-        }
-    }
-
-    // 2. Nếu FFmpeg trực tiếp gặp lỗi: Gọi qua Python script
-    if (!$compressed_ok || !file_exists($temp_out) || filesize($temp_out) < 500) {
-        $py_script = function_exists('muop_get_voice_clone_script_path') ? muop_get_voice_clone_script_path() : '';
-        if ($py_script && file_exists($py_script)) {
-            $is_win = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
-            $py_bins = $is_win ? array('python', 'py') : array('python3', '/usr/bin/python3', '/usr/local/bin/python3', 'python');
-            foreach ($py_bins as $pb) {
-                $py_cmd = sprintf(
-                    '%s %s --compress-audio %s --output %s 2>&1',
-                    $pb,
-                    escapeshellarg($py_script),
-                    escapeshellarg($file_path),
-                    escapeshellarg($temp_out)
-                );
-                $py_out = @shell_exec($py_cmd);
-                if (file_exists($temp_out) && filesize($temp_out) > 500) {
-                    $compressed_ok = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    if ($compressed_ok && file_exists($temp_out) && filesize($temp_out) > 500) {
+    if ($ret === 0 && file_exists($temp_out) && filesize($temp_out) > 500) {
         $new_size = filesize($temp_out);
-        // Thay thế nếu file nén nhỏ hơn file gốc hoặc nếu định dạng gốc khác MP3 (wav, m4a, flac)
         if ($new_size < $orig_size || $ext !== 'mp3') {
             @unlink($file_path);
             if ($ext === 'mp3') {
@@ -15962,6 +15974,14 @@ function muop_compress_audio_file($file_path) {
  * - Đồng bộ lại URL trong database nếu có file đổi đuôi sang .mp3
  */
 function muop_batch_compress_all_uploaded_audio() {
+    if (!muop_is_ffmpeg_available()) {
+        return array(
+            'success' => false,
+            'ffmpeg_missing' => true,
+            'message' => 'Máy chủ hosting hiện chưa được cài đặt công cụ FFmpeg để nén âm thanh trực tiếp. Toàn bộ file audio của bạn vẫn được lưu trữ và phát bình thường!'
+        );
+    }
+
     @set_time_limit(600);
     @ini_set('max_execution_time', '600');
 
@@ -15978,7 +15998,6 @@ function muop_batch_compress_all_uploaded_audio() {
     $total_new_bytes = 0;
     $log_details = array();
 
-    // Dùng RecursiveDirectoryIterator để duyệt toàn bộ cây thư mục uploads
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($base_dir, RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::SELF_FIRST
@@ -15990,7 +16009,7 @@ function muop_batch_compress_all_uploaded_audio() {
             if (in_array($ext, $audio_extensions)) {
                 $path = wp_normalize_path($item->getPathname());
                 $orig_size = $item->getSize();
-                if ($orig_size < 15000) continue; // Bỏ qua file quá nhỏ
+                if ($orig_size < 15000) continue;
 
                 $scanned_count++;
                 $total_orig_bytes += $orig_size;
@@ -16011,7 +16030,6 @@ function muop_batch_compress_all_uploaded_audio() {
                         'percent'  => $percent
                     );
 
-                    // Nếu file đổi đuôi sang .mp3, cập nhật lại postmeta trong CSDL
                     if ($new_path !== $path) {
                         $old_url = str_replace($base_dir, $upload_dir['baseurl'], $path);
                         $new_url = str_replace($base_dir, $upload_dir['baseurl'], $new_path);
@@ -16042,7 +16060,180 @@ function muop_batch_compress_all_uploaded_audio() {
     );
 }
 
-// AJAX handler cho Admin nén toàn bộ audio
+// Lấy danh sách các file audio cần nén để nén từng file từng bước (tránh timeout)
+add_action('wp_ajax_muop_admin_get_audio_compression_queue', 'muop_ajax_admin_get_audio_compression_queue_handler');
+function muop_ajax_admin_get_audio_compression_queue_handler() {
+    if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng F5 tải lại trang!'));
+    }
+
+    $has_ffmpeg = (bool) muop_is_ffmpeg_available();
+
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    if (!is_dir($base_dir)) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thư mục uploads!'));
+    }
+
+    $audio_extensions = array('mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac');
+    $files_queue = array();
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($base_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    $norm_basedir = wp_normalize_path($base_dir);
+    foreach ($iterator as $item) {
+        if ($item->isFile()) {
+            $ext = strtolower($item->getExtension());
+            if (in_array($ext, $audio_extensions)) {
+                $path = wp_normalize_path($item->getPathname());
+                $orig_size = $item->getSize();
+                if ($orig_size < 15000) continue;
+
+                $rel_path = ltrim(str_replace($norm_basedir, '', $path), '/\\');
+                $file_url = $upload_dir['baseurl'] . '/' . str_replace('\\', '/', $rel_path);
+
+                $files_queue[] = array(
+                    'path'       => $path,
+                    'url'        => $file_url,
+                    'file_name'  => basename($path),
+                    'size_kb'    => round($orig_size / 1024),
+                    'size_bytes' => $orig_size
+                );
+            }
+        }
+    }
+
+    wp_send_json_success(array(
+        'has_ffmpeg' => $has_ffmpeg,
+        'total'      => count($files_queue),
+        'files'      => $files_queue
+    ));
+}
+
+// Lưu file audio đã được nén thành công bởi trình duyệt (Web Audio API + lamejs)
+add_action('wp_ajax_muop_admin_save_client_compressed_audio', 'muop_ajax_admin_save_client_compressed_audio_handler');
+function muop_ajax_admin_save_client_compressed_audio_handler() {
+    if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng F5 tải lại trang!'));
+    }
+
+    $target_path = isset($_POST['file_path']) ? wp_unslash($_POST['file_path']) : '';
+    if (empty($target_path) || !file_exists($target_path)) {
+        wp_send_json_error(array('message' => 'Tệp âm thanh đích không tồn tại trên máy chủ!'));
+    }
+
+    // Bảo mật: Đảm bảo đường dẫn nằm trong thư mục uploads
+    $upload_dir = wp_upload_dir();
+    $norm_uploads = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $upload_dir['basedir']));
+    $norm_target = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $target_path));
+    if (strpos($norm_target, $norm_uploads) !== 0) {
+        wp_send_json_error(array('message' => 'Đường dẫn tệp không hợp lệ!'));
+    }
+
+    if (empty($_FILES['compressed_file']) || $_FILES['compressed_file']['error'] !== UPLOAD_ERR_OK) {
+        wp_send_json_error(array('message' => 'Không nhận được dữ liệu tệp nén từ trình duyệt!'));
+    }
+
+    $tmp_file = $_FILES['compressed_file']['tmp_name'];
+    $new_size = filesize($tmp_file);
+    $orig_size = filesize($target_path);
+
+    if ($new_size <= 1000) {
+        wp_send_json_error(array('message' => 'Tệp nén bị lỗi hoặc kích thước quá nhỏ!'));
+    }
+
+    // Chỉ ghi đè nếu tệp nén thực sự nhẹ hơn file gốc
+    if ($new_size < $orig_size) {
+        if (@copy($tmp_file, $target_path)) {
+            @unlink($tmp_file);
+            delete_transient('muop_storage_stats');
+            wp_send_json_success(array(
+                'status'       => 'compressed',
+                'file_name'    => basename($target_path),
+                'orig_size_kb' => round($orig_size / 1024),
+                'new_size_kb'  => round($new_size / 1024),
+                'saved_bytes'  => $orig_size - $new_size,
+                'saved_kb'     => round(($orig_size - $new_size) / 1024),
+                'message'      => 'Đã nén và lưu thành công!'
+            ));
+        } else {
+            wp_send_json_error(array('message' => 'Không thể ghi đè tệp âm thanh trên máy chủ!'));
+        }
+    } else {
+        @unlink($tmp_file);
+        wp_send_json_success(array(
+            'status'       => 'skipped',
+            'file_name'    => basename($target_path),
+            'orig_size_kb' => round($orig_size / 1024),
+            'new_size_kb'  => round($orig_size / 1024),
+            'saved_bytes'  => 0,
+            'saved_kb'     => 0,
+            'message'      => 'Tệp đã ở kích thước tối ưu sẵn.'
+        ));
+    }
+}
+
+// Nén 1 file audio duy nhất trong hàng đợi (nhanh, an toàn, không bao giờ timeout)
+add_action('wp_ajax_muop_admin_compress_single_audio', 'muop_ajax_admin_compress_single_audio_handler');
+function muop_ajax_admin_compress_single_audio_handler() {
+    if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng F5 tải lại trang!'));
+    }
+
+    $path = isset($_POST['file_path']) ? wp_unslash($_POST['file_path']) : '';
+    if (empty($path) || !file_exists($path)) {
+        wp_send_json_error(array('message' => 'File không tồn tại!'));
+    }
+
+    // Bảo mật: Đảm bảo file nằm trong thư mục uploads
+    $upload_dir = wp_upload_dir();
+    $norm_uploads = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $upload_dir['basedir']));
+    $norm_file = strtolower(str_replace(array('/', '\\'), DIRECTORY_SEPARATOR, $path));
+    if (strpos($norm_file, $norm_uploads) !== 0) {
+        wp_send_json_error(array('message' => 'Đường dẫn file không hợp lệ!'));
+    }
+
+    $orig_size = filesize($path);
+    $new_path = muop_compress_audio_file($path);
+    $new_size = file_exists($new_path) ? filesize($new_path) : $orig_size;
+
+    $compressed = ($new_size < $orig_size || $new_path !== $path);
+    $saved_bytes = max(0, $orig_size - $new_size);
+
+    if ($compressed && $new_path !== $path) {
+        $old_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $path);
+        $new_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $new_path);
+        global $wpdb;
+        $wpdb->query($wpdb->prepare(
+            "UPDATE {$wpdb->postmeta} SET meta_value = %s WHERE meta_key = '_chuong_audio_url' AND meta_value = %s",
+            $new_url,
+            $old_url
+        ));
+    }
+
+    wp_send_json_success(array(
+        'compressed'   => $compressed,
+        'orig_kb'      => round($orig_size / 1024),
+        'new_kb'       => round($new_size / 1024),
+        'saved_kb'     => round($saved_bytes / 1024),
+        'percent'      => $orig_size > 0 ? round(($saved_bytes / $orig_size) * 100, 1) : 0,
+        'file_name'    => basename($path)
+    ));
+}
+
+// AJAX handler cho Admin nén toàn bộ audio (Fallback)
 add_action('wp_ajax_muop_admin_compress_all_audio', 'muop_ajax_admin_compress_all_audio_handler');
 function muop_ajax_admin_compress_all_audio_handler() {
     if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
@@ -16057,7 +16248,10 @@ function muop_ajax_admin_compress_all_audio_handler() {
     if ($result && !empty($result['success'])) {
         wp_send_json_success($result);
     } else {
-        wp_send_json_error(array('message' => isset($result['message']) ? $result['message'] : 'Lỗi khi nén audio!'));
+        wp_send_json_error(array(
+            'ffmpeg_missing' => !empty($result['ffmpeg_missing']),
+            'message'        => isset($result['message']) ? $result['message'] : 'Lỗi khi nén audio!'
+        ));
     }
 }
 
@@ -16170,178 +16364,154 @@ function muop_delete_chapter_audio_file($chapter_id) {
 add_action('wp_ajax_muop_save_chapter_audio', 'muop_ajax_save_chapter_audio_handler');
 
 function muop_ajax_save_chapter_audio_handler() {
+    try {
+        $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '');
+        if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+            wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5)!'));
+        }
 
-    $nonce = isset($_POST['nonce']) ? $_POST['nonce'] : (isset($_REQUEST['nonce']) ? $_REQUEST['nonce'] : '');
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện!'));
+        }
 
-    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        $story_id   = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+        $chapter_id = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
+        $action_type = isset($_POST['action_type']) ? sanitize_text_field($_POST['action_type']) : 'save';
 
-        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang (F5)!'));
+        if (!$story_id || !$chapter_id) {
+            wp_send_json_error(array('message' => 'Thông tin truyện hoặc chương không hợp lệ!'));
+        }
 
-    }
+        $current_uid = get_current_user_id();
+        $is_from_admin = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
 
-    if (!is_user_logged_in()) {
+        if (!muop_can_user_manage_story_action($story_id, $current_uid, $is_from_admin)) {
+            wp_send_json_error(array('message' => 'Bạn không có quyền quản lý audio cho bộ truyện này!'));
+        }
 
-        wp_send_json_error(array('message' => 'Vui lòng đăng nhập để thực hiện!'));
+        // Nếu là thao tác xóa Audio: Xóa file vật lý trên đĩa
+        if ($action_type === 'delete') {
+            muop_delete_chapter_audio_file($chapter_id);
+            wp_send_json_success(array(
+                'message'    => 'Đã xóa file audio của chương này khỏi máy chủ!',
+                'chapter_id' => $chapter_id,
+                'has_audio'  => false
+            ));
+        }
 
-    }
+        // Nếu là thao tác lưu Audio: Kiểm tra file upload hoặc link trực tiếp
+        $audio_url = '';
+        if (!empty($_FILES['audio_file']) && !empty($_FILES['audio_file']['name'])) {
+            require_once(ABSPATH . 'wp-admin/includes/file.php');
+            require_once(ABSPATH . 'wp-admin/includes/image.php');
+            require_once(ABSPATH . 'wp-admin/includes/media.php');
 
+            $file = $_FILES['audio_file'];
 
+            // Kiểm tra lỗi upload mã hệ thống từ PHP
+            if (!empty($file['error'])) {
+                switch ($file['error']) {
+                    case UPLOAD_ERR_INI_SIZE:
+                    case UPLOAD_ERR_FORM_SIZE:
+                        wp_send_json_error(array('message' => 'File âm thanh vượt quá giới hạn dung lượng upload của máy chủ! Vui lòng nén file hoặc dùng file dưới 40MB.'));
+                        break;
+                    case UPLOAD_ERR_PARTIAL:
+                        wp_send_json_error(array('message' => 'File tải lên bị ngắt quãng giữa chừng, vui lòng thử lại!'));
+                        break;
+                    case UPLOAD_ERR_NO_FILE:
+                        wp_send_json_error(array('message' => 'Chưa có file nào được tải lên!'));
+                        break;
+                    default:
+                        wp_send_json_error(array('message' => 'Lỗi tải file (Mã lỗi: ' . $file['error'] . ')!'));
+                        break;
+                }
+            }
 
-    $story_id   = isset($_POST['story_id']) ? intval($_POST['story_id']) : 0;
+            $allowed = array('mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac');
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-    $chapter_id = isset($_POST['chapter_id']) ? intval($_POST['chapter_id']) : 0;
+            if (!in_array($ext, $allowed)) {
+                wp_send_json_error(array('message' => 'Định dạng file âm thanh không hợp lệ! Vui lòng chọn file .mp3, .m4a, .wav, .ogg, .aac.'));
+            }
 
-    $action_type = isset($_POST['action_type']) ? sanitize_text_field($_POST['action_type']) : 'save';
+            $upload_overrides = array(
+                'test_form' => false,
+                'test_type' => false
+            );
+            $upload = wp_handle_upload($file, $upload_overrides);
+            $dest_file = '';
 
+            if ($upload && !isset($upload['error']) && !empty($upload['file'])) {
+                $dest_file = $upload['file'];
+                $audio_url = $upload['url'];
+            } else {
+                // Fallback: Di chuyển file trực tiếp vào wp-content/uploads/audio/ nếu hosting chặn MIME của WordPress
+                $upload_dir = wp_upload_dir();
+                $audio_dir = $upload_dir['basedir'] . '/audio';
+                if (!is_dir($audio_dir)) {
+                    wp_mkdir_p($audio_dir);
+                }
+                $safe_name = 'audio_c' . $chapter_id . '_' . time() . '_' . wp_generate_password(6, false, false) . '.' . $ext;
+                $dest_file = $audio_dir . '/' . $safe_name;
 
+                $uploaded = false;
+                if (!empty($file['tmp_name'])) {
+                    if (is_uploaded_file($file['tmp_name'])) {
+                        $uploaded = @move_uploaded_file($file['tmp_name'], $dest_file);
+                    }
+                    if (!$uploaded && file_exists($file['tmp_name'])) {
+                        $uploaded = @copy($file['tmp_name'], $dest_file);
+                    }
+                }
 
-    if (!$story_id || !$chapter_id) {
+                if ($uploaded && file_exists($dest_file)) {
+                    $audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $dest_file);
+                    $audio_url = str_replace('\\', '/', $audio_url);
+                } else {
+                    $err = isset($upload['error']) ? $upload['error'] : 'Không thể lưu file âm thanh vào thư mục uploads!';
+                    wp_send_json_error(array('message' => 'Lỗi tải lên: ' . $err));
+                }
+            }
 
-        wp_send_json_error(array('message' => 'Thông tin truyện hoặc chương không hợp lệ!'));
+            // Tối ưu hóa nén nếu FFmpeg khả dụng (bảo vệ tuyệt đối bằng try-catch để không bao giờ gây lỗi 500)
+            if (!empty($dest_file) && file_exists($dest_file)) {
+                try {
+                    if (function_exists('muop_is_ffmpeg_available') && muop_is_ffmpeg_available()) {
+                        $compressed_file = muop_compress_audio_file($dest_file);
+                        if ($compressed_file && file_exists($compressed_file) && $compressed_file !== $dest_file) {
+                            $upload_dir = wp_upload_dir();
+                            $audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $compressed_file);
+                            $audio_url = str_replace('\\', '/', $audio_url);
+                        }
+                    }
+                } catch (\Throwable $tex) {
+                    // Giữ nguyên file gốc đã upload thành công
+                }
+            }
 
-    }
+        } elseif (!empty($_POST['audio_url'])) {
+            $audio_url = esc_url_raw(trim($_POST['audio_url']));
+        }
 
+        if (empty($audio_url)) {
+            wp_send_json_error(array('message' => 'Vui lòng chọn file âm thanh để tải lên hoặc nhập đường dẫn audio trực tiếp!'));
+        }
 
-
-    $current_uid = get_current_user_id();
-
-    $is_from_admin = !empty($_POST['is_admin_portal']) || (isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'quan-ly-admin') !== false);
-
-    if (!muop_can_user_manage_story_action($story_id, $current_uid, $is_from_admin)) {
-
-        wp_send_json_error(array('message' => 'Bạn không có quyền quản lý audio cho bộ truyện này!'));
-
-    }
-
-
-
-    // Nếu là thao tác xóa Audio: Xóa file vật lý trên đĩa
-
-    if ($action_type === 'delete') {
-
+        // Xóa file audio cũ trước khi cập nhật file mới
         muop_delete_chapter_audio_file($chapter_id);
+        update_post_meta($chapter_id, '_chuong_audio_url', $audio_url);
 
         wp_send_json_success(array(
-
-            'message'    => 'Đã xóa file audio của chương này khỏi máy chủ!',
-
+            'message'    => 'Đã cập nhật audio cho chương thành công (file cũ đã được dọn sạch khỏi đĩa)!',
             'chapter_id' => $chapter_id,
-
-            'has_audio'  => false
-
+            'audio_url'  => $audio_url,
+            'has_audio'  => true
         ));
-
+    } catch (\Throwable $e) {
+        wp_send_json_error(array(
+            'message' => 'Lỗi hệ thống khi lưu audio: ' . $e->getMessage()
+        ));
     }
-
-
-
-    // Nếu là thao tác lưu Audio: Kiểm tra file upload hoặc link trực tiếp
-
-    $audio_url = '';
-
-    if (!empty($_FILES['audio_file']) && !empty($_FILES['audio_file']['name'])) {
-
-        require_once(ABSPATH . 'wp-admin/includes/file.php');
-
-        require_once(ABSPATH . 'wp-admin/includes/image.php');
-
-        require_once(ABSPATH . 'wp-admin/includes/media.php');
-
-
-
-        $file = $_FILES['audio_file'];
-
-        $allowed = array('mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac');
-
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-
-
-        if (!in_array($ext, $allowed)) {
-
-            wp_send_json_error(array('message' => 'Định dạng file âm thanh không hợp lệ! Vui lòng chọn file .mp3, .m4a, .wav, .ogg, .aac.'));
-
-        }
-
-
-
-        $upload = wp_handle_upload($file, array('test_form' => false));
-
-        if ($upload && !isset($upload['error'])) {
-
-            $compressed_file = function_exists('muop_compress_audio_file') ? muop_compress_audio_file($upload['file']) : $upload['file'];
-
-            if ($compressed_file !== $upload['file']) {
-
-                $upload_dir = wp_upload_dir();
-
-                $audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $compressed_file);
-
-                $audio_url = str_replace('\\', '/', $audio_url);
-
-            } else {
-
-                $audio_url = $upload['url'];
-
-            }
-
-        } else {
-
-            // Fallback: Di chuyển file trực tiếp vào wp-content/uploads/audio/ nếu hosting chặn MIME của WordPress
-            $upload_dir = wp_upload_dir();
-            $audio_dir = $upload_dir['basedir'] . '/audio';
-            if (!is_dir($audio_dir)) {
-                wp_mkdir_p($audio_dir);
-            }
-            $safe_name = 'audio_c' . $chapter_id . '_' . time() . '_' . wp_generate_password(4, false, false) . '.' . $ext;
-            $dest_path = $audio_dir . '/' . $safe_name;
-            if (!empty($file['tmp_name']) && (move_uploaded_file($file['tmp_name'], $dest_path) || copy($file['tmp_name'], $dest_path))) {
-                $compressed_dest = function_exists('muop_compress_audio_file') ? muop_compress_audio_file($dest_path) : $dest_path;
-                $audio_url = str_replace($upload_dir['basedir'], $upload_dir['baseurl'], $compressed_dest);
-                $audio_url = str_replace('\\', '/', $audio_url);
-            } else {
-                $err = isset($upload['error']) ? $upload['error'] : 'Không thể lưu file tải lên!';
-                wp_send_json_error(array('message' => 'Lỗi tải lên: ' . $err));
-            }
-
-        }
-
-    } elseif (!empty($_POST['audio_url'])) {
-
-        $audio_url = esc_url_raw(trim($_POST['audio_url']));
-
-    }
-
-
-
-    if (empty($audio_url)) {
-
-        wp_send_json_error(array('message' => 'Vui lòng chọn file âm thanh để tải lên hoặc nhập đường dẫn audio trực tiếp!'));
-
-    }
-
-
-
-    // Xóa file audio cũ trước khi cập nhật file mới
-
-    muop_delete_chapter_audio_file($chapter_id);
-
-    update_post_meta($chapter_id, '_chuong_audio_url', $audio_url);
-
-
-
-    wp_send_json_success(array(
-
-        'message'    => 'Đã cập nhật audio cho chương thành công (file cũ đã được dọn sạch khỏi đĩa)!',
-
-        'chapter_id' => $chapter_id,
-
-        'audio_url'  => $audio_url,
-
-        'has_audio'  => true
-
-    ));
-
 }
 
 
@@ -20150,4 +20320,256 @@ function muop_ajax_trash_file_handler() {
     } else {
         wp_send_json_error(array('message' => 'Không thể chuyển file vào Thùng rác!'));
     }
+}
+
+/* =========================================================================
+ * TỐI ƯU HÓA HÌNH ẢNH & DỌN DẸP Ổ ĐĨA ĐỆM (CACHE/TEMP)
+ * ========================================================================= */
+
+// 1. Tối ưu: Ngăn WordPress tự động sinh 6-8 bản thumbnail thừa (1536x1536, 2048x2048, scaled...)
+add_filter('intermediate_image_sizes_advanced', 'muop_disable_redundant_image_sizes');
+function muop_disable_redundant_image_sizes($sizes) {
+    unset($sizes['medium_large']);
+    unset($sizes['large']);
+    unset($sizes['1536x1536']);
+    unset($sizes['2048x2048']);
+    return $sizes;
+}
+add_filter('big_image_size_threshold', '__return_false');
+
+// 2. AJAX: Xóa ổ đĩa đệm (Clear Disk Cache & Temp Files)
+add_action('wp_ajax_muop_admin_clear_disk_cache', 'muop_ajax_admin_clear_disk_cache_handler');
+function muop_ajax_admin_clear_disk_cache_handler() {
+    if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng F5 tải lại trang!'));
+    }
+
+    $deleted_files = 0;
+    $freed_bytes = 0;
+
+    // A. Dọn thư mục tmp của dự án
+    $tmp_dir = dirname(get_template_directory(), 2) . '/tmp';
+    if (!is_dir($tmp_dir)) {
+        $tmp_dir = ABSPATH . '../tmp';
+    }
+    if (is_dir($tmp_dir)) {
+        $files = glob(rtrim($tmp_dir, '/\\') . '/*');
+        if ($files) {
+            foreach ($files as $f) {
+                if (is_file($f)) {
+                    $sz = filesize($f);
+                    if (@unlink($f)) {
+                        $deleted_files++;
+                        $freed_bytes += $sz;
+                    }
+                }
+            }
+        }
+    }
+
+    // B. Dọn thư mục wp-content/cache (nếu có cache plugin hoặc page cache)
+    $cache_dir = WP_CONTENT_DIR . '/cache';
+    if (is_dir($cache_dir)) {
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($cache_dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($it as $item) {
+            if ($item->isFile()) {
+                $sz = $item->getSize();
+                if (@unlink($item->getPathname())) {
+                    $deleted_files++;
+                    $freed_bytes += $sz;
+                }
+            } elseif ($item->isDir()) {
+                @rmdir($item->getPathname());
+            }
+        }
+    }
+
+    // C. Dọn dẹp các file .tmp, .temp trong wp-content/uploads/
+    $upload_dir = wp_upload_dir();
+    $uploads_base = $upload_dir['basedir'];
+    if (is_dir($uploads_base)) {
+        $temp_files = glob($uploads_base . '/*.tmp');
+        if ($temp_files) {
+            foreach ($temp_files as $tf) {
+                if (is_file($tf)) {
+                    $sz = filesize($tf);
+                    if (@unlink($tf)) {
+                        $deleted_files++;
+                        $freed_bytes += $sz;
+                    }
+                }
+            }
+        }
+    }
+
+    // D. Dọn transient cache hết hạn trong database
+    global $wpdb;
+    $trans_deleted = $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'");
+
+    // Xóa transient lưu cache thống kê dung lượng để cập nhật số mới
+    delete_transient('muop_storage_stats');
+
+    $freed_mb = round($freed_bytes / (1024 * 1024), 2);
+
+    wp_send_json_success(array(
+        'deleted_files' => $deleted_files,
+        'freed_mb'      => $freed_mb,
+        'message'       => sprintf('Đã dọn dẹp sạch sẽ ổ đĩa đệm! Xóa %d file tạm, giải phóng %s MB và làm sạch bộ nhớ đệm cache hệ thống.', $deleted_files, $freed_mb)
+    ));
+}
+
+// 3. AJAX: Dọn dẹp các kích thước thumbnail thừa tự sinh (Clean redundant thumbnails)
+add_action('wp_ajax_muop_admin_clean_unused_thumbnails', 'muop_ajax_admin_clean_unused_thumbnails_handler');
+function muop_ajax_admin_clean_unused_thumbnails_handler() {
+    if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng F5 tải lại trang!'));
+    }
+
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    if (!is_dir($base_dir)) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thư mục uploads!'));
+    }
+
+    $deleted_files = 0;
+    $freed_bytes = 0;
+
+    // Pattern nhận diện các file kích thước thừa tự sinh lớn: -1536x*.jpg, -2048x*.jpg, -768x*.jpg, -scaled.jpg
+    $pattern = '/-(1536x\d+|2048x\d+|768x\d+|scaled)\.(jpg|jpeg|png|webp)$/i';
+
+    $it = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($base_dir, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($it as $item) {
+        if ($item->isFile()) {
+            $filename = $item->getFilename();
+            if (preg_match($pattern, $filename)) {
+                $sz = $item->getSize();
+                if (@unlink($item->getPathname())) {
+                    $deleted_files++;
+                    $freed_bytes += $sz;
+                }
+            }
+        }
+    }
+
+    delete_transient('muop_storage_stats');
+    $freed_mb = round($freed_bytes / (1024 * 1024), 2);
+
+    wp_send_json_success(array(
+        'deleted_files' => $deleted_files,
+        'freed_mb'      => $freed_mb,
+        'message'       => sprintf('Đã dọn dẹp thành công %d file ảnh thumbnail thừa tự sinh, tiết kiệm %s MB dung lượng hosting!', $deleted_files, $freed_mb)
+    ));
+}
+
+// 4. AJAX: Tối ưu & Nén hình ảnh sang WebP (giảm 60-80% dung lượng)
+add_action('wp_ajax_muop_admin_optimize_images_webp', 'muop_ajax_admin_optimize_images_webp_handler');
+function muop_ajax_admin_optimize_images_webp_handler() {
+    if (!current_user_can('manage_options') && !muop_is_current_user_admin()) {
+        wp_send_json_error(array('message' => 'Bạn không có quyền thực hiện chức năng này!'));
+    }
+    if (!muop_verify_ajax_nonce('muop_ajax_nonce', 'nonce')) {
+        wp_send_json_error(array('message' => 'Phiên làm việc đã hết hạn. Vui lòng F5 tải lại trang!'));
+    }
+
+    if (!function_exists('imagewebp')) {
+        wp_send_json_error(array('message' => 'PHP trên máy chủ chưa kích hoạt thư viện GD WebP để nén ảnh trực tiếp!'));
+    }
+
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir'];
+    if (!is_dir($base_dir)) {
+        wp_send_json_error(array('message' => 'Không tìm thấy thư mục uploads!'));
+    }
+
+    @set_time_limit(300);
+
+    $converted_count = 0;
+    $freed_bytes = 0;
+    $max_per_batch = 50; // Xử lý theo lô để tránh quá tải
+
+    $it = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($base_dir, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($it as $item) {
+        if ($converted_count >= $max_per_batch) break;
+
+        if ($item->isFile()) {
+            $ext = strtolower($item->getExtension());
+            if (in_array($ext, array('jpg', 'jpeg', 'png'))) {
+                $path = $item->getPathname();
+                $orig_size = $item->getSize();
+                if ($orig_size < 10000) continue; // Bỏ qua file quá nhỏ
+
+                $webp_path = preg_replace('/\.(jpg|jpeg|png)$/i', '.webp', $path);
+                if (file_exists($webp_path)) continue; // Đã có bản webp
+
+                $img = null;
+                if ($ext === 'png') {
+                    $img = @imagecreatefrompng($path);
+                    if ($img) {
+                        imagepalettetotruecolor($img);
+                        imagealphablending($img, true);
+                        imagesavealpha($img, true);
+                    }
+                } else {
+                    $img = @imagecreatefromjpeg($path);
+                }
+
+                if ($img) {
+                    if (@imagewebp($img, $webp_path, 82)) {
+                        imagedestroy($img);
+                        $webp_size = filesize($webp_path);
+                        if ($webp_size < $orig_size) {
+                            $saved = $orig_size - $webp_size;
+                            $freed_bytes += $saved;
+                            $converted_count++;
+
+                            // Cập nhật đường dẫn trong database nếu file là ảnh đại diện của post
+                            $old_url = str_replace($base_dir, $upload_dir['baseurl'], $path);
+                            $new_url = str_replace($base_dir, $upload_dir['baseurl'], $webp_path);
+                            global $wpdb;
+                            $wpdb->query($wpdb->prepare(
+                                "UPDATE {$wpdb->postmeta} SET meta_value = %s WHERE meta_value = %s",
+                                $new_url,
+                                $old_url
+                            ));
+                            $wpdb->query($wpdb->prepare(
+                                "UPDATE {$wpdb->posts} SET guid = %s WHERE guid = %s",
+                                $new_url,
+                                $old_url
+                            ));
+                        } else {
+                            @unlink($webp_path);
+                        }
+                    } else {
+                        imagedestroy($img);
+                    }
+                }
+            }
+        }
+    }
+
+    delete_transient('muop_storage_stats');
+    $freed_mb = round($freed_bytes / (1024 * 1024), 2);
+
+    wp_send_json_success(array(
+        'converted_count' => $converted_count,
+        'freed_mb'        => $freed_mb,
+        'message'         => sprintf('Đã nén tối ưu %d hình ảnh sang chuẩn WebP, tiết kiệm được %s MB dung lượng!', $converted_count, $freed_mb)
+    ));
 }

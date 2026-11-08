@@ -1,0 +1,1545 @@
+<?php
+
+/**
+
+ * Taxonomy Template: Team Dịch
+
+ * Trang thông tin chi tiết Team Dịch: Nút yêu thích, Tổng lượt đọc, Ngày tham gia, Truyện được yêu thích nhất, Tất cả truyện
+
+ */
+
+if (!defined('ABSPATH')) exit;
+
+
+
+get_header();
+
+
+
+$queried_obj = get_queried_object();
+
+if ($queried_obj instanceof WP_Term && $queried_obj->taxonomy === 'team_dich') {
+
+    $team_term = $queried_obj;
+
+    $team_name = $team_term->name;
+
+    $team_slug = $team_term->slug;
+
+    $team_id   = $team_term->term_id;
+
+} else {
+
+    $team_slug = get_query_var('team_dich') ?: (isset($_GET['team_dich']) ? sanitize_text_field($_GET['team_dich']) : '');
+
+    $team_term = get_term_by('slug', $team_slug, 'team_dich');
+
+    if ($team_term) {
+
+        $team_name = $team_term->name;
+
+        $team_id   = $team_term->term_id;
+
+    } else {
+
+        $team_name = !empty($team_slug) ? ucwords(str_replace('-', ' ', $team_slug)) : 'Team Dịch';
+
+        $team_id   = 0;
+
+    }
+
+}
+
+
+
+// 1. Lấy tất cả truyện của Team để tính tổng view, truyện hot nhất, ngày tham gia
+
+$all_team_stories_args = array(
+
+    'post_type'      => 'truyen',
+
+    'posts_per_page' => -1,
+
+    'post_status'    => 'publish',
+
+);
+
+
+
+if ($team_term) {
+
+    $all_team_stories_args['tax_query'] = array(
+
+        array(
+
+            'taxonomy' => 'team_dich',
+
+            'field'    => 'term_id',
+
+            'terms'    => $team_id,
+
+        )
+
+    );
+
+} else {
+
+    $all_team_stories_args['meta_query'] = array(
+
+        array(
+
+            'key'     => '_truyen_team',
+
+            'value'   => $team_name,
+
+            'compare' => '='
+
+        )
+
+    );
+
+}
+
+
+
+$all_team_stories = get_posts($all_team_stories_args);
+
+$total_stories_count = count($all_team_stories);
+
+
+
+global $wpdb;
+
+
+
+$total_team_views = 0;
+
+$top_stories      = array();
+
+$earliest_time    = null;
+
+$first_author_id  = 0;
+
+
+
+foreach ($all_team_stories as $st) {
+
+    $v = (int) get_post_meta($st->ID, '_truyen_views', true);
+
+    $total_team_views += $v;
+
+
+
+    // Chỉ đưa vào danh sách truyện yêu thích nếu có từ 50 lượt view trở lên (dưới 50 view không xuất hiện)
+
+    if ($v >= 50) {
+
+        $st->story_views = $v;
+
+        $top_stories[]   = $st;
+
+    }
+
+
+
+    $p_time = strtotime($st->post_date);
+
+    if ($earliest_time === null || $p_time < $earliest_time) {
+
+        $earliest_time = $p_time;
+
+    }
+
+
+
+    if (!$first_author_id) {
+
+        $first_author_id = (int) $st->post_author;
+
+    }
+
+}
+
+
+
+// Sắp xếp giảm dần theo lượt view và lấy tối đa 5 truyện nhiều view nhất
+
+if (!empty($top_stories)) {
+
+    usort($top_stories, function($a, $b) {
+
+        return $b->story_views <=> $a->story_views;
+
+    });
+
+    $top_stories = array_slice($top_stories, 0, 5);
+
+}
+
+
+
+// Fallback: nếu team có ít hơn 2 truyện đạt mốc 50 view nhưng có từ 2 truyện trở lên, lấy top truyện có lượt xem cao nhất của team
+
+if (count($top_stories) < 2 && count($all_team_stories) >= 2) {
+
+    $fallback_stories = $all_team_stories;
+
+    foreach ($fallback_stories as $st) {
+
+        if (!isset($st->story_views)) {
+
+            $st->story_views = (int) get_post_meta($st->ID, '_truyen_views', true);
+
+        }
+
+    }
+
+    usort($fallback_stories, function($a, $b) {
+
+        return $b->story_views <=> $a->story_views;
+
+    });
+
+    $top_stories = array_slice($fallback_stories, 0, 5);
+
+}
+
+
+
+// Xác định ngày tham gia
+
+if ($first_author_id) {
+
+    $author_obj = get_userdata($first_author_id);
+
+    $joined_date = $author_obj ? date('d/m/Y', strtotime($author_obj->user_registered)) : ($earliest_time ? date('d/m/Y', $earliest_time) : date('d/m/Y'));
+
+} else {
+
+    $joined_date = $earliest_time ? date('d/m/Y', $earliest_time) : date('d/m/Y');
+
+}
+
+
+
+// Lượt yêu thích của Team
+
+$team_fav_count = $team_id > 0 ? (int) get_term_meta($team_id, '_team_favorite_count', true) : 0;
+
+if ($team_fav_count < 0) $team_fav_count = 0;
+
+
+
+// Trạng thái đã yêu thích & theo dõi của người dùng hiện tại
+
+$is_favorited = false;
+
+$is_following_team = false;
+
+if (is_user_logged_in() && $team_id > 0) {
+
+    $current_uid = get_current_user_id();
+
+    $user_fav_teams = get_user_meta($current_uid, '_muop_favorite_teams', true);
+
+    if (is_array($user_fav_teams) && in_array($team_id, $user_fav_teams)) {
+
+        $is_favorited = true;
+
+    }
+
+    $is_following_team = muop_is_user_following_team($current_uid, $team_id);
+
+}
+
+
+
+// 2. Query phân trang cho danh sách tất cả truyện của team
+
+$paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
+
+$query_args = array(
+
+    'post_type'      => 'truyen',
+
+    'posts_per_page' => 16,
+
+    'post_status'    => 'publish',
+
+    'paged'          => $paged
+
+);
+
+
+
+if ($team_term) {
+
+    $query_args['tax_query'] = array(
+
+        array(
+
+            'taxonomy' => 'team_dich',
+
+            'field'    => 'term_id',
+
+            'terms'    => $team_id,
+
+        )
+
+    );
+
+} else {
+
+    $query_args['meta_query'] = array(
+
+        array(
+
+            'key'     => '_truyen_team',
+
+            'value'   => $team_name,
+
+            'compare' => '='
+
+        )
+
+    );
+
+}
+
+
+
+$team_query = new WP_Query($query_args);
+
+$avatar_initial = !empty($team_name) ? mb_strtoupper(mb_substr($team_name, 0, 1, 'UTF-8'), 'UTF-8') : 'T';
+
+
+
+// Lấy Avatar và Bio của Team
+
+$team_avatar_url = $team_id > 0 ? get_term_meta($team_id, '_team_avatar', true) : '';
+
+$team_avatar_url = function_exists('muop_normalize_url') ? muop_normalize_url($team_avatar_url) : $team_avatar_url;
+
+$team_bio = '';
+
+if ($team_term) {
+
+    $team_bio = !empty($team_term->description) ? $team_term->description : get_term_meta($team_id, '_team_bio', true);
+
+}
+
+if (empty($team_bio)) {
+
+    $team_bio = 'Chào mừng bạn đến với trang tác phẩm của ' . $team_name . '. Chúc các bạn độc giả có những giây phút đọc truyện ngọt ngào và thư giãn nhất!';
+
+}
+
+
+
+// Quyền quản lý và chỉnh sửa Team Dịch: Chỉ chính tác giả/dịch giả của team đó hoặc Admin mới có quyền sửa trên frontend
+
+$can_edit_team = false;
+
+if (is_user_logged_in() && $team_id > 0) {
+
+    $current_uid = get_current_user_id();
+
+    $curr_user = wp_get_current_user();
+
+    $norm_team = mb_strtolower(trim($team_name), 'UTF-8');
+
+    if (muop_is_admin($current_uid)) {
+
+        if (strpos($norm_team, 'mướp đắng') !== false || strpos($norm_team, 'muop dang') !== false) {
+
+            $can_edit_team = true;
+
+        } else {
+
+            foreach ($all_team_stories as $st) {
+
+                if ((int)$st->post_author === $current_uid) {
+
+                    $can_edit_team = true;
+
+                    break;
+
+                }
+
+            }
+
+        }
+
+    } elseif (muop_user_is_translator($current_uid)) {
+
+        $norm_display = mb_strtolower(trim($curr_user->display_name), 'UTF-8');
+
+        if ($norm_team === $norm_display) {
+
+            $can_edit_team = true;
+
+        } else {
+
+            foreach ($all_team_stories as $st) {
+
+                if ((int)$st->post_author === $current_uid) {
+
+                    $can_edit_team = true;
+
+                    break;
+
+                }
+
+            }
+
+        }
+
+    }
+
+}
+
+?>
+
+
+
+<div class="container">
+
+    <div class="section-block">
+
+        <!-- BREADCRUMBS -->
+
+        <nav class="breadcrumbs">
+
+            <a href="<?php echo esc_url(home_url('/')); ?>"><i class="fa-solid fa-house"></i> Trang chủ</a>
+
+            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
+
+            <a href="<?php echo esc_url(home_url('/team-dich/')); ?>">Team Dịch</a>
+
+            <i class="fa-solid fa-angle-right" style="font-size: 11px;"></i>
+
+            <span style="color: var(--primary-green); font-weight: 600;" id="breadcrumbTeamName"><?php echo esc_html($team_name); ?></span>
+
+        </nav>
+
+
+
+        <!-- HERO HEADER: THÔNG TIN TEAM DỊCH -->
+
+        <div class="team-hero-card">
+
+            <div class="team-hero-top">
+                <div class="team-hero-main-row">
+                    <div class="team-avatar-wrap">
+
+                    <div class="team-avatar-circle" id="teamAvatarDisplay">
+
+                        <?php if (!empty($team_avatar_url)) : ?>
+
+                            <img src="<?php echo esc_url($team_avatar_url); ?>" alt="<?php echo esc_attr($team_name); ?>" class="team-avatar-img" id="teamAvatarImg" onerror="this.style.display='none'; var c=document.getElementById('teamAvatarChar'); if(c) c.style.display='block';" />
+
+                            <span id="teamAvatarChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
+
+                        <?php else : ?>
+
+                            <span id="teamAvatarChar"><?php echo esc_html($avatar_initial); ?></span>
+
+                            <img src="" alt="<?php echo esc_attr($team_name); ?>" class="team-avatar-img" id="teamAvatarImg" style="display: none;" />
+
+                        <?php endif; ?>
+
+
+
+                        <?php if ($can_edit_team) : ?>
+
+                            <button type="button" class="btn-change-team-avatar-badge" id="btnChangeTeamAvatarBadge" title="Thay đổi ảnh đại diện Team">
+
+                                <i class="fa-solid fa-camera"></i>
+
+                            </button>
+
+                        <?php endif; ?>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="team-hero-info">
+
+                    <div class="team-hero-title-row">
+
+                        <h1 class="team-hero-name" id="teamHeroNameDisplay"><?php echo esc_html($team_name); ?></h1>
+
+                        <?php if ($can_edit_team) : ?>
+
+                            <button type="button" class="btn-edit-team-inline" id="btnEditTeamNameInline" title="Chỉnh sửa tên team dịch">
+
+                                <i class="fa-solid fa-pen-to-square"></i>
+
+                            </button>
+
+                        <?php endif; ?>
+
+                    </div>
+
+
+
+                    <div class="team-hero-bio-row">
+
+                        <div class="team-hero-bio" id="teamHeroBioDisplay" data-raw-bio="<?php echo esc_attr($team_bio); ?>"><?php echo muop_format_team_bio($team_bio); ?></div>
+
+                        <?php if ($can_edit_team) : ?>
+
+                            <button type="button" class="btn-edit-team-inline" id="btnEditTeamBioInline" title="Chỉnh sửa lời giới thiệu team">
+
+                                <i class="fa-solid fa-pen-to-square"></i>
+
+                            </button>
+
+                        <?php endif; ?>
+
+                    </div>
+                </div>
+                </div>
+
+                <!-- NÚT CHỈNH SỬA & YÊU THÍCH / THEO DÕI TEAM -->
+                <div class="team-hero-action">
+
+                    <?php if ($can_edit_team) : ?>
+
+                        <button type="button" class="btn btn-secondary btn-edit-team-all" id="btnOpenEditTeamModal" title="Chỉnh sửa thông tin Team Dịch">
+
+                            <i class="fa-solid fa-gear"></i>
+
+                            <span>Chỉnh Sửa Team</span>
+
+                        </button>
+
+                    <?php endif; ?>
+
+
+
+                    <!-- NÚT DONATE TEAM -->
+
+                    <button type="button" class="btn btn-secondary btn-donate-team" id="btnOpenDonateTeamModal" data-team-id="<?php echo esc_attr($team_id); ?>" data-team-name="<?php echo esc_attr($team_name); ?>" data-author-id="<?php echo (int)$first_author_id; ?>" onclick="window.muopOpenDonateModal && window.muopOpenDonateModal(<?php echo esc_attr($team_id); ?>, '<?php echo esc_js($team_name); ?>', <?php echo (int)$first_author_id; ?>)" title="Donate cho Team <?php echo esc_attr($team_name); ?>">
+                        <span>Donate</span>
+                    </button>
+
+
+
+                    <button type="button" class="btn <?php echo $is_favorited ? 'btn-primary' : 'btn-secondary'; ?> btn-favorite-team" id="btnToggleFavoriteTeam" data-team-id="<?php echo esc_attr($team_id); ?>" data-team-name="<?php echo esc_attr($team_name); ?>">
+
+                        <i class="fa-<?php echo $is_favorited ? 'solid' : 'regular'; ?> fa-heart" id="favTeamHeartIcon"></i>
+
+                        <span id="favTeamBtnText"><?php echo $is_favorited ? 'Đã Yêu Thích Team' : 'Yêu Thích Team'; ?></span>
+
+                    </button>
+
+
+
+                    <button type="button" class="btn <?php echo $is_following_team ? 'btn-primary' : 'btn-secondary'; ?> btn-follow-team" id="btnToggleFollowTeam" data-team-id="<?php echo esc_attr($team_id); ?>" data-team-name="<?php echo esc_attr($team_name); ?>" title="<?php echo $is_following_team ? 'Đang theo dõi team dịch này (Bấm để hủy)' : 'Theo dõi team dịch để nhận thông báo truyện mới'; ?>">
+
+                        <i class="fa-<?php echo $is_following_team ? 'solid' : 'regular'; ?> fa-bell" id="followTeamBellIcon"></i>
+
+                        <span id="followTeamBtnText"><?php echo $is_following_team ? 'Đang Theo Dõi Team' : 'Theo Dõi Team'; ?></span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- 4 Ô THỐNG KÊ (KPI STATS) -->
+
+            <div class="team-stats-grid">
+
+                <div class="team-stat-item">
+
+                    <div class="team-stat-icon">
+
+                        <i class="fa-solid fa-eye"></i>
+
+                    </div>
+
+                    <div class="team-stat-text">
+
+                        <span class="team-stat-num"><?php echo number_format($total_team_views); ?></span>
+
+                        <span class="team-stat-label">Tổng Lượt Đọc</span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="team-stat-item">
+
+                    <div class="team-stat-icon">
+
+                        <i class="fa-solid fa-book-bookmark"></i>
+
+                    </div>
+
+                    <div class="team-stat-text">
+
+                        <span class="team-stat-num"><?php echo number_format($total_stories_count); ?></span>
+
+                        <span class="team-stat-label">Truyện Đã Đăng</span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="team-stat-item">
+
+                    <div class="team-stat-icon">
+
+                        <i class="fa-solid fa-calendar-check"></i>
+
+                    </div>
+
+                    <div class="team-stat-text">
+
+                        <span class="team-stat-num"><?php echo esc_html($joined_date); ?></span>
+
+                        <span class="team-stat-label">Ngày Tham Gia</span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="team-stat-item">
+
+                    <div class="team-stat-icon" style="color: #e91e63;">
+
+                        <i class="fa-solid fa-heart"></i>
+
+                    </div>
+
+                    <div class="team-stat-text">
+
+                        <span class="team-stat-num" id="teamFavCountDisplay"><?php echo number_format($team_fav_count); ?></span>
+
+                        <span class="team-stat-label">Lượt Yêu Thích</span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- SPOTLIGHT: TOP TRUYỆN ĐƯỢC YÊU THÍCH NHẤT (HÀNG NGANG CHUYỂN ĐỘNG TỰ ĐỘNG QUA LẠI) -->
+
+        <?php if (!empty($top_stories)) : ?>
+
+            <div class="team-spotlight-box" id="teamSpotlightBox" data-total-slides="<?php echo count($top_stories); ?>">
+
+                <div class="team-spotlight-header-row">
+
+                    <div class="team-spotlight-badge">
+
+                        <i class="fa-solid fa-crown" style="color: #f59e0b;"></i> <?php echo 'Truyện Được Yêu Thích Của Team'; ?>
+
+                    </div>
+
+                    <?php if (count($top_stories) > 1) : ?>
+
+                        <div class="team-spotlight-nav-btns">
+
+                            <button type="button" class="btn-spotlight-ctrl btn-spotlight-prev" id="btnSpotlightPrev" title="Truyện trước">
+
+                                <i class="fa-solid fa-chevron-left"></i>
+
+                            </button>
+
+                            <button type="button" class="btn-spotlight-ctrl btn-spotlight-next" id="btnSpotlightNext" title="Truyện tiếp theo">
+
+                                <i class="fa-solid fa-chevron-right"></i>
+
+                            </button>
+
+                        </div>
+
+                    <?php endif; ?>
+
+                </div>
+
+
+
+                <div class="team-spotlight-viewport" id="teamSpotlightViewport">
+
+                    <div class="team-spotlight-track" id="teamSpotlightTrack">
+
+                        <?php foreach ($top_stories as $rank_idx => $story_item) : 
+
+                            $item_id        = $story_item->ID;
+
+                            $item_thumb_url = get_the_post_thumbnail_url($item_id, 'muop-cover');
+
+                            if (!$item_thumb_url) {
+
+                                $item_thumb_url = MUOP_THEME_URI . '/assets/images/default-cover.svg';
+
+                            }
+
+                            $item_views     = (int) get_post_meta($item_id, '_truyen_views', true);
+
+                            $item_author    = get_post_meta($item_id, '_truyen_author_name', true) ?: 'Đang cập nhật';
+
+                            $item_status    = get_post_meta($item_id, '_truyen_status', true);
+
+                            $item_chaps     = muop_get_story_chapters($item_id, 'ASC');
+
+                            $item_chap_cnt  = count($item_chaps);
+
+                            $item_first_url = !empty($item_chaps) ? get_permalink($item_chaps[0]->ID) : get_permalink($item_id);
+
+                            $item_excerpt   = wp_strip_all_tags($story_item->post_content);
+
+                            if (mb_strlen($item_excerpt) > 160) {
+
+                                $item_excerpt = mb_substr($item_excerpt, 0, 160) . '...';
+
+                            }
+
+                            $rank_num = $rank_idx + 1;
+
+                        ?>
+
+                            <div class="team-spotlight-item spotlight-slide" data-slide-index="<?php echo $rank_idx; ?>">
+
+                                <?php if (count($top_stories) > 1) : ?>
+
+                                    <div class="spotlight-rank-badge rank-<?php echo $rank_num; ?>">
+
+                                        <?php if ($rank_num === 1) : ?>
+
+                                            <i class="fa-solid fa-crown"></i> Top 1
+
+                                        <?php elseif ($rank_num === 2) : ?>
+
+                                            <i class="fa-solid fa-medal"></i> Top 2
+
+                                        <?php elseif ($rank_num === 3) : ?>
+
+                                            <i class="fa-solid fa-medal"></i> Top 3
+
+                                        <?php else : ?>
+
+                                            Top <?php echo $rank_num; ?>
+
+                                        <?php endif; ?>
+
+                                    </div>
+
+                                <?php endif; ?>
+
+
+
+                                <div class="team-spotlight-content">
+
+                                    <a href="<?php echo esc_url(get_permalink($item_id)); ?>" class="team-spotlight-thumb">
+
+                                        <img src="<?php echo esc_url($item_thumb_url); ?>" alt="<?php echo esc_attr(get_the_title($item_id)); ?>" />
+
+                                    </a>
+
+                                    <div class="team-spotlight-details">
+
+                                        <h2 class="team-spotlight-title">
+
+                                            <a href="<?php echo esc_url(get_permalink($item_id)); ?>">
+
+                                                <?php echo esc_html(get_the_title($item_id)); ?>
+
+                                            </a>
+
+                                        </h2>
+
+                                        <div class="team-spotlight-meta">
+
+                                            <span><i class="fa-solid fa-pen-nib"></i> <?php echo esc_html($item_author); ?></span>
+
+                                            <span><i class="fa-solid fa-book-open"></i> <?php echo $item_chap_cnt; ?> Chương</span>
+
+                                            <?php if (function_exists('muop_can_see_story_views') ? muop_can_see_story_views($item_id) : true) : ?>
+
+                                                <span style="color: var(--primary-green); font-weight: 700;"><i class="fa-solid fa-eye"></i> <?php echo number_format($item_views); ?> lượt đọc</span>
+
+                                            <?php endif; ?>
+
+                                            <span class="badge <?php echo ($item_status === 'hoan_thanh') ? 'badge-full' : 'badge-green'; ?>">
+
+                                                <?php echo ($item_status === 'hoan_thanh') ? 'Hoàn thành' : 'Đang ra'; ?>
+
+                                            </span>
+
+                                        </div>
+
+                                        <p class="team-spotlight-desc">
+
+                                            <?php echo esc_html($item_excerpt); ?>
+
+                                        </p>
+
+                                        <div class="team-spotlight-actions">
+
+                                            <a href="<?php echo esc_url($item_first_url); ?>" class="btn btn-primary" style="padding: 7px 18px; font-size: 13.5px;">
+
+                                                <i class="fa-solid fa-book-reader"></i> Đọc Ngay
+
+                                            </a>
+
+                                            <a href="<?php echo esc_url(get_permalink($item_id)); ?>" class="btn btn-secondary" style="padding: 7px 16px; font-size: 13.5px;">
+
+                                                <i class="fa-solid fa-circle-info"></i> Chi Tiết Truyện
+
+                                            </a>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        <?php endforeach; ?>
+
+                    </div>
+
+                </div>
+
+
+
+                <?php if (count($top_stories) > 1) : ?>
+
+                    <div class="team-spotlight-dots" id="teamSpotlightDots">
+
+                        <?php for ($i = 0; $i < count($top_stories); $i++) : ?>
+
+                            <button type="button" class="spotlight-dot <?php echo ($i === 0) ? 'active' : ''; ?>" data-slide="<?php echo $i; ?>" aria-label="Slide <?php echo $i + 1; ?>"></button>
+
+                        <?php endfor; ?>
+
+                    </div>
+
+                <?php endif; ?>
+
+            </div>
+
+        <?php endif; ?>
+
+
+
+        <!-- DANH SÁCH TẤT CẢ TRUYỆN CỦA TEAM -->
+
+        <div class="section-header" style="margin-top: 32px;">
+
+            <h2 class="section-title">
+
+                <i class="fa-solid fa-book-bookmark"></i> Tất Cả Truyện Của Team (<?php echo $total_stories_count; ?>)
+
+            </h2>
+
+            <span style="font-size: 13.5px; color: var(--text-muted);">
+
+                Trang <?php echo $paged; ?> / <?php echo max(1, $team_query->max_num_pages); ?>
+
+            </span>
+
+        </div>
+
+
+
+        <div class="story-grid">
+
+            <?php
+
+            if ($team_query->have_posts()) :
+
+                while ($team_query->have_posts()) : $team_query->the_post();
+
+                    get_template_part('template-parts/story-card');
+
+                endwhile;
+
+            else :
+
+                echo '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">Team hiện chưa đăng truyện nào.</p>';
+
+            endif;
+
+            ?>
+
+        </div>
+
+
+
+        <!-- PHÂN TRANG -->
+
+        <?php if ($team_query->max_num_pages > 1) : ?>
+
+            <div class="pagination-wrapper">
+
+                <?php
+
+                echo paginate_links(array(
+
+                    'total'        => $team_query->max_num_pages,
+
+                    'current'      => $paged,
+
+                    'prev_text'    => '<i class="fa-solid fa-chevron-left"></i> Trước',
+
+                    'next_text'    => 'Sau <i class="fa-solid fa-chevron-right"></i>',
+
+                    'type'         => 'plain'
+
+                ));
+
+                wp_reset_postdata();
+
+                ?>
+
+            </div>
+
+        <?php endif; ?>
+
+    </div>
+
+</div>
+
+
+
+<?php if ($can_edit_team) : ?>
+
+<!-- 1. MODAL RIÊNG: THAY ĐỔI ẢNH ĐẠI DIỆN TEAM -->
+
+<div id="modalEditSingleTeamAvatar" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 480px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+
+        <div class="modal-header-top-box">
+
+            <div class="modal-title-stacked">
+
+                <span class="modal-action-label">
+
+                    <i class="fa-solid fa-camera"></i> Chỉnh Sửa
+
+                </span>
+
+                <h3 class="modal-story-title-sub">Thay Đổi Ảnh Đại Diện Team</h3>
+
+            </div>
+
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+
+                <i class="fa-solid fa-xmark"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+
+            <div id="editSingleAvatarAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+
+
+            <form id="formEditSingleTeamAvatar" enctype="multipart/form-data">
+
+                <input type="hidden" name="action" value="muop_update_team_info" />
+
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+
+                <input type="file" name="team_avatar_file" id="inputSingleAvatarFile" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+
+
+
+                <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+
+                    <div class="avatar-preview-circle" style="width: 76px; height: 76px; border-radius: 50%; border: 3px solid #ffffff; overflow: hidden; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 12px rgba(63, 117, 35, 0.3);">
+
+                        <?php if (!empty($team_avatar_url)) : ?>
+
+                            <img id="singleAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; var c=document.getElementById('singleAvatarPreviewChar'); if(c) c.style.display='block';" />
+
+                            <span id="singleAvatarPreviewChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
+
+                        <?php else : ?>
+
+                            <span id="singleAvatarPreviewChar"><?php echo esc_html($avatar_initial); ?></span>
+
+                            <img id="singleAvatarPreviewImg" src="" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+
+                        <?php endif; ?>
+
+                    </div>
+
+
+
+                    <div style="flex: 1; min-width: 0;">
+
+                        <button type="button" id="btnTriggerSingleAvatarUpload" class="btn btn-secondary" style="padding: 8px 14px; font-size: 13px; margin-bottom: 6px;">
+
+                            <i class="fa-solid fa-upload"></i> Tải ảnh từ thiết bị
+
+                        </button>
+
+                        <div id="singleAvatarFileName" style="font-size: 12px; color: var(--text-muted); word-break: break-all;">Chưa chọn tệp (Hỗ trợ JPG, PNG, WEBP)</div>
+
+                    </div>
+
+                </div>
+
+
+
+                <div style="margin-bottom: 18px;">
+
+                    <label for="inputSingleAvatarUrl" class="form-label" style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px;">Hoặc dán đường dẫn (URL) ảnh avatar online:</label>
+
+                    <input type="url" id="inputSingleAvatarUrl" name="team_avatar_url" class="form-input" style="height: 38px; font-size: 13px;" placeholder="https://example.com/avatar-team.jpg" value="<?php echo esc_attr($team_avatar_url); ?>" />
+
+                </div>
+
+
+
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+
+                    <button type="submit" id="btnSubmitSingleAvatar" class="btn btn-primary" style="padding: 8px 22px;">
+
+                        <i class="fa-solid fa-check"></i> Cập Nhật Ảnh
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- 2. MODAL RIÊNG: ĐỔI TÊN TEAM DỊCH -->
+
+<div id="modalEditSingleTeamName" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 480px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column;">
+
+        <div class="modal-header-top-box">
+
+            <div class="modal-title-stacked">
+
+                <span class="modal-action-label">
+
+                    <i class="fa-solid fa-pen-to-square"></i> Chỉnh Sửa
+
+                </span>
+
+                <h3 class="modal-story-title-sub">Đổi Tên Team Dịch</h3>
+
+            </div>
+
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+
+                <i class="fa-solid fa-xmark"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <div style="padding: 20px;">
+
+            <div id="editSingleNameAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+
+
+            <form id="formEditSingleTeamName">
+
+                <input type="hidden" name="action" value="muop_update_team_info" />
+
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+
+
+
+                <div class="form-group" style="margin-bottom: 14px;">
+
+                    <label class="form-label" for="inputSingleTeamName" style="font-weight: 700; margin-bottom: 6px; display: block;">Tên Team Dịch Mới (*)</label>
+
+                    <input type="text" id="inputSingleTeamName" name="team_name" class="form-input" style="height: 42px; font-size: 14px;" required value="<?php echo esc_attr($team_name); ?>" placeholder="Nhập tên team dịch mới..." />
+
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 0 0;">
+
+                        Lưu ý: Hệ thống sẽ tự động cập nhật tên team ở tất cả các tác phẩm của team.
+
+                    </p>
+
+                </div>
+
+
+
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+
+                    <button type="submit" id="btnSubmitSingleName" class="btn btn-primary" style="padding: 8px 22px;">
+
+                        <i class="fa-solid fa-check"></i> Cập Nhật Tên Team
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- 3. MODAL RIÊNG: ĐỔI LỜI GIỚI THIỆU (BIO) -->
+
+<div id="modalEditSingleTeamBio" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 500px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column;">
+
+        <div class="modal-header-top-box">
+
+            <div class="modal-title-stacked">
+
+                <span class="modal-action-label">
+
+                    <i class="fa-solid fa-align-left"></i> Chỉnh Sửa
+
+                </span>
+
+                <h3 class="modal-story-title-sub">Đổi Lời Giới Thiệu Team</h3>
+
+            </div>
+
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+
+                <i class="fa-solid fa-xmark"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <div style="padding: 20px;">
+
+            <div id="editSingleBioAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+
+
+            <form id="formEditSingleTeamBio">
+
+                <input type="hidden" name="action" value="muop_update_team_info" />
+
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+
+
+
+                <div class="form-group" style="margin-bottom: 14px;">
+
+                    <label class="form-label" for="inputSingleTeamBio" style="font-weight: 700; margin-bottom: 6px; display: block;">Lời Giới Thiệu / Bio Team</label>
+
+                    <textarea id="inputSingleTeamBio" name="team_bio" class="form-input" rows="4" style="font-size: 13.5px; line-height: 1.5; resize: vertical;" placeholder="Nhập lời chào mừng hoặc giới thiệu về team dịch..."><?php echo esc_textarea($team_bio); ?></textarea>
+
+                </div>
+
+
+
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+
+                    <button type="submit" id="btnSubmitSingleBio" class="btn btn-primary" style="padding: 8px 22px;">
+
+                        <i class="fa-solid fa-check"></i> Cập Nhật Lời Giới Thiệu
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- 4. MODAL CHUNG: QUẢN LÝ TẤT CẢ THÔNG TIN TEAM DỊCH -->
+
+<div id="modalEditTeamInfo" class="custom-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 16px;">
+
+    <div class="custom-modal-content" style="background: var(--bg-card); width: 100%; max-width: 560px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+
+        
+
+        <!-- Header -->
+
+        <div class="modal-header-top-box">
+
+            <div class="modal-title-stacked">
+
+                <span class="modal-action-label">
+
+                    <i class="fa-solid fa-gear"></i> Quản Lý Team Dịch
+
+                </span>
+
+                <h3 class="modal-story-title-sub">Chỉnh Sửa Thông Tin Team</h3>
+
+            </div>
+
+            <button type="button" class="btn-close-team-modal" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; padding: 4px;" title="Đóng">
+
+                <i class="fa-solid fa-xmark"></i>
+
+            </button>
+
+        </div>
+
+
+
+        <!-- Body -->
+
+        <div style="padding: 20px; overflow-y: auto; flex: 1;">
+
+            <div id="editTeamAlert" class="alert-box" style="display: none; margin-bottom: 14px;"></div>
+
+
+
+            <form id="formEditTeamInfo" enctype="multipart/form-data">
+
+                <input type="hidden" name="action" value="muop_update_team_info" />
+
+                <input type="hidden" name="team_id" value="<?php echo esc_attr($team_id); ?>" />
+
+                <input type="hidden" name="nonce" value="<?php echo wp_create_nonce('muop_ajax_nonce'); ?>" />
+
+                <input type="file" name="team_avatar_file" id="inputTeamAvatarFile" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+
+
+
+                <!-- PHẦN 1: ẢNH ĐẠI DIỆN TEAM -->
+
+                <div class="team-edit-section" style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border-light);">
+
+                    <label class="form-label" style="font-weight: 700; margin-bottom: 10px; display: block;">
+
+                        <i class="fa-solid fa-image"></i> Ảnh Đại Diện Team (Avatar)
+
+                    </label>
+
+                    <div style="display: flex; gap: 16px; align-items: center;">
+
+                        <div class="avatar-preview-circle" style="width: 88px; height: 88px; border-radius: 50%; border: 3px solid #ffffff; overflow: hidden; background: linear-gradient(135deg, var(--primary-green), var(--avocado-green)); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 14px rgba(63, 117, 35, 0.32);">
+
+                            <?php if (!empty($team_avatar_url)) : ?>
+
+                                <img id="teamModalAvatarPreviewImg" src="<?php echo esc_url($team_avatar_url); ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; var c=document.getElementById('teamModalAvatarPreviewChar'); if(c) c.style.display='block';" />
+
+                                <span id="teamModalAvatarPreviewChar" style="display: none;"><?php echo esc_html($avatar_initial); ?></span>
+
+                            <?php else : ?>
+
+                                <span id="teamModalAvatarPreviewChar"><?php echo esc_html($avatar_initial); ?></span>
+
+                                <img id="teamModalAvatarPreviewImg" src="" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+
+                            <?php endif; ?>
+
+                        </div>
+
+
+
+                        <div style="flex: 1; min-width: 0;">
+
+                            <button type="button" id="btnTriggerTeamAvatarUpload" class="btn btn-secondary" style="padding: 8px 14px; font-size: 13px; margin-bottom: 6px;">
+
+                                <i class="fa-solid fa-upload"></i> Tải ảnh từ thiết bị
+
+                            </button>
+
+                            <div id="teamAvatarFileName" style="font-size: 12px; color: var(--text-muted); word-break: break-all;">Chưa chọn tệp (Hỗ trợ JPG, PNG, WEBP)</div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div style="margin-top: 12px;">
+
+                        <label for="inputTeamAvatarUrl" class="form-label" style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px;">Hoặc dán đường dẫn (URL) ảnh avatar online:</label>
+
+                        <input type="url" id="inputTeamAvatarUrl" name="team_avatar_url" class="form-input" style="height: 38px; font-size: 13px;" placeholder="https://example.com/avatar-team.jpg" value="<?php echo esc_attr($team_avatar_url); ?>" />
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- PHẦN 2: TÊN TEAM DỊCH -->
+
+                <div class="team-edit-section" style="margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--border-light);">
+
+                    <label class="form-label" for="inputTeamName" style="font-weight: 700; margin-bottom: 6px; display: block;">
+
+                        <i class="fa-solid fa-users"></i> Tên Team Dịch (*)
+
+                    </label>
+
+                    <input type="text" id="inputTeamName" name="team_name" class="form-input" style="height: 40px; font-size: 14px;" required value="<?php echo esc_attr($team_name); ?>" placeholder="Nhập tên team dịch..." />
+
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 6px 0 0 0;">
+
+                        Lưu ý: Khi đổi tên team dịch, hệ thống sẽ tự động cập nhật tên team ở tất cả các tác phẩm của team.
+
+                    </p>
+
+                </div>
+
+
+
+                <!-- PHẦN 3: DÒNG GIỚI THIỆU (BIO) -->
+
+                <div class="team-edit-section" style="margin-bottom: 10px;">
+
+                    <label class="form-label" for="inputTeamBio" style="font-weight: 700; margin-bottom: 6px; display: block;">
+
+                        <i class="fa-solid fa-align-left"></i> Lời Giới Thiệu / Bio Team
+
+                    </label>
+
+                    <textarea id="inputTeamBio" name="team_bio" class="form-input" rows="3" style="font-size: 13.5px; line-height: 1.5; resize: vertical;" placeholder="Nhập lời chào mừng hoặc giới thiệu về team dịch..."><?php echo esc_textarea($team_bio); ?></textarea>
+
+                </div>
+
+
+
+                <!-- PHẦN 4: CẤU HÌNH NHẬN DONATE (MÃ VIETQR CÓ LOGO WEB) -->
+
+                <?php
+
+                $team_donate = function_exists('muop_get_team_donate_info') ? muop_get_team_donate_info($team_id) : array();
+
+                $banks_list = function_exists('muop_get_vietnam_banks_list') ? muop_get_vietnam_banks_list() : array();
+
+                $curr_bank = $team_donate['bank_code'] ?? '';
+
+                $curr_acc_num = $team_donate['account_number'] ?? '';
+
+                $curr_acc_name = $team_donate['account_name'] ?? '';
+
+                $curr_qr_url = (!empty($team_donate['has_donate']) && !empty($team_donate['qr_url'])) ? $team_donate['qr_url'] : '';
+
+                ?>
+
+                <div class="team-edit-section" style="margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--border-light);">
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+
+                        <label class="form-label" style="font-weight: 700; margin-bottom: 0; display: flex; align-items: center; gap: 6px; color: #b45309;">
+
+                            <i class="fa-solid fa-mug-hot"></i> Thông Tin Nhận Donate (Mã VietQR)
+
+                        </label>
+
+                        <button type="button" id="btnDeleteTeamQrCode" class="btn btn-outline btn-xs" style="<?php echo !empty($curr_qr_url) ? 'display: inline-flex;' : 'display: none;'; ?> color: #dc2626; border-color: #fca5a5; font-size: 11.5px; padding: 2px 8px;" title="Xóa mã QR donate">
+
+                            <i class="fa-solid fa-trash-can"></i> Xóa mã QR
+
+                        </button>
+
+                    </div>
+
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 12px 0; line-height: 1.45;">
+
+                        Khi độc giả bấm nút <strong>Donate</strong>, hệ thống sẽ hiện Popup mã QR để chuyển khoản. Mã QR sau khi tạo sẽ tự động được đóng dấu <strong>Logo web ở chính giữa tâm mã</strong>.
+
+                    </p>
+
+
+
+                    <!-- Preview mã QR hiện tại -->
+
+                    <div id="teamQrPreviewWrap" style="<?php echo !empty($curr_qr_url) ? 'display: flex;' : 'display: none;'; ?> align-items: center; gap: 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px;">
+
+                        <div style="width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background: #fff; border: 1px solid #fde68a; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+
+                            <img id="teamQrPreviewImg" src="<?php echo esc_url($curr_qr_url); ?>" alt="QR Preview" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;" />
+
+                        </div>
+
+                        <div style="flex: 1; font-size: 12px;">
+
+                            <div style="font-weight: 700; color: #92400e;" id="teamQrPreviewTextHolder"><?php echo esc_html($curr_acc_name); ?></div>
+
+                            <div style="color: #0284c7; font-weight: 600;" id="teamQrPreviewTextNum">STK: <?php echo esc_html($curr_acc_num); ?></div>
+
+                            <div style="color: #78350f;" id="teamQrPreviewTextBank"><?php echo esc_html($team_donate['bank_name'] ?? ''); ?></div>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+
+                        <div>
+
+                            <label class="form-label" for="inputDonateBank" style="font-size: 12.5px; font-weight: 600; margin-bottom: 4px; display: block;">
+
+                                Ngân hàng
+
+                            </label>
+
+                            <select id="inputDonateBank" name="donate_bank_code" class="form-input" style="height: 38px; font-size: 13px;">
+
+                                <option value="">-- Chọn ngân hàng --</option>
+
+                                <?php foreach ($banks_list as $code => $bank) : ?>
+
+                                    <option value="<?php echo esc_attr($code); ?>" <?php selected($curr_bank, $code); ?>>
+
+                                        <?php echo esc_html($bank['name']); ?> (<?php echo esc_html($code); ?>)
+
+                                    </option>
+
+                                <?php endforeach; ?>
+
+                            </select>
+
+                        </div>
+
+                        <div>
+
+                            <label class="form-label" for="inputDonateAccNum" style="font-size: 12.5px; font-weight: 600; margin-bottom: 4px; display: block;">
+
+                                Số tài khoản (STK)
+
+                            </label>
+
+                            <input type="text" id="inputDonateAccNum" name="donate_account_number" class="form-input" style="height: 38px; font-size: 13px;" value="<?php echo esc_attr($curr_acc_num); ?>" placeholder="VD: 0987654321..." />
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div style="margin-bottom: 10px;">
+
+                        <label class="form-label" for="inputDonateAccName" style="font-size: 12.5px; font-weight: 600; margin-bottom: 4px; display: block;">
+
+                            Tên chủ tài khoản (In hoa không dấu)
+
+                        </label>
+
+                        <input type="text" id="inputDonateAccName" name="donate_account_name" class="form-input" style="height: 38px; font-size: 13px; text-transform: uppercase;" value="<?php echo esc_attr($curr_acc_name); ?>" placeholder="VD: NGUYEN VAN A" />
+
+                    </div>
+
+
+
+                    <div>
+
+                        <label class="form-label" for="inputDonateQrFile" style="font-size: 12.5px; font-weight: 600; margin-bottom: 4px; display: block;">
+
+                            <i class="fa-solid fa-qrcode"></i> Tải ảnh mã QR riêng từ máy (Không bắt buộc):
+
+                        </label>
+
+                        <input type="file" id="inputDonateQrFile" name="donate_qr_file" class="form-input" accept="image/png, image/jpeg, image/webp" style="height: 38px; font-size: 12.5px; padding: 4px 8px;" />
+
+                        <p style="font-size: 11.5px; color: var(--text-muted); margin: 4px 0 0 0;">
+
+                            * Nếu không tải ảnh, hệ thống sẽ tự động tạo mã VietQR theo STK và Ngân hàng đã nhập, tự chèn logo web ở chính giữa.
+
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- Footer buttons -->
+
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border-light);">
+
+                    <button type="button" class="btn btn-secondary btn-close-team-modal">Hủy</button>
+
+                    <button type="submit" id="btnSubmitTeamInfo" class="btn btn-primary" style="padding: 8px 22px;">
+
+                        <i class="fa-solid fa-check"></i> Lưu Thay Đổi
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+<?php endif; ?>
+
+
+
+<?php
+
+// Include Modal Donate Ủng Hộ Team Dịch (Hình 5)
+$donate_modal_file = get_template_directory() . '/templates/modal-donate-team.php';
+if (file_exists($donate_modal_file)) {
+    include $donate_modal_file;
+}
+
+get_footer();
+

@@ -10140,6 +10140,8 @@ html[data-theme="dark"] .admin-db-footer-divider {
 .db-table-scroll-wrapper {
   position: relative !important;
   width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
   margin-bottom: 24px;
 }
 
@@ -10156,6 +10158,23 @@ html[data-theme="dark"] .admin-db-footer-divider {
   font-size: 13px;
   color: var(--text-muted);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .db-table-scroll-controller {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+  }
+  .db-table-scroll-btns {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+  }
 }
 
 .db-table-scroll-controller + .db-table-container {
